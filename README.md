@@ -5,7 +5,7 @@
 **Product Owner:** Javiera Gonzalez (Encargada Servicios Conectados, Volvo Chile SPA)
 
 ## 1. Vision General del Proyecto
-El Volvo Dashboard es una aplicacion de escritorio nativa de grado empresarial desarrollada en Python y PyQt6[cite: 4, 5]. 
+El Volvo Dashboard es una aplicacion de escritorio nativa de grado empresarial desarrollada en Python y PyQt6. 
 Su objetivo es centralizar, visualizar y automatizar la gestion de grandes volumenes de datos operativos, comerciales y financieros para 
 el area de Servicios Conectados de Volvo Chile SPA
 
