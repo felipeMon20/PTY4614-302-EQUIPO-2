@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volvo Dashboard App — Presentación Capstone</title>
+<style>
+  :root{
+    --azul-950:#0a1f3d;
+    --azul-800:#0d3b73;
+    --azul-600:#1257a1;
+    --azul-400:#3d7dc4;
+    --azul-200:#a9c6e8;
+    --azul-100:#e8f0fa;
+    --azul-050:#f4f8fd;
+    --gris-700:#2b3440;
+    --gris-500:#5b6470;
+    --gris-300:#c3cbd6;
+    --blanco:#ffffff;
+    --borde:#dbe4f0;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    height:100%;
+    width:100%;
+    overflow:hidden;
+    background:var(--blanco);
+    font-family:'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color:var(--gris-700);
+  }
+
+  /* ---------- SVG defs (iconos reutilizables) ---------- */
+  .icon-defs{ position:absolute; width:0; height:0; overflow:hidden; }
+
+  .deck{
+    position:relative;
+    height:100vh;
+    width:100vw;
+  }
+
+  .slide{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:6vh 8vw;
+    opacity:0;
+    visibility:hidden;
+    transform:translateX(24px);
+    transition:opacity .35s ease, transform .35s ease, visibility .35s;
+    background:var(--blanco);
+    overflow:hidden;
+  }
+
+  .slide.active{
+    opacity:1;
+    visibility:visible;
+    transform:translateX(0);
+  }
+
+  .brandbar{
+    position:absolute;
+    top:0; left:0; right:0;
+    height:6px;
+    background:var(--azul-600);
+    z-index:5;
+  }
+
+  /* ---------- Marca mínima (esquina, todas las diapositivas) ---------- */
+  .mini-brand{
+    position:fixed;
+    top:22px; left:6vw;
+    display:flex;
+    align-items:center;
+    gap:0.5rem;
+    z-index:15;
+    opacity:0.9;
+  }
+  .mini-brand svg{ width:20px; height:20px; }
+  .mini-brand span{
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:0.12em;
+    color:var(--azul-800);
+    text-transform:uppercase;
+  }
+
+  /* ---------- Animaciones ---------- */
+  @keyframes fadeUp{
+    0%{ opacity:0; transform:translateY(18px); }
+    100%{ opacity:1; transform:translateY(0); }
+  }
+  .reveal{ opacity:0; }
+  .slide.active .reveal{
+    animation:fadeUp .6s cubic-bezier(.16,.8,.3,1) both;
+  }
+  .d1{ animation-delay:.05s !important; }
+  .d2{ animation-delay:.15s !important; }
+  .d3{ animation-delay:.25s !important; }
+  .d4{ animation-delay:.35s !important; }
+  .d5{ animation-delay:.45s !important; }
+  .d6{ animation-delay:.55s !important; }
+
+  @keyframes chevronBounce{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(7px); }
+  }
+  @keyframes driveLoop{
+    0%{ transform:translateX(-18%); }
+    100%{ transform:translateX(118%); }
+  }
+  @keyframes softPulse{
+    0%,100%{ opacity:.5; }
+    50%{ opacity:1; }
+  }
+
+  /* ================= DIAPOSITIVA 1 — PORTADA ================= */
+  #slide-1{
+    padding:0 7vw;
+  }
+  .cover-grid{
+    display:grid;
+    grid-template-columns:1.05fr 0.95fr;
+    gap:5vw;
+    align-items:center;
+    width:100%;
+    max-width:1280px;
+    z-index:2;
+  }
+  .cover-left{ text-align:left; }
+  .cover-mark{
+    width:56px;
+    height:56px;
+    margin-bottom:2rem;
+  }
+  .cover-title{
+    font-size:clamp(2.3rem, 4.8vw, 3.9rem);
+    font-weight:700;
+    color:var(--azul-950);
+    letter-spacing:-0.01em;
+    line-height:1.06;
+  }
+  .cover-rule{
+    width:72px;
+    height:4px;
+    background:var(--azul-600);
+    margin:1.6rem 0;
+    border-radius:2px;
+  }
+  .cover-sub{
+    font-size:clamp(1.05rem, 1.8vw, 1.3rem);
+    color:var(--azul-600);
+    font-weight:600;
+    letter-spacing:0.02em;
+  }
+  .cover-desc{
+    margin-top:1.4rem;
+    font-size:clamp(1rem, 1.5vw, 1.2rem);
+    color:var(--gris-500);
+    max-width:520px;
+    line-height:1.55;
+  }
+  .cover-authors{
+    margin-top:2.6rem;
+    font-size:1rem;
+    color:var(--gris-700);
+    font-weight:600;
+    letter-spacing:0.03em;
+  }
+
+  /* Mock-up de la aplicación (decorativo, no son datos reales) */
+  .cover-right{ display:flex; justify-content:center; }
+  .mock-window{
+    width:100%;
+    max-width:400px;
+    border:1px solid var(--borde);
+    border-radius:12px;
+    overflow:hidden;
+    background:var(--blanco);
+  }
+  .mock-titlebar{
+    height:26px;
+    background:var(--azul-050);
+    border-bottom:1px solid var(--borde);
+    display:flex;
+    align-items:center;
+    gap:5px;
+    padding:0 10px;
+  }
+  .mock-dot{ width:7px; height:7px; border-radius:50%; background:var(--gris-300); }
+  .mock-body{ display:flex; height:260px; }
+  .mock-sidebar{
+    width:32%;
+    background:var(--azul-950);
+    padding:12px 10px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .mock-sidebar-brand{
+    font-size:0.6rem;
+    font-weight:700;
+    letter-spacing:0.14em;
+    color:var(--blanco);
+    margin-bottom:4px;
+  }
+  .mock-nav{ display:flex; flex-direction:column; gap:7px; }
+  .mock-nav-item{
+    display:flex; align-items:center; gap:6px;
+    font-size:0.52rem;
+    color:#b9cbe6;
+    font-weight:600;
+  }
+  .mock-nav-item.active{ color:var(--blanco); }
+  .mock-nav-dot{ width:5px; height:5px; border-radius:2px; background:var(--azul-400); flex-shrink:0; }
+  .mock-nav-item.active .mock-nav-dot{ background:var(--blanco); }
+
+  .mock-content{ flex:1; padding:12px; display:flex; flex-direction:column; gap:10px; }
+  .mock-searchbar{
+    height:18px;
+    border:1px solid var(--borde);
+    border-radius:5px;
+    background:var(--azul-050);
+  }
+  .mock-kpis{ display:flex; gap:6px; }
+  .mock-kpi{
+    flex:1;
+    border:1px solid var(--borde);
+    border-radius:6px;
+    padding:6px 7px;
+    border-top:3px solid var(--azul-400);
+  }
+  .mock-kpi:nth-child(2){ border-top-color:#2f9e6e; }
+  .mock-kpi:nth-child(3){ border-top-color:#c9a227; }
+  .mock-kpi-value{ width:60%; height:8px; border-radius:3px; background:var(--gris-300); margin-bottom:5px; }
+  .mock-kpi-label{ width:80%; height:5px; border-radius:2px; background:var(--azul-100); }
+
+  .mock-table{ flex:1; border:1px solid var(--borde); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .mock-row{ display:flex; gap:6px; }
+  .mock-cell{ height:6px; border-radius:2px; background:var(--azul-050); }
+  .mock-row.header .mock-cell{ background:var(--azul-100); height:7px; }
+  .mock-cell.w1{ width:18%; } .mock-cell.w2{ width:34%; } .mock-cell.w3{ width:22%; } .mock-cell.w4{ width:16%; }
+
+  /* Camión decorativo (franja inferior de toda la diapositiva) */
+  .road-strip{
+    position:absolute;
+    left:0; right:0; bottom:6vh;
+    height:60px;
+    overflow:hidden;
+    pointer-events:none;
+    z-index:1;
+  }
+  .road-line{
+    position:absolute; left:0; right:0; bottom:6px;
+    height:1px; background:var(--borde);
+  }
+  .truck-icon{
+    position:absolute;
+    bottom:6px;
+    width:120px; height:48px;
+    color:var(--azul-200);
+    animation:driveLoop 22s linear infinite;
+  }
+
+  /* ================= DIAPOSITIVA 2 — PROBLEMA ================= */
+  #slide-2{
+    justify-content:flex-start;
+    padding-top:8vh;
+  }
+  .slide-kicker{
+    font-size:0.92rem;
+    font-weight:700;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--azul-600);
+    margin-bottom:0.5rem;
+  }
+  .slide-title{
+    font-size:clamp(1.7rem, 3.2vw, 2.35rem);
+    font-weight:700;
+    color:var(--azul-950);
+    margin-bottom:1.8rem;
+    line-height:1.15;
+  }
+
+  .sources-row{
+    display:flex;
+    gap:1.2rem;
+    width:100%;
+    max-width:980px;
+    justify-content:center;
+  }
+  .cluster{
+    flex:1;
+    max-width:300px;
+    border:1px solid var(--borde);
+    border-radius:10px;
+    padding:1.1rem 1.2rem;
+    background:var(--azul-050);
+  }
+  .cluster-count{
+    font-size:1.9rem;
+    font-weight:700;
+    color:var(--azul-950);
+    line-height:1;
+  }
+  .cluster-label{
+    font-size:0.92rem;
+    font-weight:700;
+    color:var(--azul-800);
+    margin-top:0.3rem;
+  }
+  .cluster-sub{
+    font-size:0.78rem;
+    color:var(--gris-500);
+    margin-top:0.2rem;
+    line-height:1.3;
+  }
+  .cluster-icons{
+    display:flex;
+    gap:5px;
+    margin-top:0.7rem;
+    flex-wrap:wrap;
+  }
+  .cluster-icons svg{
+    width:16px; height:16px;
+    color:var(--azul-400);
+  }
+  .cluster.bi .cluster-icons svg{ color:#c9a227; }
+
+  .total-tag{
+    text-align:center;
+    font-size:0.82rem;
+    font-weight:700;
+    color:var(--azul-600);
+    letter-spacing:0.04em;
+    margin-top:0.8rem;
+  }
+
+  .funnel-arrow{
+    margin:0.6rem 0;
+    width:26px; height:26px;
+    color:var(--azul-400);
+    animation:chevronBounce 1.8s ease-in-out infinite;
+  }
+
+  .problem-core{
+    width:100%;
+    max-width:980px;
+    background:var(--azul-950);
+    border-radius:12px;
+    padding:1.5rem 1.8rem;
+  }
+  .problem-core h3{
+    font-size:0.95rem;
+    font-weight:700;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--azul-200);
+    margin-bottom:1rem;
+  }
+  .consequence-row{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:1rem;
+  }
+  .consequence-item{
+    display:flex;
+    align-items:flex-start;
+    gap:0.55rem;
+    font-size:0.95rem;
+    color:#e6edf8;
+    line-height:1.35;
+    font-weight:500;
+  }
+  .consequence-dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    background:var(--azul-400);
+    margin-top:0.5em;
+    flex-shrink:0;
+  }
+
+  .restriction-banner{
+    margin-top:1.6rem;
+    width:100%;
+    max-width:980px;
+    border-top:1px solid var(--borde);
+    padding-top:1.1rem;
+    display:flex;
+    align-items:baseline;
+    gap:0.6rem;
+    font-size:0.98rem;
+  }
+  .restriction-label{
+    font-weight:700;
+    color:var(--azul-950);
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    font-size:0.8rem;
+  }
+  .restriction-text{
+    color:var(--gris-500);
+  }
+
+  /* ================= DIAPOSITIVA 3 — OBJETIVO GENERAL ================= */
+  #slide-3{
+    text-align:center;
+    position:relative;
+  }
+  .quote-mark{
+    position:absolute;
+    width:120px; height:120px;
+    color:var(--azul-100);
+    top:8vh; left:50%;
+    transform:translateX(-50%);
+    z-index:0;
+  }
+  .objective-card{
+    background:var(--azul-050);
+    border:1px solid var(--borde);
+    border-left:6px solid var(--azul-600);
+    border-radius:14px;
+    padding:3.2rem 4vw;
+    max-width:900px;
+    position:relative;
+    z-index:1;
+  }
+  .objective-text{
+    font-size:clamp(1.5rem, 2.8vw, 2.15rem);
+    font-weight:600;
+    color:var(--azul-950);
+    line-height:1.4;
+  }
+
+  /* ================= DIAPOSITIVA 4 — OBJETIVOS ESPECÍFICOS ================= */
+  #slide-4{
+    justify-content:flex-start;
+    padding-top:8vh;
+  }
+  .obj-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1.3rem;
+    width:100%;
+    max-width:1040px;
+  }
+  .obj-block{
+    background:var(--blanco);
+    border:1px solid var(--borde);
+    border-radius:12px;
+    padding:1.7rem 1.8rem;
+    display:flex;
+    gap:1.1rem;
+    align-items:flex-start;
+    transition:border-color .2s;
+  }
+  .obj-num{
+    font-size:1.9rem;
+    font-weight:700;
+    color:var(--azul-400);
+    line-height:1;
+    flex-shrink:0;
+    min-width:3ch;
+  }
+  .obj-body h4{
+    font-size:1.12rem;
+    font-weight:700;
+    color:var(--azul-950);
+    margin-bottom:0.35rem;
+  }
+  .obj-body p{
+    font-size:0.96rem;
+    color:var(--gris-500);
+    line-height:1.45;
+  }
+
+  /* ================= NAVEGACIÓN ================= */
+  .nav-bar{
+    position:fixed;
+    bottom:0; left:0; right:0;
+    height:64px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:1.6rem;
+    background:var(--blanco);
+    border-top:1px solid var(--borde);
+    z-index:20;
+  }
+  .nav-btn{
+    width:38px; height:38px;
+    border-radius:50%;
+    border:1px solid var(--borde);
+    background:var(--blanco);
+    color:var(--azul-800);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .15s, border-color .15s;
+  }
+  .nav-btn:hover{ background:var(--azul-050); border-color:var(--azul-400); }
+  .nav-btn svg{ width:16px; height:16px; }
+
+  .nav-dots{ display:flex; gap:0.5rem; }
+  .nav-dot{
+    width:9px; height:9px;
+    border-radius:50%;
+    background:var(--borde);
+    border:none;
+    cursor:pointer;
+    padding:0;
+    transition:background .15s, transform .15s;
+  }
+  .nav-dot.active{ background:var(--azul-600); transform:scale(1.25); animation:softPulse 2.4s ease-in-out infinite; }
+
+  .nav-count{
+    font-size:0.85rem;
+    color:var(--gris-500);
+    font-variant-numeric:tabular-nums;
+    min-width:44px;
+    text-align:center;
+  }
+
+  @media (max-width:900px){
+    .cover-grid{ grid-template-columns:1fr; }
+    .cover-right{ display:none; }
+    .sources-row{ flex-direction:column; align-items:center; }
+    .cluster{ max-width:420px; width:100%; }
+    .consequence-row{ grid-template-columns:1fr 1fr; }
+    .obj-grid{ grid-template-columns:1fr; }
+    .mini-brand{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<svg class="icon-defs" aria-hidden="true">
+  <defs>
+    <symbol id="ic-sheet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+      <path d="M9 12h7M9 16h7M9 8h3"/>
+    </symbol>
+    <symbol id="ic-bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 20V11M12 20V4M19 20v-7"/>
+      <path d="M3 20h18"/>
+    </symbol>
+    <symbol id="ic-truck" viewBox="0 0 120 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 34V16h52v18"/>
+      <path d="M56 22h20l14 12v0h4v0"/>
+      <path d="M56 34h38"/>
+      <circle cx="24" cy="38" r="6"/>
+      <circle cx="84" cy="38" r="6"/>
+      <path d="M4 26h20"/>
+    </symbol>
+    <symbol id="ic-volvo" viewBox="0 0 64 64" fill="none">
+      <circle cx="28" cy="36" r="20" stroke="currentColor" stroke-width="3.4"/>
+      <path d="M28 16 L54 10" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M46 8 L56 9 L55 19" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <symbol id="ic-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 9l6 6 6-6"/>
+    </symbol>
+    <symbol id="ic-quote" viewBox="0 0 100 80" fill="currentColor">
+      <path d="M0 40 C0 15 18 0 40 0 L40 14 C24 14 14 24 14 40 L34 40 L34 80 L0 80 Z"/>
+      <path d="M58 40 C58 15 76 0 98 0 L98 14 C82 14 72 24 72 40 L92 40 L92 80 L58 80 Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="mini-brand">
+  <svg><use href="#ic-volvo"/></svg>
+  <span>Volvo Dashboard App</span>
+</div>
+
+<div class="deck">
+
+  <!-- ================= SLIDE 1 — PORTADA ================= -->
+  <section class="slide active" id="slide-1">
+    <div class="brandbar"></div>
+
+    <div class="road-strip">
+      <div class="road-line"></div>
+      <svg class="truck-icon"><use href="#ic-truck"/></svg>
+    </div>
+
+    <div class="cover-grid">
+      <div class="cover-left">
+        <svg class="cover-mark reveal d1" style="color:var(--azul-800)"><use href="#ic-volvo"/></svg>
+        <div class="cover-title reveal d2">Volvo Dashboard App</div>
+        <div class="cover-rule reveal d3"></div>
+        <div class="cover-sub reveal d3">Gerencia OCT · Servicios Conectados · Volvo Chile</div>
+        <div class="cover-desc reveal d4">Aplicación de escritorio para centralizar la gestión de la flota comercial.</div>
+        <div class="cover-authors reveal d5">Felipe Monsalve · Irma Beltrán</div>
+      </div>
+
+      <div class="cover-right reveal d4">
+        <div class="mock-window">
+          <div class="mock-titlebar">
+            <span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span>
+          </div>
+          <div class="mock-body">
+            <div class="mock-sidebar">
+              <div class="mock-sidebar-brand">VOLVO</div>
+              <div class="mock-nav">
+                <div class="mock-nav-item"><span class="mock-nav-dot"></span>Inicio</div>
+                <div class="mock-nav-item active"><span class="mock-nav-dot"></span>Clientes y Flota</div>
+                <div class="mock-nav-item"><span class="mock-nav-dot"></span>Comercial</div>
+                <div class="mock-nav-item"><span class="mock-nav-dot"></span>Operaciones</div>
+                <div class="mock-nav-item"><span class="mock-nav-dot"></span>Administración</div>
+              </div>
+            </div>
+            <div class="mock-content">
+              <div class="mock-searchbar"></div>
+              <div class="mock-kpis">
+                <div class="mock-kpi"><div class="mock-kpi-value"></div><div class="mock-kpi-label"></div></div>
+                <div class="mock-kpi"><div class="mock-kpi-value"></div><div class="mock-kpi-label"></div></div>
+                <div class="mock-kpi"><div class="mock-kpi-value"></div><div class="mock-kpi-label"></div></div>
+              </div>
+              <div class="mock-table">
+                <div class="mock-row header"><div class="mock-cell w1"></div><div class="mock-cell w2"></div><div class="mock-cell w3"></div><div class="mock-cell w4"></div></div>
+                <div class="mock-row"><div class="mock-cell w1"></div><div class="mock-cell w2"></div><div class="mock-cell w3"></div><div class="mock-cell w4"></div></div>
+                <div class="mock-row"><div class="mock-cell w1"></div><div class="mock-cell w2"></div><div class="mock-cell w3"></div><div class="mock-cell w4"></div></div>
+                <div class="mock-row"><div class="mock-cell w1"></div><div class="mock-cell w2"></div><div class="mock-cell w3"></div><div class="mock-cell w4"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 2 — PROBLEMA ================= -->
+  <section class="slide" id="slide-2">
+    <div class="brandbar"></div>
+    <div class="slide-kicker reveal d1">Planteamiento del problema</div>
+    <div class="slide-title reveal d1">Múltiples fuentes → trabajo manual → problemas</div>
+
+    <div class="sources-row reveal d2">
+      <div class="cluster">
+        <div class="cluster-count">6</div>
+        <div class="cluster-label">Excel operativos</div>
+        <div class="cluster-sub">Comercial, financiero, clientes y flota</div>
+        <div class="cluster-icons">
+          <svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg>
+          <svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg>
+        </div>
+      </div>
+      <div class="cluster">
+        <div class="cluster-count">4</div>
+        <div class="cluster-label">Excel de soporte interno</div>
+        <div class="cluster-sub">Trazabilidad, historial, correos y reportes</div>
+        <div class="cluster-icons">
+          <svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg><svg><use href="#ic-sheet"/></svg>
+        </div>
+      </div>
+      <div class="cluster bi">
+        <div class="cluster-count">2</div>
+        <div class="cluster-label">Power BI</div>
+        <div class="cluster-sub">Corporativo y propio</div>
+        <div class="cluster-icons">
+          <svg><use href="#ic-bi"/></svg><svg><use href="#ic-bi"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="total-tag reveal d3">12 fuentes distintas de información</div>
+
+    <svg class="funnel-arrow reveal d3"><use href="#ic-chevron"/></svg>
+
+    <div class="problem-core reveal d4">
+      <h3>Consecuencias</h3>
+      <div class="consequence-row">
+        <div class="consequence-item"><span class="consequence-dot"></span>Procesos manuales</div>
+        <div class="consequence-item"><span class="consequence-dot"></span>Duplicidad de información</div>
+        <div class="consequence-item"><span class="consequence-dot"></span>Errores humanos</div>
+        <div class="consequence-item"><span class="consequence-dot"></span>Pérdida de trazabilidad</div>
+      </div>
+    </div>
+
+    <div class="restriction-banner reveal d5">
+      <span class="restriction-label">Restricción</span>
+      <span class="restriction-text">No se permite el uso de una base de datos relacional tradicional (política de ciberseguridad corporativa).</span>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 3 — OBJETIVO GENERAL ================= -->
+  <section class="slide" id="slide-3">
+    <div class="brandbar"></div>
+    <svg class="quote-mark"><use href="#ic-quote"/></svg>
+    <div class="slide-kicker reveal d1" style="position:relative; z-index:1;">Objetivo general</div>
+    <div class="objective-card reveal d2">
+      <p class="objective-text">“Centralizar y automatizar, desde una aplicación de escritorio, la gestión de la información de la flota comercial, reduciendo la dependencia de múltiples planillas y procesos manuales, dentro de las restricciones de ciberseguridad de la empresa.”</p>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 4 — OBJETIVOS ESPECÍFICOS ================= -->
+  <section class="slide" id="slide-4">
+    <div class="brandbar"></div>
+    <div class="slide-kicker reveal d1">Objetivos específicos</div>
+    <div class="slide-title reveal d1">Cuatro focos del proyecto</div>
+
+    <div class="obj-grid">
+      <div class="obj-block reveal d2">
+        <div class="obj-num">01</div>
+        <div class="obj-body">
+          <h4>Centralizar</h4>
+          <p>Centralizar la información comercial, financiera y de contacto de la flota en una única aplicación.</p>
+        </div>
+      </div>
+      <div class="obj-block reveal d3">
+        <div class="obj-num">02</div>
+        <div class="obj-body">
+          <h4>Resguardar</h4>
+          <p>Resguardar la integridad de la información mediante mecanismos de respaldo y registro de cambios.</p>
+        </div>
+      </div>
+      <div class="obj-block reveal d4">
+        <div class="obj-num">03</div>
+        <div class="obj-body">
+          <h4>Automatizar</h4>
+          <p>Automatizar cálculos y procesos operativos recurrentes.</p>
+        </div>
+      </div>
+      <div class="obj-block reveal d5">
+        <div class="obj-num">04</div>
+        <div class="obj-body">
+          <h4>Facilitar</h4>
+          <p>Facilitar la búsqueda, el filtrado y la comunicación relacionada con clientes y flota.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ================= NAVEGACIÓN ================= -->
+<div class="nav-bar">
+  <button class="nav-btn" id="prevBtn" aria-label="Diapositiva anterior">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+
+  <div class="nav-dots" id="navDots"></div>
+
+  <span class="nav-count" id="navCount">1 / 4</span>
+
+  <button class="nav-btn" id="nextBtn" aria-label="Diapositiva siguiente">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var total = slides.length;
+  var current = 0;
+
+  var dotsContainer = document.getElementById('navDots');
+  var dots = [];
+  slides.forEach(function(_, i){
+    var b = document.createElement('button');
+    b.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    b.setAttribute('aria-label', 'Ir a diapositiva ' + (i + 1));
+    b.addEventListener('click', function(){ goTo(i); });
+    dotsContainer.appendChild(b);
+    dots.push(b);
+  });
+
+  var countEl = document.getElementById('navCount');
+  var prevBtn = document.getElementById('prevBtn');
+  var nextBtn = document.getElementById('nextBtn');
+
+  function render(){
+    slides.forEach(function(s, i){ s.classList.toggle('active', i === current); });
+    dots.forEach(function(d, i){ d.classList.toggle('active', i === current); });
+    countEl.textContent = (current + 1) + ' / ' + total;
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+  }
+
+  function goTo(i){
+    if (i < 0 || i >= total) return;
+    current = i;
+    render();
+  }
+
+  prevBtn.addEventListener('click', function(){ goTo(current - 1); });
+  nextBtn.addEventListener('click', function(){ goTo(current + 1); });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { goTo(current + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { goTo(current - 1); }
+    else if (e.key >= '1' && e.key <= '9') {
+      var idx = parseInt(e.key, 10) - 1;
+      if (idx < total) goTo(idx);
+    }
+  });
+
+  var touchStartX = null;
+  document.addEventListener('touchstart', function(e){ touchStartX = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if (touchStartX === null) return;
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) { dx < 0 ? goTo(current + 1) : goTo(current - 1); }
+    touchStartX = null;
+  }, {passive:true});
+
+  render();
+})();
+</script>
+
+</body>
+</html>
