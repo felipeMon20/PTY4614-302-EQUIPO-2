@@ -1,0 +1,228 @@
+/* =========================================================
+   GESTOR SSCC APP - GLOBAL STYLESHEET (BRAND THEME)
+========================================================= */
+
+/* --- Contenedores Principales --- */
+QMainWindow {
+    background-color: #F8FAFC; 
+}
+
+/* SIDEBAR: Fondo Azul Marino Corporativo */
+#sidebar {
+    background-color: #003057; 
+    border-right: none;
+}
+
+#header {
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #E5E7EB;
+    border-bottom-left-radius: 12px;
+}
+
+#main_content_area {
+    background-color: transparent;
+}
+
+/* --- Textos Globales --- */
+QLabel {
+    color: #1E293B;
+}
+
+QLabel#app_title {
+    font-size: 15px;
+    font-weight: bold;
+    color: #FFFFFF;
+}
+
+QLabel[class="title"] {
+    color: #1E293B;
+    border: none;
+    background: transparent;
+}
+
+QLabel[class="subtitle"] {
+    color: #475569;
+    border: none;
+    background: transparent;
+}
+
+/* --- Tarjetas y Contenedores (QFrame.card) --- */
+QFrame[class="card"] {
+    background-color: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+}
+
+/* --- Botones del Menú Lateral (Sidebar) --- */
+QPushButton.menu_button {
+    text-align: left;
+    padding: 9px 10px;
+    background-color: transparent;
+    color: #E5E7EB;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+QPushButton.menu_button:hover {
+    background-color: #0B4270; 
+    color: #FFFFFF;
+}
+
+QPushButton.menu_button:checked {
+    background-color: #2563EB; 
+    color: #FFFFFF; 
+    font-weight: bold;
+}
+
+/* --- Sistema Dinámico de Botones (Primary, Secondary, Success, Danger) --- */
+
+QPushButton[class="primary"] {
+    padding: 6px 14px;
+    background-color: #2563EB;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    border: none;
+}
+QPushButton[class="primary"]:hover { background-color: #1D4ED8; }
+QPushButton[class="primary"]:disabled { background-color: #94A3B8; }
+
+QPushButton[class="success"] {
+    padding: 6px 14px;
+    background-color: #10B981;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    border: none;
+}
+QPushButton[class="success"]:hover { background-color: #059669; }
+
+QPushButton[class="danger"] {
+    padding: 6px 14px;
+    background-color: #EF4444;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    border: none;
+}
+QPushButton[class="danger"]:hover { background-color: #B91C1C; }
+QPushButton[class="danger"]:disabled { background-color: #94A3B8; }
+
+QPushButton[class="secondary"] {
+    padding: 6px 14px;
+    background-color: #F8FAFC;
+    color: #475569;
+    font-weight: bold;
+    border-radius: 6px;
+    border: 1px solid #E5E7EB;
+}
+QPushButton[class="secondary"]:hover { background-color: #E2E8F0; }
+
+/* --- Entradas de Texto y Búsqueda --- */
+QLineEdit {
+    background-color: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #1E2937;
+    font-size: 13px;
+}
+QLineEdit:focus { border: 1px solid #2563EB; background-color: #FFFFFF; }
+
+QLineEdit[class="search_bar"] {
+    padding: 6px;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    background-color: #F9FAFB;
+    color: #1E293B;
+}
+QLineEdit[class="search_bar"]:focus { border: 1px solid #2563EB; }
+
+/* --- ComboBox (Listas Desplegables) --- */
+QComboBox[class="combo_box"] {
+    padding: 6px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    background-color: #FFFFFF;
+    color: #1E293B;
+    font-weight: bold;
+    combobox-popup: 0; 
+}
+QComboBox[class="combo_box"]:focus {
+    border: 1px solid #2563EB;
+}
+QComboBox[class="combo_box"] QAbstractItemView {
+    background-color: #FFFFFF;
+    selection-background-color: #E0F2FE;
+    selection-color: #0F172A;
+    color: #1E293B;
+    border: 1px solid #CBD5E1;
+    outline: none;
+}
+QComboBox[class="combo_box"] QAbstractItemView::item {
+    min-height: 28px;
+    padding-left: 8px;
+}
+/* --- Desplegable de cualquier ComboBox: lista corta con el estilo de la app --- */
+QComboBox { combobox-popup: 0; }
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    selection-background-color: #E0F2FE;
+    selection-color: #0F172A;
+    color: #1E293B;
+    border: 1px solid #CBD5E1;
+    outline: none;
+}
+QComboBox QAbstractItemView::item {
+    min-height: 28px;
+    padding-left: 8px;
+}
+
+
+/* Barras de desplazamiento delgadas, sin flechas (aplican a toda la app salvo donde un widget defina las suyas) */
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 8px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical {
+    background: #CBD5E1;
+    min-height: 30px;
+    border-radius: 3px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #A9B6C9;
+}
+QScrollBar:horizontal {
+    border: none;
+    background: transparent;
+    height: 8px;
+    margin: 2px;
+}
+QScrollBar::handle:horizontal {
+    background: #CBD5E1;
+    min-width: 30px;
+    border-radius: 3px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #A9B6C9;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    width: 0px;
+    height: 0px;
+    background: transparent;
+    border: none;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: transparent;
+}
+
+QToolTip {
+    background-color: #FFFFFF;
+    color: #1E293B;
+    border: 1px solid #C9D1E0;
+    padding: 4px 8px;
+}

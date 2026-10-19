@@ -1,0 +1,308 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
+  <diagram id="comunicacion-gestion-azure" name="Comunicación Gestión ↔ Azure">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1820" pageHeight="1210" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITULO -->
+        <mxCell id="titulo" value="&lt;b&gt;Empresa Demo Sistema de Gestión ↔ Plataforma Azure&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=30;fontColor=#0B2A4A;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="18" width="1000" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitulo" value="Cómo conviven los dos sistemas: un solo lugar para los datos (SharePoint), cada archivo con un único dueño y cero trabajo duplicado" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontColor=#64748B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="1300" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ① SISTEMA DE GESTION -->
+        <mxCell id="lane_app" value="① SISTEMA DE GESTIÓN · app de escritorio" style="swimlane;rounded=1;arcSize=4;startSize=40;fillColor=#1C3F6E;swimlaneFillColor=#F7FAFE;strokeColor=#1C3F6E;strokeWidth=2;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="110" width="420" height="710" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_gestion" value="" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#1C6BBA;strokeColor=#0B2A4A;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="95" y="162" width="36" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_gestion_txt" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;Equipo de gestión&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Ingresa, corrige y cruza los datos del negocio en el día a día." style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="148" y="160" width="290" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="app_box" value="&lt;b&gt;🖥️ Empresa Demo Sistema de Gestión&lt;/b&gt;" style="rounded=1;arcSize=5;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=12;spacingTop=6;fontSize=14;fontColor=#1C3F6E;fontFamily=Segoe UI;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="75" y="260" width="365" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="mod_comercial" value="Comercial" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#9DBFE3;fontSize=12;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="90" y="302" width="163" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="mod_provisiones" value="Provisiones" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#9DBFE3;fontSize=12;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="262" y="302" width="163" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="mod_operaciones" value="Operaciones" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#9DBFE3;fontSize=12;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="90" y="346" width="163" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="mod_contactos" value="Contactos y Correos" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#9DBFE3;fontSize=12;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="262" y="346" width="163" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="mod_instalaciones" value="Instalaciones" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#9DBFE3;fontSize=12;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="90" y="390" width="163" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="mod_historial" value="Historial de cambios" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#9DBFE3;fontSize=12;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="262" y="390" width="163" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="app_guardar" value="&lt;b&gt;💾 Guardar (Ctrl+S)&lt;/b&gt; · con respaldo y escritura segura" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#1C6BBA;strokeColor=#1C3F6E;fontSize=12;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="90" y="438" width="335" height="40" as="geometry" />
+        </mxCell>
+        <!-- dashboard.py como mini navegador -->
+        <mxCell id="app_dashboard" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="488" width="335" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="nav_barra" value="&lt;font color=&quot;#EF4444&quot;&gt;●&lt;/font&gt; &lt;font color=&quot;#F59E0B&quot;&gt;●&lt;/font&gt; &lt;font color=&quot;#22C55E&quot;&gt;●&lt;/font&gt;&amp;nbsp;&amp;nbsp; 🔒 https://… dashboard Azure" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FED7AA;strokeColor=#EA580C;align=left;spacingLeft=8;fontSize=11;fontColor=#7C2D12;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="90" y="488" width="335" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="nav_cuerpo" value="&lt;b&gt;📊 dashboard.py · navegador integrado&lt;/b&gt;&lt;br&gt;Muestra la página de Azure dentro de la app, sin abrir otro programa." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontColor=#7C2D12;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="98" y="514" width="319" height="62" as="geometry" />
+        </mxCell>
+
+        <mxCell id="onedrive" value="&lt;b&gt;☁️ Carpeta local sincronizada con OneDrive&lt;/b&gt;&lt;br&gt;La app guarda en el disco y OneDrive sube el cambio a SharePoint automáticamente." style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#E6F6F7;strokeColor=#0E7C86;strokeWidth=2;align=left;spacingLeft=10;spacingRight=8;fontSize=12;fontColor=#134E4A;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="75" y="615" width="365" height="62" as="geometry" />
+        </mxCell>
+
+        <mxCell id="contraparte" value="&lt;b&gt;🧩 APP la contraparte comercial&lt;/b&gt; &lt;i&gt;(sistema externo)&lt;/i&gt;&lt;br&gt;Mantiene el maestro RM. No es parte de ninguno de los dos sistemas." style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=2;dashed=1;align=left;spacingLeft=10;spacingRight=8;fontSize=12;fontColor=#334155;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="75" y="705" width="365" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ② SHAREPOINT -->
+        <mxCell id="lane_sp" value="② SHAREPOINT / ONEDRIVE · punto de encuentro (fuente única de datos)" style="swimlane;rounded=1;arcSize=4;startSize=40;fillColor=#0E7C86;swimlaneFillColor=#F4FBFB;strokeColor=#0E7C86;strokeWidth=2;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="560" y="110" width="620" height="710" as="geometry" />
+        </mxCell>
+
+        <!-- Grupo A -->
+        <mxCell id="grupo_a" value="&lt;b&gt;A · Datos del Sistema de Gestión&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;color:#475569&quot;&gt;✍️ Escribe: solo la app  ·  👁️ Azure: solo lectura&lt;/span&gt;" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#EEF4FB;strokeColor=#1C6BBA;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=14;spacingTop=6;fontSize=14;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="580" y="160" width="580" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="Base Comercial (RM_CONTRATOS.csv)" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="595" y="222" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="a1i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="604" y="231" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="Provisiones (provisionContratos)" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="875" y="222" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="a2i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="884" y="231" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="Instalaciones" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="595" y="276" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="a3i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="604" y="285" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="Contactos y Correos" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="875" y="276" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="a4i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="884" y="285" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" value="Historial de cambios (log)" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="595" y="330" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="a5i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="604" y="339" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" value="Casos de baja CM" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="875" y="330" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="a6i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="884" y="339" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a_nota" value="🔒 Aquí está la única versión real de los datos: nadie fuera de la app edita estos archivos." style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=2;fontColor=#1C3F6E;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="597" y="384" width="550" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- Grupo C (Azure) -->
+        <mxCell id="grupo_c" value="&lt;b&gt;C · Datos de la Plataforma Azure&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;color:#475569&quot;&gt;✍️ Escribe: solo Azure  ·  🚫 La app no los toca&lt;/span&gt;" style="rounded=1;arcSize=5;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#6D28D9;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=14;spacingTop=6;fontSize=14;fontColor=#4C1D95;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="580" y="455" width="580" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="Academia" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6D28D9;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="595" y="518" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c1i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="604" y="527" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="Otros archivos que edite Azure &lt;i&gt;(por definir)&lt;/i&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6D28D9;dashed=1;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="875" y="518" width="270" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c2i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="884" y="527" width="26" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- Grupo B (externos) -->
+        <mxCell id="grupo_b" value="&lt;b&gt;B · Entradas externas&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;color:#475569&quot;&gt;✍️ Escriben otros sistemas  ·  👁️ La app solo los lee para actualizarse&lt;/span&gt;" style="rounded=1;arcSize=5;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=14;spacingTop=6;fontSize=14;fontColor=#334155;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="580" y="620" width="580" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="&lt;b&gt;RM de la contraparte comercial&lt;/b&gt; (RM_REPORTE_CONECTADOS.xlsx)" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#64748B;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="595" y="680" width="270" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="b1i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="604" y="692" width="26" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="Reporte de Provisiones (SharePoint)" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#64748B;align=left;spacingLeft=42;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="875" y="680" width="270" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="b2i" value="X" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#1D6F42;strokeColor=none;fontSize=14;fontStyle=1;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="884" y="692" width="26" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ③ PLATAFORMA AZURE -->
+        <mxCell id="lane_azure" value="③ PLATAFORMA AZURE · página web" style="swimlane;rounded=1;arcSize=4;startSize=40;fillColor=#6D28D9;swimlaneFillColor=#FBF9FF;strokeColor=#6D28D9;strokeWidth=2;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="110" width="460" height="710" as="geometry" />
+        </mxCell>
+        <mxCell id="conector" value="&lt;b&gt;🔌 Conector de lectura&lt;/b&gt;&lt;br&gt;Toma los archivos desde SharePoint cada cierto tiempo.&lt;br&gt;&lt;i&gt;Tecnología a definir por el equipo Azure.&lt;/i&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#16A34A;strokeWidth=2;align=left;spacingLeft=10;spacingRight=8;fontSize=12;fontColor=#14532D;fontFamily=Segoe UI;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="170" width="420" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="web" value="&lt;b&gt;🌐 Dashboard web (HTML)&lt;/b&gt;" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6D28D9;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=12;spacingTop=6;fontSize=14;fontColor=#4C1D95;fontFamily=Segoe UI;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="290" width="420" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="kpi1" value="&lt;b&gt;&lt;font style=&quot;font-size:18px&quot;&gt;▲&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Flota activa" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#6CC3B5;strokeColor=none;fontSize=12;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1315" y="332" width="126" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="kpi2" value="&lt;b&gt;&lt;font style=&quot;font-size:18px&quot;&gt;●&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Contratos" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#6CC3B5;strokeColor=none;fontSize=12;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1447" y="332" width="126" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="kpi3" value="&lt;b&gt;&lt;font style=&quot;font-size:18px&quot;&gt;$&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Provisiones" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#6CC3B5;strokeColor=none;fontSize=12;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1579" y="332" width="126" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="grafico" value="📈 Gráficos y tendencias del negocio&lt;br&gt;&lt;span style=&quot;font-size:11px;color:#64748B&quot;&gt;Solo muestran los datos: no los modifican&lt;/span&gt;" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#EAF7F4;strokeColor=#6CC3B5;fontSize=12;fontColor=#134E4A;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1315" y="406" width="390" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="editar" value="&lt;b&gt;✏️ Formularios de edición&lt;/b&gt; · solo para archivos C" style="rounded=1;arcSize=20;whiteSpace=wrap;html=1;fillColor=#6D28D9;strokeColor=#4C1D95;fontSize=12;fontColor=#FFFFFF;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1315" y="530" width="390" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_gerencia" value="" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#6D28D9;strokeColor=#4C1D95;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1332" y="618" width="36" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_gerencia_txt" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;Gerencia y usuarios de negocio&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Ven cómo le va al negocio y toman decisiones." style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1385" y="616" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="azure_nota" value="♻️ &lt;b&gt;Sin trabajo duplicado:&lt;/b&gt; Azure no vuelve a calcular lo que ya hace la app; lee el resultado y lo muestra." style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EEFF;strokeColor=#C4B5FD;align=left;spacingLeft=10;spacingRight=8;fontSize=12;fontColor=#4C1D95;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="710" width="420" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- FLECHAS -->
+        <mxCell id="e_guardar" value="guarda" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1C6BBA;strokeWidth=3;endArrow=block;endFill=1;fontSize=12;fontStyle=1;fontColor=#1C3F6E;fontFamily=Segoe UI;labelBackgroundColor=#F7FAFE;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="app_box" target="onedrive">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sube" value="sube cambios&lt;br&gt;⏱️ t1 ≈ 3 s" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1C6BBA;strokeWidth=3;endArrow=block;endFill=1;fontSize=12;fontStyle=1;fontColor=#1C3F6E;fontFamily=Segoe UI;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.242;entryX=0;entryY=0.5;" edge="1" parent="1" source="onedrive" target="grupo_a">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="630" />
+              <mxPoint x="500" y="295" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_reporte" value="actualiza" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;fontColor=#334155;fontFamily=Segoe UI;labelBackgroundColor=#F1F5F9;exitX=1;exitY=0.8125;entryX=0.5;entryY=1;" edge="1" parent="1" source="contraparte" target="b1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="730" y="770" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_lee_rm" value="la app lee RM&lt;br&gt;(sincronización)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;dashed=1;dashPattern=8 4;endArrow=block;endFill=1;fontSize=11;fontColor=#334155;fontFamily=Segoe UI;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.726;" edge="1" parent="1" source="b1" target="onedrive">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="705" />
+              <mxPoint x="520" y="660" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_lectura" value="👁️ solo lectura&lt;br&gt;⏱️ t2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=3;dashed=1;dashPattern=8 4;endArrow=block;endFill=1;fontSize=12;fontStyle=1;fontColor=#14532D;fontFamily=Segoe UI;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.2037;entryX=0;entryY=0.5;" edge="1" parent="1" source="grupo_a" target="conector">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_muestra" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=3;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="conector" target="web">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_edita_c" value="✏️ lee y escribe&lt;br&gt;(solo C)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6D28D9;strokeWidth=3;startArrow=block;startFill=1;endArrow=block;endFill=1;fontSize=12;fontStyle=1;fontColor=#4C1D95;fontFamily=Segoe UI;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="editar" target="grupo_c">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1230" y="552" />
+              <mxPoint x="1230" y="525" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_consultan" value="consultan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6D28D9;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;fontColor=#4C1D95;fontFamily=Segoe UI;labelBackgroundColor=#FBF9FF;exitX=0.5;exitY=0;entryX=0.119;entryY=1;" edge="1" parent="1" source="actor_gerencia" target="web">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_enlace" value="🖥️ dashboard.py muestra la página de Azure dentro de la app (navegador integrado) · solo la visualiza, sin mezclar el código de los dos sistemas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#EA580C;strokeWidth=2;dashed=1;dashPattern=4 4;endArrow=block;endFill=1;fontSize=12;fontStyle=1;fontColor=#7C2D12;fontFamily=Segoe UI;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="app_dashboard" target="web">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="55" y="534" />
+              <mxPoint x="55" y="842" />
+              <mxPoint x="1765" y="842" />
+              <mxPoint x="1765" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- LEYENDA -->
+        <mxCell id="leyenda" value="&lt;b&gt;🧭 Cómo leer el diagrama&lt;/b&gt;" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;fontSize=15;fontColor=#0B2A4A;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="880" width="420" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="ley_e1" value="" style="html=1;strokeColor=#1C6BBA;strokeWidth=3;endArrow=block;endFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="935" as="sourcePoint" />
+            <mxPoint x="150" y="935" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ley_t1" value="La app escribe sus datos" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="165" y="922" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ley_e2" value="" style="html=1;strokeColor=#16A34A;strokeWidth=3;dashed=1;dashPattern=8 4;endArrow=block;endFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="980" as="sourcePoint" />
+            <mxPoint x="150" y="980" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ley_t2" value="Azure solo lee (no puede modificar)" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="165" y="967" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ley_e3" value="" style="html=1;strokeColor=#6D28D9;strokeWidth=3;startArrow=block;startFill=1;endArrow=block;endFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1025" as="sourcePoint" />
+            <mxPoint x="150" y="1025" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ley_t3" value="Azure edita solo sus propios archivos" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="165" y="1012" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ley_e4" value="" style="html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1070" as="sourcePoint" />
+            <mxPoint x="150" y="1070" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ley_t4" value="Sistemas externos (entradas)" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="165" y="1057" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ley_e5" value="" style="html=1;strokeColor=#EA580C;strokeWidth=2;dashed=1;dashPattern=4 4;endArrow=block;endFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1115" as="sourcePoint" />
+            <mxPoint x="150" y="1115" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ley_t5" value="Navegador integrado: la app muestra la web" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="165" y="1102" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ley_colores" value="Color = dueño del archivo:  &lt;font color=&quot;#1C6BBA&quot;&gt;&lt;b&gt;azul&lt;/b&gt;&lt;/font&gt; app · &lt;font color=&quot;#6D28D9&quot;&gt;&lt;b&gt;morado&lt;/b&gt;&lt;/font&gt; Azure · &lt;font color=&quot;#64748B&quot;&gt;&lt;b&gt;gris&lt;/b&gt;&lt;/font&gt; externos" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1140" width="390" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- REGLAS -->
+        <mxCell id="reglas" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;🤝 Reglas de convivencia entre los dos sistemas&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Un solo dueño por archivo.&lt;/b&gt; Los archivos A los escribe solo la app, los C solo Azure y los B sus sistemas de origen.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. Azure nunca edita los archivos A.&lt;/b&gt; Sobre ellos, el dashboard es de solo lectura (ideal: permiso de SharePoint de solo lectura para Azure).&lt;br&gt;&lt;br&gt;&lt;b&gt;3. La app nunca toca los archivos C.&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;4. Los cálculos del negocio viven en un solo lugar:&lt;/b&gt; la app. Azure muestra el resultado, no lo vuelve a construir.&lt;br&gt;&lt;br&gt;&lt;b&gt;5. Sistemas separados:&lt;/b&gt; se unen solo por SharePoint y por el navegador integrado de dashboard.py, que muestra la web de Azure sin compartir código ni datos.&lt;br&gt;&lt;br&gt;&lt;b&gt;6. Acuerdo de formato:&lt;/b&gt; si la app cambia el nombre de una hoja o columna, avisar antes al equipo Azure (el dashboard depende de ellos)." style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F4FBFB;strokeColor=#0E7C86;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=16;spacingRight=14;spacingTop=10;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="560" y="880" width="620" height="300" as="geometry" />
+        </mxCell>
+
+        <!-- TIEMPOS -->
+        <mxCell id="tiempos" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;⏱️ Tiempos a medir&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;t1 · App → SharePoint (medido)&lt;/b&gt;&lt;br&gt;Promedio &lt;b&gt;≈ 3,0 s&lt;/b&gt; en 5 pruebas: 3,24 · 3,24 · 3,32 · 3,10 · 1,92 s (mín 1,9 s · máx 3,3 s).&lt;br&gt;&lt;span style=&quot;font-size:11px;color:#64748B&quot;&gt;PruebasFM.csv (hoy RM_CONTRATOS.csv, 3,1 MB), medido el 29-09-2026. Desde que se guarda el archivo hasta que OneDrive lo marca como subido.&lt;/span&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;t2 · SharePoint → Dashboard&lt;/b&gt;&lt;br&gt;Cada cuánto el conector de Azure vuelve a leer los archivos (lo define el equipo Azure).&lt;br&gt;&lt;br&gt;&lt;b&gt;Retraso total ≈ 3 s + t2&lt;/b&gt;&lt;br&gt;Es lo que tarda un cambio en verse en el dashboard: el retraso real lo decide el conector de Azure, no OneDrive." style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#D97706;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=16;spacingRight=14;spacingTop=10;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="880" width="460" height="300" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

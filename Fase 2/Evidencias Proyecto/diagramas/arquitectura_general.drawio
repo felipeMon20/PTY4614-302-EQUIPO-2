@@ -1,0 +1,188 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
+  <diagram id="arquitectura-empresa-dashboard" name="Arquitectura General">
+    <mxGraphModel dx="1900" dy="1300" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1300" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITULO -->
+        <mxCell id="titulo" value="&lt;b&gt;Gestor SSCC&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=30;fontColor=#0B2A4A;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="18" width="600" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitulo" value="¿Cómo funciona la aplicación? · Vista general de su arquitectura, explicada en simple" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontColor=#64748B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="900" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ① USUARIOS -->
+        <mxCell id="usuarios" value="① ¿QUIÉN LA USA?" style="swimlane;rounded=1;arcSize=8;startSize=40;fillColor=#1C6BBA;swimlaneFillColor=#EEF4FB;strokeColor=#1C6BBA;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="110" width="240" height="710" as="geometry" />
+        </mxCell>
+        <mxCell id="actor" value="" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#1C6BBA;strokeColor=#0B2A4A;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="130" y="170" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_txt" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;Equipo de gestión de flota&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Personas que administran los camiones, clientes y contratos (Comercial, Operaciones y Finanzas)." style="text;html=1;align=center;verticalAlign=top;whiteSpace=wrap;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="55" y="280" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_pc" value="&lt;b&gt;💻 Desde su computador&lt;/b&gt;&lt;br&gt;Abre el programa como cualquier otra aplicación de Windows." style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="55" y="385" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_tareas" value="&lt;b&gt;🗂️ En el día a día:&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Busca un cliente o camión&lt;br&gt;&lt;br&gt;• Filtra y revisa estados&lt;br&gt;&lt;br&gt;• Edita un dato y presiona &lt;b&gt;Guardar&lt;/b&gt; (o Ctrl+S)&lt;br&gt;&lt;br&gt;• Envía correos a clientes&lt;br&gt;&lt;br&gt;• Revisa el historial de cambios&lt;br&gt;&lt;br&gt;• Genera el reporte mensual de instalaciones" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="55" y="480" width="210" height="325" as="geometry" />
+        </mxCell>
+
+        <!-- ② APLICACION -->
+        <mxCell id="app" value="② LA APLICACIÓN · Gestor SSCC (programa de escritorio)" style="swimlane;rounded=1;arcSize=4;startSize=40;fillColor=#1C3F6E;swimlaneFillColor=#FFFFFF;strokeColor=#1C3F6E;strokeWidth=2;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="320" y="110" width="900" height="710" as="geometry" />
+        </mxCell>
+
+        <!-- ③ Pantallas -->
+        <mxCell id="pantallas" value="③ CÓMO ESTÁ ORGANIZADA · Pantallas del menú lateral" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F5F9FE;strokeColor=#1C6BBA;dashed=1;align=left;verticalAlign=top;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#1C6BBA;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="340" y="158" width="860" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="p_inicio" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;🏠 Inicio&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Panel de indicadores de Power BI, visto directamente dentro de la aplicación." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E8F1FB;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="355" y="198" width="270" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="p_clientes" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;👥 Clientes y Flota&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Directorio de clientes con sus camiones, flotas y contactos. Desde aquí se da de alta un camión nuevo." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E8F1FB;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="635" y="198" width="270" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="p_comercial" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;📊 Comercial&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;El centro de todo: una fila por camión con su cliente, plan, estado y fechas de contrato. Desde aquí también se envían correos." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#DCEAFB;strokeColor=#1C3F6E;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="915" y="198" width="270" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="p_operaciones" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;⚙️ Operaciones&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Seguimiento de la conexión y entrega de cada camión (conectado, desconectado, activando, sin flota)." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E8F1FB;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="355" y="348" width="270" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="p_ingresos" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;💰 Ingresos y Conciliación&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Provisiones (parte financiera)&lt;br&gt;• Contratos de mantenimiento (CM)&lt;br&gt;• Facturación manual (solo consulta)" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E8F1FB;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="635" y="348" width="270" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="p_admin" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;🛡️ Administración&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Historial de cambios&lt;br&gt;• Configuración y respaldos&lt;br&gt;• Instalaciones (reporte mensual)&lt;br&gt;• Contactos, ejecutivos y clientes" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E8F1FB;strokeColor=#1C6BBA;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="915" y="348" width="270" height="135" as="geometry" />
+        </mxCell>
+
+        <!-- Motor interno -->
+        <mxCell id="motor" value="LO QUE HACE POR DENTRO · de forma automática, sin que la persona tenga que hacer nada" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F3FBF6;strokeColor=#2E9E5B;dashed=1;align=left;verticalAlign=top;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#2E7D4F;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="340" y="512" width="860" height="293" as="geometry" />
+        </mxCell>
+        <mxCell id="m_carga" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;⏳ Carga al abrir&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Mientras se ve la pantalla de bienvenida, lee las planillas y deja todo listo para usar." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EAF7EF;strokeColor=#2E9E5B;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="355" y="550" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="m_memoria" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;⚡ Trabaja en memoria&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Mantiene los datos abiertos para que buscar y filtrar sea instantáneo, sin reabrir los Excel." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EAF7EF;strokeColor=#2E9E5B;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="635" y="550" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="m_vigilante" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;👁️ Vigilante de cambios&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Si otra persona modifica una planilla por fuera de la app, lo detecta y avisa con una campana." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF4E0;strokeColor=#D97706;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="915" y="550" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="m_guardado" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;🛟 Guardado seguro&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Antes de guardar hace una copia de respaldo. Si algo falla, el archivo original no se toca." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EAF7EF;strokeColor=#2E9E5B;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="355" y="675" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="m_historial" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;📝 Todo queda anotado&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Cada cambio guardado se registra y se puede revisar después en la pantalla Historial." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EAF7EF;strokeColor=#2E9E5B;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="635" y="675" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="m_bloqueo" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;🔒 Protección de archivos&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Si una planilla está ocupada, la app se pausa con un aviso rojo hasta que vuelva a estar libre." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C0392B;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="915" y="675" width="270" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- ⑦ EXTERNOS -->
+        <mxCell id="externos" value="⑦ COMPONENTES EXTERNOS · no son parte de la app, pero se conecta con ellos" style="swimlane;rounded=1;arcSize=6;startSize=40;fillColor=#0F766E;swimlaneFillColor=#F2FBFA;strokeColor=#0F766E;fontColor=#FFFFFF;fontSize=14;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="110" width="620" height="360" as="geometry" />
+        </mxCell>
+        <mxCell id="x_powerbi" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;📈 Power BI&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Panel de indicadores que se ve en Inicio, reporte de Notas de Venta y base de clientes." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E6F6F4;strokeColor=#0F766E;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="160" width="290" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="x_sharepoint" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;☁️ SharePoint (web)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Se abre en el navegador para descargar los contratos de provisión nuevos." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E6F6F4;strokeColor=#0F766E;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="160" width="290" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="x_outlook" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;✉️ Outlook&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;La app prepara los correos a clientes y los envía con la cuenta de Outlook del computador." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E6F6F4;strokeColor=#0F766E;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="313" width="290" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="x_planillas" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;📄 Planillas externas&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Reporte mensual de contratos de mantenimiento (3PC) y maestro comercial (RM), que se importan a la app." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#E6F6F4;strokeColor=#0F766E;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="313" width="290" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ④ DATOS -->
+        <mxCell id="datos" value="④ ¿DÓNDE ESTÁN LOS DATOS?" style="swimlane;rounded=1;arcSize=6;startSize=40;fillColor=#D97706;swimlaneFillColor=#FFFBF3;strokeColor=#D97706;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="490" width="620" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="d_carpeta" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;Carpeta compartida de la empresa&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;i&gt;(SharePoint / OneDrive sincronizado en el PC)&lt;/i&gt;&lt;br&gt;&lt;br&gt;&lt;div style=&quot;text-align:left&quot;&gt;Planillas Excel que son la fuente oficial:&lt;br&gt;• Registro Maestro RM_CONTRATOS (flota y clientes)&lt;br&gt;• Provisiones&lt;br&gt;• Contactos, correos y ejecutivos&lt;br&gt;• Instalaciones&lt;br&gt;• Facturación manual&lt;br&gt;• Historial de cambios y casos CM&lt;/div&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=18;fillColor=#FFF4E0;strokeColor=#D97706;strokeWidth=2;fontSize=12;fontColor=#1E293B;verticalAlign=top;spacingTop=4;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="540" width="340" height="285" as="geometry" />
+        </mxCell>
+        <mxCell id="d_respaldos" value="&lt;b&gt;&lt;font style=&quot;font-size:14px&quot;&gt;💾 Copias de seguridad&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;i&gt;(en el propio computador)&lt;/i&gt;&lt;br&gt;&lt;br&gt;• Antes de cada guardado&lt;br&gt;• Automática los viernes&lt;br&gt;• Manual, cuando se quiera&lt;br&gt;&lt;br&gt;Se restauran desde Configuración." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;dashed=1;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=6;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1630" y="540" width="235" height="265" as="geometry" />
+        </mxCell>
+
+        <!-- ⑤ SINCRONIZACION -->
+        <mxCell id="sync" value="⑤ ¿CÓMO SE SINCRONIZA Y ACTUALIZA LA INFORMACIÓN?" style="swimlane;rounded=1;arcSize=4;startSize=40;fillColor=#6D28D9;swimlaneFillColor=#FAF7FF;strokeColor=#6D28D9;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="850" width="1180" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;1 · Al abrir&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;La app lee las planillas de la carpeta compartida y muestra siempre la información más reciente." style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F1EAFE;strokeColor=#6D28D9;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=8;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="55" y="900" width="215" height="285" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;2 · Al guardar&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;① Hace un respaldo&lt;br&gt;② Guarda en la planilla compartida&lt;br&gt;③ Lo anota en el Historial&lt;br&gt;④ La pantalla se actualiza al instante&lt;br&gt;&lt;br&gt;Así todo el equipo trabaja sobre el mismo dato." style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F1EAFE;strokeColor=#6D28D9;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=8;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="287" y="900" width="215" height="285" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;3 · Si otro cambia algo&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;El vigilante lo detecta y muestra un aviso.&lt;br&gt;&lt;br&gt;La persona decide si recargar. Si tiene cambios sin guardar, primero elige guardarlos o descartarlos." style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F1EAFE;strokeColor=#6D28D9;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=8;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="519" y="900" width="215" height="285" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;4 · Entre pantallas&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Guardar en Provisiones actualiza datos del camión en Comercial.&lt;br&gt;&lt;br&gt;• Contratos CM se cruza con cada camión.&lt;br&gt;&lt;br&gt;• Contactos alimenta a Correos e Instalaciones." style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F1EAFE;strokeColor=#6D28D9;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=8;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="751" y="900" width="215" height="285" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" value="&lt;b&gt;&lt;font style=&quot;font-size:15px&quot;&gt;5 · Procesos periódicos&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;• &lt;b&gt;Mensual:&lt;/b&gt; importar contratos CM (3PC) y armar el reporte de Instalaciones.&lt;br&gt;&lt;br&gt;• &lt;b&gt;Cuando se necesite:&lt;/b&gt; traer provisiones desde SharePoint.&lt;br&gt;&lt;br&gt;• &lt;b&gt;Viernes:&lt;/b&gt; respaldo automático completo." style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F1EAFE;strokeColor=#6D28D9;align=left;verticalAlign=top;spacingLeft=10;spacingRight=8;spacingTop=8;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="983" y="900" width="220" height="285" as="geometry" />
+        </mxCell>
+
+        <!-- ⑥ TECNOLOGIAS -->
+        <mxCell id="tec" value="⑥ TECNOLOGÍAS QUE INTERVIENEN" style="swimlane;rounded=1;arcSize=6;startSize=40;fillColor=#475569;swimlaneFillColor=#F8FAFC;strokeColor=#475569;fontColor=#FFFFFF;fontSize=15;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="850" width="620" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="&lt;b&gt;Windows&lt;/b&gt; · el computador donde funciona" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="898" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="&lt;b&gt;Python&lt;/b&gt; · el lenguaje en que está hecha" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="898" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="&lt;b&gt;PyQt6&lt;/b&gt; · dibuja las ventanas y botones" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="956" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" value="&lt;b&gt;pandas&lt;/b&gt; · ordena, cruza y filtra las tablas" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="956" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t5" value="&lt;b&gt;Microsoft Excel&lt;/b&gt; · donde viven los datos" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="1014" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t6" value="&lt;b&gt;SharePoint / OneDrive&lt;/b&gt; · comparte los archivos" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="1014" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t7" value="&lt;b&gt;Power BI&lt;/b&gt; · indicadores y reportes" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="1072" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t8" value="&lt;b&gt;Outlook&lt;/b&gt; · envío de correos" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="1072" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t9" value="&lt;b&gt;Watchdog&lt;/b&gt; · el “vigilante” de archivos" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="1130" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t10" value="&lt;b&gt;Programa .exe&lt;/b&gt; · se instala listo para abrir" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;align=left;spacingLeft=12;fontSize=12;fontColor=#1E293B;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="1575" y="1130" width="290" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- FLECHAS -->
+        <mxCell id="e_usa" value="usa" style="endArrow=block;endFill=1;html=1;strokeColor=#1C6BBA;strokeWidth=3;fontSize=12;fontStyle=1;fontColor=#1C6BBA;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.307;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="usuarios" target="pantallas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_conecta" value="se conecta" style="endArrow=block;endFill=1;startArrow=block;startFill=1;html=1;strokeColor=#0F766E;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;fontColor=#0F766E;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.388;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pantallas" target="externos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_avisa" value="avisa" style="endArrow=block;endFill=1;html=1;strokeColor=#D97706;strokeWidth=2;dashed=1;fontSize=11;fontStyle=1;fontColor=#D97706;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.342;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="datos" target="m_vigilante">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_guarda" value="lee y&lt;br&gt;guarda" style="endArrow=block;endFill=1;startArrow=block;startFill=1;html=1;strokeColor=#2E9E5B;strokeWidth=3;fontSize=11;fontStyle=1;fontColor=#2E7D4F;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.744;exitDx=0;exitDy=0;entryX=0;entryY=0.727;entryDx=0;entryDy=0;" edge="1" parent="1" source="motor" target="datos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- LEYENDA -->
+        <mxCell id="leyenda" value="&lt;b&gt;Cómo leer las flechas:&lt;/b&gt;   &lt;font color=&quot;#1C6BBA&quot;&gt;━━ azul&lt;/font&gt; la persona usa las pantallas   ·   &lt;font color=&quot;#2E9E5B&quot;&gt;━━ verde&lt;/font&gt; la app lee y guarda en las planillas   ·   &lt;font color=&quot;#D97706&quot;&gt;┅┅ naranja&lt;/font&gt; aviso cuando alguien cambia un archivo por fuera   ·   &lt;font color=&quot;#0F766E&quot;&gt;┅┅ verde azulado&lt;/font&gt; conexión con servicios externos" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontColor=#475569;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1215" width="1840" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

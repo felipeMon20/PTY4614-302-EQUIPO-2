@@ -1,0 +1,69 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="alcance-web" name="Página Web - Alcance">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="1000" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Título -->
+        <mxCell id="titulo" value="&lt;b&gt;Página Web — Estado del alcance&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px&quot; color=&quot;#5F6B7A&quot;&gt;Funcionalidades implementadas y pendientes&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=24;fontColor=#1B365D;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="900" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Caja: Lo que contiene -->
+        <mxCell id="contiene" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F4FBF6;strokeColor=#2E8B57;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="110" width="620" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="contiene_header" value="&lt;b&gt;✔ Lo que contiene&lt;/b&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#2E8B57;strokeColor=none;fontColor=#FFFFFF;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="60" y="110" width="620" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="contiene_items" value="&lt;div style=&quot;line-height:1.9&quot;&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Búsqueda general&lt;br&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Impresión de reporte por unidad&lt;br&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Dashboard de ejemplos&lt;br&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Reporte de unidades: &lt;i&gt;a punto de vencer&lt;/i&gt; | &lt;i&gt;sin contrato&lt;/i&gt; | &lt;i&gt;confiables&lt;/i&gt;&lt;br&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Gráfico por modelo según su &lt;b&gt;estado comercial&lt;/b&gt;&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;font color=&quot;#5F6B7A&quot;&gt;(filtrable por cantidad o proporción)&lt;/font&gt;&lt;br&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Datos generales de la Academia&lt;br&gt;&lt;span style=&quot;color:#2E8B57&quot;&gt;&lt;b&gt;✔&lt;/b&gt;&lt;/span&gt;&amp;nbsp; Comparación: cliente con contrato de &lt;b&gt;Telemetría&lt;/b&gt;&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; ¿tiene o no una &lt;b&gt;capacitación&lt;/b&gt;?&lt;/div&gt;" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=15;fontColor=#1F2933;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="85" y="180" width="580" height="360" as="geometry" />
+        </mxCell>
+
+        <!-- Caja: Lo que faltaría -->
+        <mxCell id="falta" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFF8EE;strokeColor=#E07B00;strokeWidth=2;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="720" y="110" width="520" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="falta_header" value="&lt;b&gt;⏳ Lo que faltaría&lt;/b&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#E07B00;strokeColor=none;fontColor=#FFFFFF;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="720" y="110" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="falta_1" value="&lt;b&gt;&lt;font color=&quot;#E07B00&quot;&gt;💡 Idea — Metas en el Dashboard&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Colocar una &lt;b&gt;meta&lt;/b&gt; en el dashboard, ya sea para &lt;b&gt;Telemetría&lt;/b&gt; o para la &lt;b&gt;Academia&lt;/b&gt;, y mostrar el avance respecto a ella." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F2B266;align=left;verticalAlign=top;spacing=14;fontSize=14;fontColor=#1F2933;" vertex="1" parent="1">
+          <mxGeometry x="750" y="190" width="460" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="falta_2" value="&lt;b&gt;&lt;font color=&quot;#E07B00&quot;&gt;🔍 Comparación inversa&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;Identificar clientes que tienen una &lt;b&gt;capacitación&lt;/b&gt; pero &lt;b&gt;no tienen Telemetría&lt;/b&gt; contratada." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F2B266;align=left;verticalAlign=top;spacing=14;fontSize=14;fontColor=#1F2933;" vertex="1" parent="1">
+          <mxGeometry x="750" y="360" width="460" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- Caja: Comunicación App ↔ Web -->
+        <mxCell id="com" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F2F6FB;strokeColor=#1B365D;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="590" width="1180" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="com_header" value="&lt;b&gt;🔄 Comunicación entre la App y la Página Web&lt;/b&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#1B365D;strokeColor=none;fontColor=#FFFFFF;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="60" y="590" width="1180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="app" value="&lt;b&gt;🖥️ App de Escritorio&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px&quot; color=&quot;#5F6B7A&quot;&gt;Gestor SSCC (PyQt6)&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#DCE8F5;strokeColor=#1B365D;strokeWidth=2;fontSize=16;fontColor=#1B365D;" vertex="1" parent="1">
+          <mxGeometry x="110" y="700" width="260" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="archivos" value="&lt;b&gt;📊 Archivos compartidos&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px&quot; color=&quot;#5F6B7A&quot;&gt;Excel de datos&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=22;fillColor=#E6F4EA;strokeColor=#2E8B57;strokeWidth=2;fontSize=16;fontColor=#1F5E3A;" vertex="1" parent="1">
+          <mxGeometry x="520" y="690" width="260" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="web" value="&lt;b&gt;🌐 Página Web&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px&quot; color=&quot;#5F6B7A&quot;&gt;Reportes y dashboards&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#DCE8F5;strokeColor=#1B365D;strokeWidth=2;fontSize=16;fontColor=#1B365D;" vertex="1" parent="1">
+          <mxGeometry x="930" y="700" width="260" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="Lee / escribe" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#1B365D;strokeWidth=2;fontSize=12;fontColor=#1B365D;labelBackgroundColor=#F2F6FB;" edge="1" parent="1" source="app" target="archivos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="Lee" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#1B365D;strokeWidth=2;fontSize=12;fontColor=#1B365D;labelBackgroundColor=#F2F6FB;" edge="1" parent="1" source="archivos" target="web">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="com_nota" value="La App y la Página Web &lt;b&gt;no se conectan directamente&lt;/b&gt;: ambas trabajan sobre los mismos archivos, que actúan como fuente de datos común." style="text;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;fontSize=13;fontColor=#5F6B7A;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="210" y="850" width="880" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
