@@ -18,6 +18,7 @@ data/
 datos_demo/
 Respaldo*/
 *_backup_*
+!src/tests/test_backup_manager.py
 *.bak
 config/pinned_contacts.json
 config/recent_recipients.json

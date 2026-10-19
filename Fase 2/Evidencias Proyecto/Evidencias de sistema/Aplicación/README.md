@@ -24,7 +24,7 @@ Proyecto desarrollado como proyecto de título (DUOC UC). Los datos reales de la
 - **Interfaz (`src/ui/`):** un módulo por pantalla sobre PyQt6, con tema claro/oscuro (`src/theme/`).
 - **Integridad:** respaldos automáticos antes de escribir, escritura atómica, historial de cada cambio (`LogApp.csv`) y papelera de registros eliminados.
 
-El detalle técnico y de negocio está en [`docs/`](docs/README.md) (Vault de Obsidian; también se lee como Markdown normal). Para empezar: [Arquitectura](docs/04.%20Arquitectura%20y%20Patrones%20del%20Sistema.md), [Flujos de datos](docs/05.%20Flujos%20de%20Datos%20y%20Sincronización.md) y [Manual de operación](docs/10.%20Manual%20de%20Operación.md). Los diagramas están en [`diagramas/`](diagramas/).
+El detalle técnico y de negocio está en [`docs/`](../../Evidencias%20de%20documentaci%C3%B3n/docs/README.md) (Vault de Obsidian; también se lee como Markdown normal). Para empezar: [Arquitectura](../../Evidencias%20de%20documentaci%C3%B3n/docs/04.%20Arquitectura%20y%20Patrones%20del%20Sistema.md), [Flujos de datos](../../Evidencias%20de%20documentaci%C3%B3n/docs/05.%20Flujos%20de%20Datos%20y%20Sincronización.md) y [Manual de operación](../../Evidencias%20de%20documentaci%C3%B3n/docs/10.%20Manual%20de%20Operación.md). Los diagramas están en [`diagramas/`](../../Evidencias%20de%20documentaci%C3%B3n/diagramas/).
 
 ## Probarla con datos de ejemplo
 
@@ -48,7 +48,7 @@ Más de mil pruebas con `unittest` en `src/tests/`. La suite monta un entorno ai
 python src/tests/test_main.py
 ```
 
-Ver [Pruebas y auditoría de tests](docs/11.%20Pruebas%20y%20Auditoría%20de%20Tests.md).
+Ver [Pruebas y auditoría de tests](../../Evidencias%20de%20documentaci%C3%B3n/docs/11.%20Pruebas%20y%20Auditoría%20de%20Tests.md).
 
 ## Ejecutable
 
@@ -62,9 +62,9 @@ config/                 lectura de app_config.json y catálogo de archivos de da
 src/core, services, ui  núcleo, reglas de negocio e interfaz
 src/theme, assets       tema visual, fuentes e imágenes
 src/tests               pruebas automatizadas y generador de datos ficticios
-docs/                   documentación técnica y funcional (Vault de Obsidian)
-diagramas/              diagramas de arquitectura y de datos
-duoc/                   entregables académicos (presentación, plan de pruebas, gestión de cambios)
+(ver ../../Evidencias de documentación/docs)  documentación técnica y funcional
+(ver ../../Evidencias de documentación/diagramas)  diagramas de arquitectura y de datos
+duoc/calidad            plan de pruebas y gestión de cambios (los usa el auditor de tests)
 duoc/archivos de referencia   datos de prueba ficticios con el formato real de los archivos
 ```
 

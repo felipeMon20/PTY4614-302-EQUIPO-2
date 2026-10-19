@@ -1,0 +1,18 @@
+{
+    "DATA_DIR": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia",
+    "EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\RM_CONTRATOS.csv",
+    "LOG_EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\LogApp.csv",
+    "LOG_CSV_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\LogApp.csv",
+    "DELETED_LOG_EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\RegistroEliminado.xlsx",
+    "PROVISION_EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\provisionContratos.xlsx",
+    "INSTALACIONES_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\Instalaciones.xlsx",
+    "RM_REPORTE_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\RM_REPORTE_CONECTADOS.xlsx",
+    "CONTACTOS_EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\contactos.xlsx",
+    "CORREOS_EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\Correos.csv",
+    "CASOS_BAJA_CM_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\CasosBajaCM.csv",
+    "POWERBI_EXCEL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\BBDD CLIENTES CM.xlsx",
+    "PROVISIONES_SHAREPOINT_URL": "",
+    "REPORTE_NOTAS_VENTAS_URL": "",
+    "POWERBI_EMBED_URL": "",
+    "FACTURACION_MANUAL_PATH": "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia\\facturacionManual.xlsx"
+}
