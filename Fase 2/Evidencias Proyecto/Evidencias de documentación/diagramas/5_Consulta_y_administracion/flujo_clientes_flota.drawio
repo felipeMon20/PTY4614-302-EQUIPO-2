@@ -1,0 +1,219 @@
+<mxfile host="65bd71144e">
+    <diagram id="clientes-flota" name="Clientes y Flota">
+        <mxGraphModel dx="878" dy="2222" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1500" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;whiteSpace=wrap;html=1;fontFamily=Helvetica;align=left;verticalAlign=middle;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Clientes y Flota: consultar clientes y unidades&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Pantalla de consulta: se mira, se busca y se salta a donde se trabaja (no se edita ni se da de alta aquí)&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="950" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley0" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pantalla" vertex="1">
+                    <mxGeometry height="36" width="150" x="1000" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Acción del usuario" vertex="1">
+                    <mxGeometry height="36" width="150" x="1165" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sistema" vertex="1">
+                    <mxGeometry height="36" width="150" x="1330" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Fuera de la app" vertex="1">
+                    <mxGeometry height="36" width="150" x="1495" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;" value="Decisión" vertex="1">
+                    <mxGeometry height="46" width="110" x="1660" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_ini" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="1790" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_fin" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="1860" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_cli" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Cliente" vertex="1">
+                    <mxGeometry height="560" width="40" x="20" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_cli" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="560" width="2010" x="70" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_uni" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=16;horizontal=0;" value="Unidad" vertex="1">
+                    <mxGeometry height="540" width="40" x="20" y="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_uni" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#FAF7FC;strokeColor=#9673a6;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="540" width="2010" x="70" y="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="ic" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="90" y="133" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Clientes y Flota › Cliente: una tarjeta por cliente" vertex="1">
+                    <mxGeometry height="90" width="230" x="170" y="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Agrupa por RUT (sin RUT, por razón social). La razón principal es la más frecuente. Cuenta unidades y flotas; «SIN FLOTA» y «NO EXISTE EN VC» no cuentan como flota" vertex="1">
+                    <mxGeometry height="140" width="310" x="440" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Busca por razón social, RUT (con o sin puntos) o CDB, ordena la lista o marca «Solo con aviso de flotas», y hace clic en un cliente" vertex="1">
+                    <mxGeometry height="130" width="290" x="790" y="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="c4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Panel derecho: detalle del cliente" vertex="1">
+                    <mxGeometry height="90" width="240" x="1120" y="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="cd" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Qué pestaña abre?" vertex="1">
+                    <mxGeometry height="120" width="240" x="1410" y="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="cr" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Resumen: unidades totales, % Volvo Connect, % CIV y % Safety Zone, datos del cliente y cuántos contactos tiene" vertex="1">
+                    <mxGeometry height="120" width="290" x="100" y="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="cu" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Unidades: las unidades del cliente. Un clic en una abre la pestaña Unidades con esa unidad" vertex="1">
+                    <mxGeometry height="120" width="290" x="420" y="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="cf" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Flotas VC: una fila por flota con su cantidad de unidades; las sin flota aparecen aparte" vertex="1">
+                    <mxGeometry height="120" width="290" x="740" y="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="cc" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Contactos: salen del CDB Flota de las unidades del cliente" vertex="1">
+                    <mxGeometry height="120" width="290" x="1060" y="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="cz" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Razones (N): solo si el mismo RUT trae más de una razón social (la tarjeta se ve en rojo)" vertex="1">
+                    <mxGeometry height="120" width="290" x="1380" y="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="cc2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Presiona «Agregar contacto»: el formulario trae el CDB Flota del cliente ya escrito" vertex="1">
+                    <mxGeometry height="110" width="290" x="1060" y="450" as="geometry"/>
+                </mxCell>
+                <mxCell id="cc3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Guarda el contacto en contactos.xlsx y la pestaña se recarga sola" vertex="1">
+                    <mxGeometry height="110" width="290" x="740" y="450" as="geometry"/>
+                </mxCell>
+                <mxCell id="cz2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Presiona «Unificar en una sola razón social» y confirma" vertex="1">
+                    <mxGeometry height="100" width="290" x="1380" y="450" as="geometry"/>
+                </mxCell>
+                <mxCell id="cz3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Renombra las otras razones a la que tiene más unidades; guarda con copia de seguridad y registro en el historial" vertex="1">
+                    <mxGeometry height="130" width="300" x="1710" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="iu" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="90" y="738" as="geometry"/>
+                </mxCell>
+                <mxCell id="u1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Clientes y Flota › Unidades: una tarjeta por VIN" vertex="1">
+                    <mxGeometry height="90" width="230" x="170" y="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="u2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Muestra el contrato actual de cada VIN: N° contrato, estados, periodo interno, término y forma de contrato. Sin Volvo Connect: tarjeta «SIN VC»" vertex="1">
+                    <mxGeometry height="140" width="310" x="440" y="695" as="geometry"/>
+                </mxCell>
+                <mxCell id="u3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Filtra por seis datos (estado comercial, activación, tipo de facturación, forma de contrato, tipo de servicio, Flota VC), ordena y busca por razón social, VIN, CDB o RUT" vertex="1">
+                    <mxGeometry height="160" width="320" x="790" y="685" as="geometry"/>
+                </mxCell>
+                <mxCell id="u4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Hace clic en una unidad" vertex="1">
+                    <mxGeometry height="90" width="200" x="1150" y="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="u5" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Caja derecha: portada con el estado de Volvo Connect y chips de chasis, modelo y periodo. Pestañas Ficha, Historial y Contratos anteriores" vertex="1">
+                    <mxGeometry height="150" width="310" x="1390" y="690" as="geometry"/>
+                </mxCell>
+                <mxCell id="ud" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Qué mira?" vertex="1">
+                    <mxGeometry height="110" width="220" x="1750" y="710" as="geometry"/>
+                </mxCell>
+                <mxCell id="fx1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Ficha: cliente, situación, unidad, facturación y CM. Si es Vigente y está Desconectada muestra la franja roja «ARREGLO URGENTE»" vertex="1">
+                    <mxGeometry height="140" width="300" x="100" y="900" as="geometry"/>
+                </mxCell>
+                <mxCell id="fx3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Si no tiene Volvo Connect: presiona «Contactar» en «Ofrécele Volvo Connect»" vertex="1">
+                    <mxGeometry height="110" width="290" x="440" y="910" as="geometry"/>
+                </mxCell>
+                <mxCell id="fx4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Se abre el Gestor de Correos con esa unidad ya seleccionada" vertex="1">
+                    <mxGeometry height="110" width="290" x="770" y="910" as="geometry"/>
+                </mxCell>
+                <mxCell id="h1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Historial: los cambios guardados de la unidad, del más reciente al más antiguo" vertex="1">
+                    <mxGeometry height="110" width="300" x="1110" y="910" as="geometry"/>
+                </mxCell>
+                <mxCell id="ca" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Contratos anteriores: lista de contratos finalizados. Al elegir uno se ve su ficha con aviso amarillo y el botón «Ver contrato actual»" vertex="1">
+                    <mxGeometry height="140" width="320" x="1450" y="900" as="geometry"/>
+                </mxCell>
+                <mxCell id="notas" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontSize=12;align=left;verticalAlign=top;spacing=12;" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;• Un cliente es su RUT: si un mismo RUT trae varias razones sociales, es un solo cliente. Sin RUT se identifica por su razón social.&lt;br&gt;• Cada unidad aparece una sola vez, con su contrato actual. Los contratos terminados se consultan en «Contratos anteriores».&lt;br&gt;• Esta pantalla no da de alta unidades: el alta y la importación de Power BI viven en Comercial › Unidad nueva (el código ya no tiene el botón «+ Nuevo Cliente» que mencionan el Manual de Operación y la guía 14).&lt;br&gt;• Para corregir el nombre o el RUT de un cliente se usa Administración › Clientes. «Unificar» aquí solo sirve para dejar una razón social cuando un RUT trae varias.&lt;br&gt;• El ícono amarillo de una tarjeta de cliente avisa flotas incoherentes: un CDB flota con varias Flota VC, una Flota VC con varios CDB flota, o unidades con solo uno de los dos datos.&lt;br&gt;• La pantalla se recarga sola cuando cambian los datos (si no está visible, al volver a entrar)." vertex="1">
+                    <mxGeometry height="230" width="1750" x="20" y="1230" as="geometry"/>
+                </mxCell>
+                <mxCell id="f1" edge="1" parent="1" source="ic" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f2" edge="1" parent="1" source="c1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f3" edge="1" parent="1" source="c2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f4" edge="1" parent="1" source="c3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f5" edge="1" parent="1" source="c4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="cd" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f6" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cr" value="Resumen">
+                    <mxGeometry relative="1" x="0.9705" y="-5" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f7" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cu" value="Unidades">
+                    <mxGeometry relative="1" x="0.9614" y="-5" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f8" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cf" value="Flotas VC">
+                    <mxGeometry relative="1" x="0.9441" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f9" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cc" value="Contactos">
+                    <mxGeometry relative="1" x="0.8987" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f10" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cz" value="Razones">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f11" edge="1" parent="1" source="cc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cc2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f12" edge="1" parent="1" source="cc2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="cc3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f13" edge="1" parent="1" source="cz" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cz2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f14" edge="1" parent="1" source="cz2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="cz3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f15" edge="1" parent="1" source="iu" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="u1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f16" edge="1" parent="1" source="u1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="u2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f17" edge="1" parent="1" source="u2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="u3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f18" edge="1" parent="1" source="u3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="u4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f19" edge="1" parent="1" source="u4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="u5" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f20" edge="1" parent="1" source="u5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="ud" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f21" edge="1" parent="1" source="ud" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="fx1" value="Ficha">
+                    <mxGeometry relative="1" x="0.9763" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f22" edge="1" parent="1" source="ud" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="h1" value="Historial">
+                    <mxGeometry relative="1" x="0.913" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f23" edge="1" parent="1" source="ud" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="ca" value="Contratos anteriores">
+                    <mxGeometry relative="1" x="0.8788" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f24" edge="1" parent="1" source="fx1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="fx3" value="Sin Volvo Connect">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f25" edge="1" parent="1" source="fx3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="fx4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -2,7 +2,6 @@ import hashlib
 import os
 import re
 import sys
-import time
 from collections import Counter
 from datetime import datetime
 import pandas as pd
@@ -17,17 +16,17 @@ from src.ui.guardado_overlay import crear_tarjeta_carga
 import qtawesome as qta
 
 from src.services.vin_service import obtener_modelo_desde_vin
-from src.services import comercial_services
+from src.services import comercial_services, ejecutivos_service
 from src.theme.theme_manager import ThemeManager
 from src.theme.colors import DANGER, SUCCESS, BORDER, TEXT_SECONDARY, BACKGROUND, SURFACE, PRIMARY, SECONDARY
 from src.core.dataframe_formatter import DataFrameFormatter
 from src.core.normalizacion import normalizar_periodo_interno
-from src.core.perf_log import medir
 from src.core.constants import (
     COL_ESTADO_COMERCIAL, COL_TIPO_FACTURACION, COL_ETAPA_GESTION, COL_ESTADO_ACTIVACION, ETAPA_GESTION_COLORES,
     TIPO_FACTURACION_DISPLAY_MAP, TIPO_FACTURACION_DISPLAY_A_REAL,
     TIPO_FACTURACION_HABILITA_JUSTTIME, TIPO_FACTURACION_HABILITA_CM,
-    TIPO_CM_OPCIONES, ESTADO_CM_OPCIONES, FORMA_CONTRATO_TIPO_CM_MAP, JUSTTIME_ESTADO_OPCIONES, JUSTTIME_ESTADO_PENDIENTE,
+    TIPO_CM_OPCIONES, ESTADO_CM_OPCIONES, FORMA_CONTRATO_TIPO_CM_MAP, JUSTTIME_ESTADO_OPCIONES, JUSTTIME_ESTADO_PENDIENTE, JUSTTIME_ESTADO_NO_APLICA,
+    JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_ELIMINAR, JUSTTIME_ESTADO_REVISAR_PAGO,
     FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ,
     VALOR_TIPO_FACT_CLIENTE, VALOR_TIPO_FACT_INTERNO, VALOR_TIPO_FACT_PROVISION_MAS,
     VALOR_TIPO_FACT_CM, VALOR_TIPO_FACT_FACTURACION_MANUAL, VALOR_TIPO_FACT_SIN_REGISTRO,
@@ -60,7 +59,7 @@ def _partir_tipo_servicio(valor):
 
 
 # Orden de presentación del combo TIPO DE FACTURACION en la pestaña "JustTime
-# & CM" (definido con la contraparte comercial, 16-09-2026): usa los valores reales ya
+# & CM" (definido con Javiera, 16-09-2026): usa los valores reales ya
 # centralizados en constants.py, no valores inventados.
 _ORDEN_TIPO_FACTURACION = (
     VALOR_TIPO_FACT_CLIENTE, VALOR_TIPO_FACT_INTERNO, VALOR_TIPO_FACT_PROVISION_MAS,
@@ -103,6 +102,30 @@ _RESUMEN_GRUPOS = [
                         'N CONTRATO 3PC', 'TIPO DE CM', 'ESTADO DEL CM', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'PAGO CM']),
 ]
 
+class _EtiquetaElidida(QLabel):
+    """Etiqueta de una línea que acorta su texto con "..." y lo deja completo en la ayuda emergente."""
+
+    def __init__(self, texto="", parent=None):
+        super().__init__(parent)
+        self._texto = ""
+        self.setMinimumWidth(30)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.set_texto(texto)
+
+    def set_texto(self, texto):
+        self._texto = str(texto)
+        self.setToolTip(self._texto)
+        self._acortar()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._acortar()
+
+    def _acortar(self):
+        ancho = max(10, self.width())
+        self.setText(self.fontMetrics().elidedText(self._texto, Qt.TextElideMode.ElideRight, ancho))
+
+
 # Nombre visible de campos cuya columna en PruebasFM se llama distinto
 _ETIQUETAS_CAMPO = {'CDB': 'CDB COMERCIAL', 'N CONTRATO 3PC': 'N° CONTRATO 3PC'}
 
@@ -120,27 +143,16 @@ _MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
 # los campos no listados aquí se reparten el espacio restante de su fila.
 _ANCHO_FIJO = {
     'RUT': 130,
-    'CDB': 100,
+    'CDB': 140,
     'CDB FLOTA': 100,
     'INDUSTRIA': 150,
-    # TIPO DE SERVICIO (25-09-2026, a pedido explícito): al bajar a su
-    # propia fila junto a 3 campos de ancho fijo (INICIO/DURACIÓN/TÉRMINO
-    # CONTRATO), quedaba como único campo flexible y se estiraba gigante --
-    # mismo ancho aproximado que tenían los combos de la fila de arriba.
-    'TIPO DE SERVICIO': 200,
     'VIN': 190,
     'CHASIS': 100,
     'MODELO': 100,
-    'INICIO CONTRATO': 110,
-    'DURACIÓN (MESES)': 85,
-    'TÉRMINO CONTRATO': 110,
     'FECHA DE BAJA': 110,
     'ESTADO DE ENTREGA': 110,
     'INICIO': 110,
     'TERMINO': 110,
-    'FECHA INICIO CM': 110,
-    'FECHA TERMINO CM': 110,
-    'PAGO CM': 110,
 }
 
 # Campos de cada bloque de la pestaña "JustTime & CM" (16-09-2026): se
@@ -148,6 +160,8 @@ _ANCHO_FIJO = {
 # _actualizar_habilitacion_justtime_cm). TIPO DE FACTURACION no forma parte
 # de ningún bloque: es el disparador, siempre editable.
 _CAMPOS_BLOQUE_JUSTTIME = ['CONTRATO CREADO EN JUSTTIME', 'INICIO', 'TERMINO']
+_ESTADOS_COMERCIALES_FIN = {'BAJA', 'BAJA SOLICITADA', 'VENCIDO'}
+_ESTADOS_JT_CORREGIBLES = (JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_PENDIENTE, JUSTTIME_ESTADO_REVISAR_PAGO)
 _CAMPOS_BLOQUE_CM = ['N CONTRATO 3PC', 'TIPO DE CM', 'ESTADO DEL CM', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'PAGO CM']
 
 # Campos bloqueados al abrir el formulario desde general.py ("+ Nuevo
@@ -179,17 +193,22 @@ _CAMPOS_CONDICION_CONTRATO = (
     + _CAMPOS_BLOQUE_JUSTTIME + _CAMPOS_BLOQUE_CM
 )
 
+# En una renovación (contrato Vigente/Vencido reemplazado por uno nuevo) la
+# unidad sigue activa: se conservan tipo de servicio y los datos de Operaciones.
+_CAMPOS_RENOVACION_CONSERVADOS = ('TIPO DE SERVICIO', 'ESTADO DE ACTIVACIÓN ACTUAL', 'ESTADO DE ENTREGA')
+
 # Campos con validación de "obligatorio" en _validate_and_accept: se marcan
 # con asterisco rojo en su etiqueta para que sea visible en el formulario.
 # CHASIS se completa solo a partir del VIN (ver _auto_calculate_chasis), asi
 # que en la practica tambien exige que el VIN tenga largo suficiente.
-# Definicion cerrada con la contraparte comercial (16-09-2026): RUT, RAZÓN SOCIAL, VIN,
+# Definicion cerrada con Javiera (16-09-2026): RUT, RAZÓN SOCIAL, VIN,
 # CHASIS, EJECUTIVO. Reemplaza la version anterior (que incluia ESTADO
-# COMERCIAL en vez de RUT/EJECUTIVO).
-_CAMPOS_OBLIGATORIOS = {'RUT', 'RAZÓN SOCIAL', 'VIN', 'CHASIS', 'EJECUTIVO'}
+# COMERCIAL en vez de RUT/EJECUTIVO). EJECUTIVO dejó de ser obligatorio
+# (19-10-2026): vacío se guarda como Desconocido.
+_CAMPOS_OBLIGATORIOS = {'RUT', 'RAZÓN SOCIAL', 'VIN', 'CHASIS'}
 
 # Valores por defecto que deben verse en el formulario desde que se abre (no
-# recien al guardar), definidos junto a la contraparte comercial. EJECUTIVO no tiene default:
+# recien al guardar), definidos junto a Javiera. EJECUTIVO no tiene default:
 # es obligatorio. MODELO usa "-" (agregado a las opciones oficiales del
 # combo, ver general.py/comercial.py) hasta que exista un VIN válido que
 # permita deducirlo (ver _auto_calculate_modelo).
@@ -217,7 +236,7 @@ _DEFAULTS_INICIALES = {
 }
 
 # Columnas de PruebasFM que no aparecen en este formulario y que deben
-# quedar en "-" al crear una unidad nueva, tal como se definio con la contraparte comercial.
+# quedar en "-" al crear una unidad nueva, tal como se definio con Javiera.
 # FECHA DE BAJA (16-09-2026) y los campos de JustTime/CM (16-09-2026,
 # pestaña "JustTime & CM") salieron de esta lista: ahora tienen su propio
 # widget. Solo queda OBSERVACIONES, que no forma parte de ninguna pestaña.
@@ -356,7 +375,7 @@ class _ComercialUnidadFormMixin:
         BI) activa el "modo lote" de importación: UN SOLO exec() de este
         mismo diálogo recorre todos los registros, reutilizando los mismos
         widgets en vez de cerrar/reabrir una ventana por cada uno (16-09-2026,
-        a pedido de la contraparte comercial: "que se sienta como un único proceso continuo").
+        a pedido de Javiera: "que se sienta como un único proceso continuo").
         El diálogo solo llama accept()/reject() una vez, al terminar o
         cancelar el lote completo; el resultado se recupera después con
         `obtener_resultados_lote()`. `progreso` (tupla indice/total) sigue
@@ -518,6 +537,7 @@ class _ComercialUnidadFormMixin:
             self._vins_existentes.discard('')
         self._vins_con_contrato_abierto = comercial_services.vins_con_contrato_abierto(df_comercial)
         self.modo_nuevo_contrato = False
+        self.modo_renovacion = False
         self._vin_contrato_nuevo = ''
         self._id_contrato = str((datos_iniciales or {}).get('ID', '')).strip() if modo_edicion else ''
         self._contrato_cerrado = False
@@ -526,17 +546,10 @@ class _ComercialUnidadFormMixin:
         # RUT -> {RAZÓN SOCIAL, CDB, EJECUTIVO, INDUSTRIA} (listas/contador de
         # valores vistos en Comercial para ese RUT) y CDB -> lista de FLOTA VC
         # asociadas. Se usan para autocompletar/filtrar al ingresar el RUT.
-        # Instrumentacion temporal (auditoria de rendimiento B-1, 17-09-2026):
-        # medir por separado el costo de los lookups vs. el resto de la
-        # construccion del dialogo, para poder ver en consola el efecto real
-        # del cache de _construir_lookups al abrir el dialogo varias veces
-        # seguidas. No cambia ningun comportamiento, solo imprime tiempos.
-        _t_inicio_dialogo = time.perf_counter()
-        with medir("ComercialAgregarDialog._construir_lookups"):
-            self._rut_lookup, self._flota_by_cdb = self._construir_lookups(df_comercial)
+        self._rut_lookup, self._flota_by_cdb = self._construir_lookups(df_comercial)
+        self._ejecutivos_todos = self._construir_lista_ejecutivos(df_comercial)
 
-        with medir("ComercialAgregarDialog._setup_ui"):
-            self._setup_ui()
+        self._setup_ui()
 
         if datos_iniciales:
             self._aplicar_datos_iniciales(datos_iniciales)
@@ -565,8 +578,6 @@ class _ComercialUnidadFormMixin:
             self._actualizar_boton_chasis_bi()
 
         self._validar_vin_duplicado()
-        print(f"[PERF][UI] ComercialAgregarDialog.__init__ TOTAL: "
-              f"{(time.perf_counter() - _t_inicio_dialogo) * 1000:.0f} ms")
 
     # ------------------------------------------------------------------
     # Lookups RUT -> Razón Social / CDB / Ejecutivo, CDB -> Flota VC
@@ -576,7 +587,7 @@ class _ComercialUnidadFormMixin:
         """Deja solo dígitos y el dígito verificador (letra K incluida),
         sin puntos/guion/espacios, en mayúsculas. Causa raíz del bug de
         autocompletado reportado el 16-09-2026: PruebasFM guarda el RUT con
-        puntos y guion (ej. '31.431.765-6', ver generar_mock_data.py) pero
+        puntos y guion (ej. '12.345.678-9', ver generar_mock_data.py) pero
         la comparación anterior era un match exacto de texto -- cualquier
         diferencia de formato entre lo tipeado y lo almacenado (con/sin
         puntos, con/sin guion, espacios) hacía fallar la búsqueda. Se
@@ -584,6 +595,36 @@ class _ComercialUnidadFormMixin:
         comparar, en vez de exigir que el formato tipeado coincida
         exactamente con el guardado."""
         return re.sub(r'[^0-9A-Z]', '', str(rut).upper())
+
+    @staticmethod
+    def _construir_lista_ejecutivos(df):
+        """Ejecutivos activos del directorio (Ejecutivos_VC.csv) más los nombres
+        de Comercial que el directorio no reconoce, sin repetir alias."""
+        directorio = pd.DataFrame()
+        try:
+            if os.path.exists(ejecutivos_service.get_ejecutivos_csv_path()):
+                directorio = ejecutivos_service.leer_ejecutivos()
+        except Exception:
+            directorio = pd.DataFrame()
+        nombres = []
+        if not directorio.empty:
+            activos = directorio[directorio['activo'].astype(str).str.strip().str.upper() != 'NO']
+            nombres = [n.strip() for n in activos['nombre'].tolist() if n.strip()]
+        if isinstance(df, pd.DataFrame) and not df.empty and 'EJECUTIVO' in df.columns:
+            for nombre in df['EJECUTIVO'].dropna().astype(str).str.strip().unique():
+                if nombre.lower() in ejecutivos_service._NOMBRES_IGNORADOS:
+                    continue
+                if not directorio.empty and ejecutivos_service.buscar_ejecutivo(
+                        nombre, directorio, incluir_inactivos=True):
+                    continue
+                nombres.append(nombre)
+        vistos, resultado = set(), []
+        for nombre in sorted(nombres, key=str.casefold):
+            clave = ejecutivos_service.normalizar_nombre(nombre)
+            if clave not in vistos:
+                vistos.add(clave)
+                resultado.append(nombre)
+        return resultado
 
     def _construir_lookups(self, df):
         rut_lookup, flota_by_cdb = {}, {}
@@ -620,7 +661,9 @@ class _ComercialUnidadFormMixin:
             if g is None:
                 g = grupos[clave] = (set(), set(), set(), [])
             if razon: g[0].add(razon)
-            if cdb: g[1].add(cdb)
+            # Solo CDB reales (numéricos): un "-" no cuenta como CDB del RUT
+            cdb_valido = re.sub(r'\.0$', '', cdb)
+            if cdb_valido.isdigit(): g[1].add(cdb_valido)
             if ejecutivo: g[2].add(ejecutivo)
             if industria: g[3].append(industria)
 
@@ -663,7 +706,29 @@ class _ComercialUnidadFormMixin:
     # resetear_para_crear/cargar_para_editar), así que el título ya no se
     # calcula una sola vez al construir -- ver _actualizar_titulo.
     # ------------------------------------------------------------------
+    # Renovación de varias unidades a la vez: sin el paso "Empresa & Unidad" (ver
+    # ComercialUnidadFormWidget._configurar_modo_multiple)
+    _primer_paso = 0
+    cantidad_multiple = 1
+
+    def _autocompletar_duracion_mensual(self):
+        """Con facturación manual el contrato siempre es mensual: duración "-" y término MENSUAL."""
+        if str(self._tipo_facturacion_actual).strip().upper() != VALOR_TIPO_FACT_FACTURACION_MANUAL:
+            return
+        duracion = self.inputs['DURACIÓN (MESES)']
+        if duracion.text().strip() != '-':
+            duracion.setText('-')
+        self._auto_calculate_termino()
+
     def _calcular_titulo_subtitulo(self):
+        if self.modo_renovacion and self.cantidad_multiple > 1:
+            return f"Renovar {self.cantidad_multiple} contratos", (
+                "Los cambios de Comercial y JustTime & CM se aplican a todas las unidades seleccionadas. "
+                "Al guardar, cada contrato actual queda como Renovado y se crea uno nuevo.")
+        if self.modo_renovacion:
+            return "Renovar con un contrato nuevo", (
+                f"Contrato nuevo para la unidad {self._vin_contrato_nuevo}. Al guardar, el contrato actual queda "
+                "como Renovado en el historial y este pasa a ser el vigente.")
         if self.modo_nuevo_contrato:
             return "Nuevo contrato", (f"Nuevo contrato para la unidad {self._vin_contrato_nuevo}. "
                                       "Se crea con un N° Contrato nuevo y el anterior queda en el historial.")
@@ -688,413 +753,375 @@ class _ComercialUnidadFormMixin:
     # UI
     # ------------------------------------------------------------------
     def _setup_ui(self):
-        # ------------------------------------------------------------------
-        # Instrumentacion TEMPORAL (auditoria de rendimiento, punto nuevo
-        # sobre _setup_ui, 17-09-2026): mide bloques tematicos con
-        # perf_log.medir() y acumula por separado cuanto tiempo se va en
-        # qta.icon() y en ThemeManager.apply_combo_box() (via un monkeypatch
-        # LOCAL, restaurado siempre en el finally). No cambia ningun
-        # comportamiento visual ni logico, solo agrega mediciones e imprime
-        # un resumen al final. Se puede quitar sin dejar rastro.
-        # ------------------------------------------------------------------
-        _perf_acc = {'icons_s': 0.0, 'icons_n': 0, 'combo_s': 0.0, 'combo_n': 0}
-        _orig_qta_icon = qta.icon
-        _orig_apply_combo = ThemeManager.apply_combo_box
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(8, 4, 8, 8)
+        outer_layout.setSpacing(12)
 
-        def _icon_medido(*a, **kw):
-            _t0 = time.perf_counter()
-            _r = _orig_qta_icon(*a, **kw)
-            _perf_acc['icons_s'] += time.perf_counter() - _t0
-            _perf_acc['icons_n'] += 1
-            return _r
+        # --- Encabezado: titulo/subtitulo varian segun el modo (nueva /
+        # edicion / importacion en lote via `progreso`). Guardados como
+        # self._title_lbl/_subtitle_lbl (25-09-2026): ComercialUnidadFormWidget
+        # reutiliza la misma instancia del formulario para alternar entre
+        # modo crear/editar (ver _actualizar_titulo), así que el título ya
+        # no puede fijarse una sola vez al construir el widget. ---
+        titulo, subtitulo = self._calcular_titulo_subtitulo()
+        self.setWindowTitle(f" Gestión de Unidades — {titulo}")
 
-        def _apply_combo_medido(combo):
-            _t0 = time.perf_counter()
-            _orig_apply_combo(combo)
-            _perf_acc['combo_s'] += time.perf_counter() - _t0
-            _perf_acc['combo_n'] += 1
+        header_row = QHBoxLayout()
+        icon_lbl = QLabel()
+        icon_lbl.setFixedSize(40, 40)
+        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_lbl.setStyleSheet("background-color: #EEF2F6; border-radius: 10px;")
+        icon_lbl.setPixmap(qta.icon('fa5s.truck', color='#66748D').pixmap(18, 18))
+        header_texts = QVBoxLayout()
+        header_texts.setSpacing(1)
+        self._title_lbl = QLabel(titulo)
+        self._title_lbl.setStyleSheet("font-size: 18px; color: #0F1B33; font-weight: 700; letter-spacing: 0;")
+        self._subtitle_lbl = QLabel(subtitulo)
+        self._subtitle_lbl.setStyleSheet("font-size: 12px; color: #66748D; font-weight: 400; letter-spacing: 0;")
+        header_texts.addWidget(self._title_lbl)
+        header_texts.addWidget(self._subtitle_lbl)
+        header_row.addWidget(icon_lbl)
+        header_row.addSpacing(10)
+        header_row.addLayout(header_texts)
+        header_row.addStretch()
+        # Chasis de Power BI del registro que se está importando: solo
+        # identificador interno del lote (nunca llena CHASIS, que sigue
+        # derivándose del VIN), pero se muestra para que la persona lo pueda
+        # copiar rápido si lo necesita en otro lado. A pedido del usuario
+        # (16-09-2026): en rojo, junto al contador de progreso, con el
+        # formato "CHASIS: XXXXXX" en vez de "Chasis Power BI: XXXXXX".
+        self._btn_chasis_bi = QPushButton("")
+        self._btn_chasis_bi.setFlat(True)
+        self._btn_chasis_bi.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_chasis_bi.setStyleSheet(
+            f"QPushButton {{ text-align: right; border: none; background: transparent; "
+            f"color: {DANGER}; font-weight: bold; font-size: 11px; padding: 0; }}"
+        )
+        self._btn_chasis_bi.setToolTip("Clic para copiar el Chasis de Power BI al portapapeles.")
+        self._btn_chasis_bi.clicked.connect(self._copiar_chasis_bi)
+        self._btn_chasis_bi.setVisible(False)
+        header_row.addWidget(self._btn_chasis_bi)
+        header_row.addSpacing(8)
 
-        qta.icon = _icon_medido
-        ThemeManager.apply_combo_box = staticmethod(_apply_combo_medido)
-        try:
-            with medir("_setup_ui > 1) header"):
-                outer_layout = QVBoxLayout(self)
-                outer_layout.setContentsMargins(8, 4, 8, 8)
-                outer_layout.setSpacing(12)
+        self._badge_progreso = QLabel()
+        self._badge_progreso.setStyleSheet("background-color: #1C6BBA; color: white; font-size: 12px; font-weight: bold; border-radius: 10px; padding: 3px 4px;")
+        self._badge_progreso.setVisible(bool(self.progreso))
+        header_row.addWidget(self._badge_progreso)
+        outer_layout.addLayout(header_row)
 
-                # --- Encabezado: titulo/subtitulo varian segun el modo (nueva /
-                # edicion / importacion en lote via `progreso`). Guardados como
-                # self._title_lbl/_subtitle_lbl (25-09-2026): ComercialUnidadFormWidget
-                # reutiliza la misma instancia del formulario para alternar entre
-                # modo crear/editar (ver _actualizar_titulo), así que el título ya
-                # no puede fijarse una sola vez al construir el widget. ---
-                titulo, subtitulo = self._calcular_titulo_subtitulo()
-                self.setWindowTitle(f" Gestión de Unidades — {titulo}")
+        if self.progreso:
+            self._actualizar_progreso_visual()
 
-                header_row = QHBoxLayout()
-                icon_lbl = QLabel()
-                icon_lbl.setFixedSize(40, 40)
-                icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                icon_lbl.setStyleSheet("background-color: #EEF2F6; border-radius: 10px;")
-                icon_lbl.setPixmap(qta.icon('fa5s.truck', color='#66748D').pixmap(18, 18))
-                header_texts = QVBoxLayout()
-                header_texts.setSpacing(1)
-                self._title_lbl = QLabel(titulo)
-                self._title_lbl.setStyleSheet("font-size: 18px; color: #0F1B33; font-weight: 700; letter-spacing: 0;")
-                self._subtitle_lbl = QLabel(subtitulo)
-                self._subtitle_lbl.setStyleSheet("font-size: 12px; color: #66748D; font-weight: 400; letter-spacing: 0;")
-                header_texts.addWidget(self._title_lbl)
-                header_texts.addWidget(self._subtitle_lbl)
-                header_row.addWidget(icon_lbl)
-                header_row.addSpacing(10)
-                header_row.addLayout(header_texts)
-                header_row.addStretch()
-                # Chasis de Power BI del registro que se está importando: solo
-                # identificador interno del lote (nunca llena CHASIS, que sigue
-                # derivándose del VIN), pero se muestra para que la persona lo pueda
-                # copiar rápido si lo necesita en otro lado. A pedido del usuario
-                # (16-09-2026): en rojo, junto al contador de progreso, con el
-                # formato "CHASIS: XXXXXX" en vez de "Chasis Power BI: XXXXXX".
-                self._btn_chasis_bi = QPushButton("")
-                self._btn_chasis_bi.setFlat(True)
-                self._btn_chasis_bi.setCursor(Qt.CursorShape.PointingHandCursor)
-                self._btn_chasis_bi.setStyleSheet(
-                    f"QPushButton {{ text-align: right; border: none; background: transparent; "
-                    f"color: {DANGER}; font-weight: bold; font-size: 11px; padding: 0; }}"
-                )
-                self._btn_chasis_bi.setToolTip("Clic para copiar el Chasis de Power BI al portapapeles.")
-                self._btn_chasis_bi.clicked.connect(self._copiar_chasis_bi)
-                self._btn_chasis_bi.setVisible(False)
-                header_row.addWidget(self._btn_chasis_bi)
-                header_row.addSpacing(8)
+        # Overlay breve "Cargando siguiente Unidad" entre un registro y el
+        # siguiente durante una importación en lote: se muestra encima del
+        # mismo diálogo (nunca se cierra ni se vuelve a abrir), para que se
+        # sienta como un único proceso continuo. Usa la misma tarjeta de
+        # carga con spinner que el resto de la app (gira solo mientras se ve).
+        self._overlay_transicion = QWidget()
+        overlay_layout = QVBoxLayout(self._overlay_transicion)
+        overlay_layout.setContentsMargins(0, 20, 0, 20)
+        overlay_layout.addStretch()
 
-                self._badge_progreso = QLabel()
-                self._badge_progreso.setStyleSheet("background-color: #1C6BBA; color: white; font-size: 12px; font-weight: bold; border-radius: 10px; padding: 3px 4px;")
-                self._badge_progreso.setVisible(bool(self.progreso))
-                header_row.addWidget(self._badge_progreso)
-                outer_layout.addLayout(header_row)
+        tarjeta_overlay = crear_tarjeta_carga("Cargando siguiente unidad…", "Preparando el siguiente registro del lote.")
 
-                if self.progreso:
-                    self._actualizar_progreso_visual()
+        overlay_row_centrado = QHBoxLayout()
+        overlay_row_centrado.addStretch()
+        overlay_row_centrado.addWidget(tarjeta_overlay)
+        overlay_row_centrado.addStretch()
+        overlay_layout.addLayout(overlay_row_centrado)
+        overlay_layout.addStretch()
 
-            with medir("_setup_ui > 2) overlay_lote"):
-                # Overlay breve "Cargando siguiente Unidad" entre un registro y el
-                # siguiente durante una importación en lote: se muestra encima del
-                # mismo diálogo (nunca se cierra ni se vuelve a abrir), para que se
-                # sienta como un único proceso continuo. Usa la misma tarjeta de
-                # carga con spinner que el resto de la app (gira solo mientras se ve).
-                self._overlay_transicion = QWidget()
-                overlay_layout = QVBoxLayout(self._overlay_transicion)
-                overlay_layout.setContentsMargins(0, 20, 0, 20)
-                overlay_layout.addStretch()
+        self._overlay_transicion.setVisible(False)
+        outer_layout.addWidget(self._overlay_transicion)
 
-                tarjeta_overlay = crear_tarjeta_carga("Cargando siguiente unidad…", "Preparando el siguiente registro del lote.")
+        # Contenedor único con el resto del formulario (periodo + secciones):
+        # se oculta entero durante el overlay de transición de un registro a
+        # otro, y se vuelve a mostrar ya con los datos del siguiente.
+        self._contenido_widget = QWidget()
+        contenido_layout = QVBoxLayout(self._contenido_widget)
+        contenido_layout.setContentsMargins(0, 0, 0, 0)
+        contenido_layout.setSpacing(14)
+        outer_layout.addWidget(self._contenido_widget, 1)
 
-                overlay_row_centrado = QHBoxLayout()
-                overlay_row_centrado.addStretch()
-                overlay_row_centrado.addWidget(tarjeta_overlay)
-                overlay_row_centrado.addStretch()
-                overlay_layout.addLayout(overlay_row_centrado)
-                overlay_layout.addStretch()
+        # --- Periodo interno de gestión: visible y editable, no solo el mes
+        # actual inyectado en silencio (a pedido de Javiera). Se guarda con
+        # el mismo formato "Mes - Año" que ya usa el resto del proyecto. ---
+        periodo_row = QHBoxLayout()
+        periodo_row.setSpacing(8)
+        lbl_periodo = QLabel("PERIODO INTERNO:")
+        self.combo_periodo_mes = ComboTarjeta("Mes")
+        self.combo_periodo_mes.addItems(_MESES)
+        ThemeManager.apply_combo_box(self.combo_periodo_mes)
+        self.combo_periodo_mes.setMinimumWidth(150)
+        self.combo_periodo_mes.setMinimumHeight(40)
+        hoy = datetime.now()
+        self.spin_periodo_anio = _SelectorAnio(2000, hoy.year)
+        ThemeManager.apply_combo_box(self.spin_periodo_anio)
+        self.spin_periodo_anio.setMinimumWidth(96)
+        self.spin_periodo_anio.setMinimumHeight(40)
+        self.combo_periodo_mes.setCurrentText(_MESES[hoy.month - 1])
+        self.spin_periodo_anio.setValue(hoy.year)
+        periodo_row.addWidget(lbl_periodo)
+        periodo_row.addWidget(self.combo_periodo_mes)
+        periodo_row.addWidget(self.spin_periodo_anio)
 
-                self._overlay_transicion.setVisible(False)
-                outer_layout.addWidget(self._overlay_transicion)
+        # --- Indicador ETAPA GESTIÓN (16-09-2026): visible siempre, fuera de
+        # las pestañas (igual que el período interno), para que se vea sin
+        # importar en qué pestaña esté el usuario. Reutiliza tal cual la
+        # regla central de negocio (DataFrameFormatter.calcular_etapa_gestion_esperada)
+        # y la paleta de colores existente (ETAPA_GESTION_COLORES, antes en
+        # general.py, movida a constants.py para evitar un import circular)
+        # -- no se reimplementa la regla ni se inventa una paleta nueva.
+        # Bloqueado siempre (22-09-2026, a pedido explícito: la regla de
+        # negocio debe respetarse siempre, no solo en el modo restringido
+        # de "Por gestionar"/"Gestionar Bajas"): el combo nunca es editable
+        # por el usuario, solo cambia vía _recalcular_etapa_gestion.
+        # Oculto (07-10-2026, a pedido explícito): la aplicación la
+        # calcula sola; el widget sigue existiendo como portador del
+        # valor para get_data y las restricciones.
+        lbl_etapa = QLabel("ETAPA GESTIÓN:")
+        combo_etapa = QComboBox()
+        combo_etapa.addItems(sorted(ETAPA_GESTION_COLORES.keys()))
+        ThemeManager.apply_combo_box(combo_etapa)
+        combo_etapa.setEnabled(False)
+        self.inputs['ETAPA GESTIÓN'] = combo_etapa
+        periodo_row.addWidget(lbl_etapa)
+        periodo_row.addWidget(combo_etapa)
+        lbl_etapa.setVisible(False)
+        combo_etapa.setVisible(False)
 
-                # Contenedor único con el resto del formulario (periodo + secciones):
-                # se oculta entero durante el overlay de transición de un registro a
-                # otro, y se vuelve a mostrar ya con los datos del siguiente.
-                self._contenido_widget = QWidget()
-                contenido_layout = QVBoxLayout(self._contenido_widget)
-                contenido_layout.setContentsMargins(0, 0, 0, 0)
-                contenido_layout.setSpacing(14)
-                outer_layout.addWidget(self._contenido_widget, 1)
+        header_row.insertLayout(header_row.indexOf(self._btn_chasis_bi), periodo_row)
 
-            with medir("_setup_ui > 3) periodo_y_etapa"):
-                # --- Periodo interno de gestión: visible y editable, no solo el mes
-                # actual inyectado en silencio (a pedido de la contraparte comercial). Se guarda con
-                # el mismo formato "Mes - Año" que ya usa el resto del proyecto. ---
-                periodo_row = QHBoxLayout()
-                periodo_row.setSpacing(8)
-                lbl_periodo = QLabel("PERIODO INTERNO:")
-                self.combo_periodo_mes = ComboTarjeta("Mes")
-                self.combo_periodo_mes.addItems(_MESES)
-                ThemeManager.apply_combo_box(self.combo_periodo_mes)
-                self.combo_periodo_mes.setMinimumWidth(150)
-                self.combo_periodo_mes.setMinimumHeight(40)
-                hoy = datetime.now()
-                self.spin_periodo_anio = _SelectorAnio(2000, hoy.year)
-                ThemeManager.apply_combo_box(self.spin_periodo_anio)
-                self.spin_periodo_anio.setMinimumWidth(96)
-                self.spin_periodo_anio.setMinimumHeight(40)
-                self.combo_periodo_mes.setCurrentText(_MESES[hoy.month - 1])
-                self.spin_periodo_anio.setValue(hoy.year)
-                periodo_row.addWidget(lbl_periodo)
-                periodo_row.addWidget(self.combo_periodo_mes)
-                periodo_row.addWidget(self.spin_periodo_anio)
+        # --- Cuerpo: pestañas por bloque temático (Cliente / Comercial /
+        # Operaciones / JustTime & CM), a pedido explícito del usuario para
+        # que el formulario no se sienta como una sola pantalla enorme
+        # (16-09-2026). Mismos widgets y misma lógica de siempre: este
+        # cambio es solo de distribución visual, no de datos. Mismo QSS de
+        # pestañas que ya usa el resto de la app (ver ComercialModule en
+        # comercial.py), para no introducir un lenguaje visual nuevo.
+        # Pestañas y páginas nacen dentro del formulario y se llenan
+        # después: armarlas sueltas y moverlas al final re-aplicaba los
+        # estilos a todo su contenido una vez por cada nivel
+        self.tabs = QTabWidget(self._contenido_widget)
+        self.tabs.tabBar().hide()
+        self.tabs.setStyleSheet("QTabWidget::pane { border: none; background: transparent; }")
+        pagina_empresa = QWidget()
+        tab_comercial = QWidget()
+        tab_justtime_cm = QWidget()
+        tab_operaciones = QWidget()
+        self.tabs.addTab(pagina_empresa, "Empresa & Unidad")
+        self.tabs.addTab(tab_comercial, "Comercial")
+        self.tabs.addTab(tab_justtime_cm, "JustTime & CM")
+        self.tabs.addTab(tab_operaciones, "Operaciones")
 
-                # --- Indicador ETAPA GESTIÓN (16-09-2026): visible siempre, fuera de
-                # las pestañas (igual que el período interno), para que se vea sin
-                # importar en qué pestaña esté el usuario. Reutiliza tal cual la
-                # regla central de negocio (DataFrameFormatter.calcular_etapa_gestion_esperada)
-                # y la paleta de colores existente (ETAPA_GESTION_COLORES, antes en
-                # general.py, movida a constants.py para evitar un import circular)
-                # -- no se reimplementa la regla ni se inventa una paleta nueva.
-                # Bloqueado siempre (22-09-2026, a pedido explícito: la regla de
-                # negocio debe respetarse siempre, no solo en el modo restringido
-                # de "Por gestionar"/"Gestionar Bajas"): el combo nunca es editable
-                # por el usuario, solo cambia vía _recalcular_etapa_gestion.
-                # Oculto (07-10-2026, a pedido explícito): la aplicación la
-                # calcula sola; el widget sigue existiendo como portador del
-                # valor para get_data y las restricciones.
-                lbl_etapa = QLabel("ETAPA GESTIÓN:")
-                combo_etapa = QComboBox()
-                combo_etapa.addItems(sorted(ETAPA_GESTION_COLORES.keys()))
-                ThemeManager.apply_combo_box(combo_etapa)
-                combo_etapa.setEnabled(False)
-                self.inputs['ETAPA GESTIÓN'] = combo_etapa
-                periodo_row.addWidget(lbl_etapa)
-                periodo_row.addWidget(combo_etapa)
-                lbl_etapa.setVisible(False)
-                combo_etapa.setVisible(False)
+        # --- Pestaña única "Comercial" (25-09-2026, a pedido
+        # explícito): fusiona lo que antes eran las pestañas
+        # "Cliente" y "Comercial". JustTime & CM SE PROBÓ fusionada
+        # acá también, pero con las 5 secciones apiladas el
+        # formulario quedaba demasiado alto para resoluciones de
+        # pantalla normales y los campos terminaban superpuestos
+        # (reportado por el usuario) -- se le devolvió su propia
+        # pestaña (ver más abajo), igual que "Operaciones", que
+        # nunca tuvo este problema por tener una sola sección.
+        # Mismas secciones/_build_section de siempre, solo cambia en
+        # qué pestaña viven -- ninguna lógica de datos/validación
+        # cambia por esto. ---
+        layout_empresa = QVBoxLayout(pagina_empresa)
+        layout_empresa.setContentsMargins(0, 0, 0, 0)
+        layout_empresa.setSpacing(14)
+        layout_empresa.addWidget(self._build_section(
+            'empresa', "1. Empresa", "Información del cliente propietario de la unidad.",
+            [[('RUT', 'lineedit'), ('RAZÓN SOCIAL', 'lineedit'), ('INDUSTRIA', 'combo_editable')]],
+            padre=pagina_empresa
+        ))
+        layout_empresa.addWidget(self._build_section(
+            'unidad', "2. Información de la unidad", "Datos técnicos del camión.",
+            [[('VIN', 'lineedit'), ('CHASIS', 'readonly'), ('MODELO', 'combo'), ('CDB', 'lineedit')]],
+            padre=pagina_empresa
+        ))
+        layout_empresa.addStretch()
 
-                header_row.insertLayout(header_row.indexOf(self._btn_chasis_bi), periodo_row)
+        layout_comercial = QVBoxLayout(tab_comercial)
+        layout_comercial.setContentsMargins(0, 0, 0, 0)
+        layout_comercial.setSpacing(14)
+        layout_comercial.addWidget(self._build_section(
+            'comercial', "3. Información comercial", "Datos de la venta y facturación del servicio.",
+            [
+                [('EJECUTIVO', 'combo_editable'), ('FORMA DE CONTRATO', 'combo'), ('TIPO DE FACTURACION', 'tipo_facturacion'), ('ESTADO COMERCIAL', 'combo')],
+                [('TIPO DE SERVICIO', 'combo'), ('INICIO CONTRATO', 'date'), ('DURACIÓN (MESES)', 'lineedit'), ('TÉRMINO CONTRATO', 'readonly')],
+            ],
+            padre=tab_comercial
+        ))
+        layout_comercial.addStretch()
 
-            with medir("_setup_ui > 4) tabs_crear_y_qss"):
-                # --- Cuerpo: pestañas por bloque temático (Cliente / Comercial /
-                # Operaciones / JustTime & CM), a pedido explícito del usuario para
-                # que el formulario no se sienta como una sola pantalla enorme
-                # (16-09-2026). Mismos widgets y misma lógica de siempre: este
-                # cambio es solo de distribución visual, no de datos. Mismo QSS de
-                # pestañas que ya usa el resto de la app (ver ComercialModule en
-                # comercial.py), para no introducir un lenguaje visual nuevo.
-                self.tabs = QTabWidget()
-                self.tabs.tabBar().hide()
-                self.tabs.setStyleSheet("QTabWidget::pane { border: none; background: transparent; }")
+        # --- Pestaña "Operaciones" ---
+        layout_operaciones = QVBoxLayout(tab_operaciones)
+        layout_operaciones.setContentsMargins(0, 0, 0, 0)
+        layout_operaciones.setSpacing(14)
+        _section_operativa = self._build_section(
+            'operativa', "6. Información operativa", "Estado y flota de la unidad en Volvo Connect.",
+            [
+                [('FLOTA VC', 'combo_editable'), ('FLOTA VC 2', 'combo_editable'), ('ESTADO DE ACTIVACIÓN ACTUAL', 'combo')],
+                [('CDB FLOTA', 'lineedit'), ('ESTADO DE ENTREGA', 'date'), ('FECHA DE BAJA', 'date')],
+            ],
+            padre=tab_operaciones
+        )
+        layout_operaciones.addWidget(_section_operativa)
+        layout_operaciones.addStretch()
+        self._pagina_operaciones = tab_operaciones
 
-            with medir("_setup_ui > 5) tab_comercial (Cliente+Comercial fusionados)"):
-                # --- Pestaña única "Comercial" (25-09-2026, a pedido
-                # explícito): fusiona lo que antes eran las pestañas
-                # "Cliente" y "Comercial". JustTime & CM SE PROBÓ fusionada
-                # acá también, pero con las 5 secciones apiladas el
-                # formulario quedaba demasiado alto para resoluciones de
-                # pantalla normales y los campos terminaban superpuestos
-                # (reportado por el usuario) -- se le devolvió su propia
-                # pestaña (ver más abajo), igual que "Operaciones", que
-                # nunca tuvo este problema por tener una sola sección.
-                # Mismas secciones/_build_section de siempre, solo cambia en
-                # qué pestaña viven -- ninguna lógica de datos/validación
-                # cambia por esto. ---
-                pagina_empresa = QWidget()
-                layout_empresa = QVBoxLayout(pagina_empresa)
-                layout_empresa.setContentsMargins(0, 0, 0, 0)
-                layout_empresa.setSpacing(14)
-                layout_empresa.addWidget(self._build_section(
-                    'empresa', "1. Empresa", "Información del cliente propietario de la unidad.",
-                    [[('RUT', 'lineedit'), ('RAZÓN SOCIAL', 'lineedit'), ('INDUSTRIA', 'combo_editable')]]
-                ))
-                layout_empresa.addWidget(self._build_section(
-                    'unidad', "2. Información de la unidad", "Datos técnicos del camión.",
-                    [[('VIN', 'lineedit'), ('CHASIS', 'readonly'), ('MODELO', 'combo'), ('CDB', 'lineedit')]]
-                ))
-                layout_empresa.addStretch()
-                self.tabs.addTab(pagina_empresa, "Empresa & Unidad")
+        # --- Pestaña "JustTime & CM" (25-09-2026: separada de nuevo
+        # de "Comercial" -- ver comentario más arriba). Mismo
+        # contenido lado a lado de siempre, solo con pestaña propia
+        # en vez de compartida. ---
+        layout_justtime_cm = QVBoxLayout(tab_justtime_cm)
+        layout_justtime_cm.setContentsMargins(0, 0, 0, 0)
+        layout_justtime_cm.setSpacing(14)
+        row_justtime_cm = QHBoxLayout()
+        row_justtime_cm.setSpacing(14)
+        _section_justtime = self._build_section(
+            'justtime', "4. JustTime", "Facturación y contrato en JustTime (según Tipo de Facturación).",
+            [
+                [('CONTRATO CREADO EN JUSTTIME', 'combo'), ('INICIO', 'date'), ('TERMINO', 'date')],
+            ],
+            padre=tab_justtime_cm
+        )
+        row_justtime_cm.addWidget(_section_justtime, 1)
+        _section_cm = self._build_section(
+            'cm', "5. Contrato de Mantenimiento (CM)", "Solo aplica cuando Tipo de Facturación es CM.",
+            [
+                [('N CONTRATO 3PC', 'lineedit'), ('TIPO DE CM', 'combo'), ('ESTADO DEL CM', 'combo')],
+                [('FECHA INICIO CM', 'date'), ('FECHA TERMINO CM', 'date'), ('PAGO CM', 'lineedit')],
+            ],
+            padre=tab_justtime_cm
+        )
+        row_justtime_cm.addWidget(_section_cm, 1)
+        layout_justtime_cm.addLayout(row_justtime_cm)
+        layout_justtime_cm.addStretch()
 
-                tab_comercial = QWidget()
-                layout_comercial = QVBoxLayout(tab_comercial)
-                layout_comercial.setContentsMargins(0, 0, 0, 0)
-                layout_comercial.setSpacing(14)
-                layout_comercial.addWidget(self._build_section(
-                    'comercial', "3. Información comercial", "Datos de la venta y facturación del servicio.",
-                    [
-                        [('EJECUTIVO', 'combo_editable'), ('FORMA DE CONTRATO', 'combo'), ('TIPO DE FACTURACION', 'tipo_facturacion'), ('ESTADO COMERCIAL', 'combo')],
-                        [('TIPO DE SERVICIO', 'combo'), ('INICIO CONTRATO', 'date'), ('DURACIÓN (MESES)', 'lineedit'), ('TÉRMINO CONTRATO', 'readonly')],
-                    ]
-                ))
-                layout_comercial.addStretch()
-                self.tabs.addTab(tab_comercial, "Comercial")
+        self._construir_cuerpo_pasos(contenido_layout)
+        # Antes había una lógica de foco distinta para alta vs. edición
+        # (pestaña "Cliente" vs. "Comercial", ver historial 25-09-2026);
+        # con las fusiones/separaciones de pestañas del 25-09-2026
+        # "Comercial" (0) sigue siendo el foco inicial correcto tanto
+        # para crear como para editar -- no hace falta elegir índice
+        # según el modo.
+        self.tabs.setCurrentIndex(0)
 
-            with medir("_setup_ui > 7) tab_operaciones"):
-                # --- Pestaña "Operaciones" ---
-                tab_operaciones = QWidget()
-                layout_operaciones = QVBoxLayout(tab_operaciones)
-                layout_operaciones.setContentsMargins(0, 0, 0, 0)
-                layout_operaciones.setSpacing(14)
-                with medir("_setup_ui > 7a) tab_operaciones._build_section"):
-                    _section_operativa = self._build_section(
-                        'operativa', "6. Información operativa", "Estado y flota de la unidad en Servicios Conectados.",
-                        [
-                            [('FLOTA VC', 'combo_editable'), ('FLOTA VC 2', 'combo_editable'), ('ESTADO DE ACTIVACIÓN ACTUAL', 'combo')],
-                            [('CDB FLOTA', 'lineedit'), ('ESTADO DE ENTREGA', 'date'), ('FECHA DE BAJA', 'date')],
-                        ]
-                    )
-                with medir("_setup_ui > 7b0) tab_operaciones.layout_operaciones.addWidget"):
-                    layout_operaciones.addWidget(_section_operativa)
-                layout_operaciones.addStretch()
-                with medir("_setup_ui > 7b) tab_operaciones.addTab"):
-                    self._pagina_operaciones = tab_operaciones
+        # --- Conexiones en vivo para cálculos y autocompletado ---
+        self.inputs['VIN'].textChanged.connect(self._auto_calculate_chasis)
+        self.inputs['VIN'].textChanged.connect(self._auto_calculate_modelo)
+        # textChanged cubre tanto tipeo como pegado (Ctrl+V) del VIN.
+        self.inputs['VIN'].textChanged.connect(self._validar_vin_duplicado)
+        # MODELO: si el usuario elige un valor a mano desde el combo
+        # (`activated`, no `currentTextChanged`: así no se confunde con los
+        # setCurrentText programáticos de _auto_calculate_modelo/precarga),
+        # el autocompletado por VIN deja de pisarlo.
+        self.inputs['MODELO'].activated.connect(self._on_modelo_editado_manualmente)
+        self.inputs['INICIO CONTRATO'].textChanged.connect(self._on_inicio_contrato_changed)
+        self.inputs['DURACIÓN (MESES)'].textChanged.connect(self._auto_calculate_termino)
+        self.inputs['DURACIÓN (MESES)'].textChanged.connect(self._on_duracion_nuevo_contrato)
+        self.inputs['FECHA DE BAJA'].textChanged.connect(self._on_fecha_baja_changed)
+        self.inputs['ESTADO DE ENTREGA'].textChanged.connect(self._on_fecha_generica_widget_changed)
+        self.inputs['PAGO CM'].textChanged.connect(self._on_pago_cm_changed)
+        # textChanged (no editingFinished): autocompletar apenas se escribe o
+        # pega el RUT/CDB, sin esperar a que el campo pierda el foco.
+        self.inputs['RUT'].textChanged.connect(self._on_rut_completado)
+        self.inputs['CDB'].textChanged.connect(self._actualizar_flota_vc_por_cdb)
 
-            with medir("_setup_ui > 8) tab_justtime_cm"):
-                # --- Pestaña "JustTime & CM" (25-09-2026: separada de nuevo
-                # de "Comercial" -- ver comentario más arriba). Mismo
-                # contenido lado a lado de siempre, solo con pestaña propia
-                # en vez de compartida. ---
-                tab_justtime_cm = QWidget()
-                layout_justtime_cm = QVBoxLayout(tab_justtime_cm)
-                layout_justtime_cm.setContentsMargins(0, 0, 0, 0)
-                layout_justtime_cm.setSpacing(14)
-                row_justtime_cm = QHBoxLayout()
-                row_justtime_cm.setSpacing(14)
-                with medir("_setup_ui > 8a) tab_justtime_cm._build_section(justtime)"):
-                    _section_justtime = self._build_section(
-                        'justtime', "4. JustTime", "Facturación y contrato en JustTime (según Tipo de Facturación).",
-                        [
-                            [('CONTRATO CREADO EN JUSTTIME', 'combo'), ('INICIO', 'date'), ('TERMINO', 'date')],
-                        ]
-                    )
-                row_justtime_cm.addWidget(_section_justtime, 1)
-                with medir("_setup_ui > 8b) tab_justtime_cm._build_section(cm)"):
-                    _section_cm = self._build_section(
-                        'cm', "5. Contrato de Mantenimiento (CM)", "Solo aplica cuando Tipo de Facturación es CM.",
-                        [
-                            [('N CONTRATO 3PC', 'lineedit'), ('TIPO DE CM', 'combo'), ('ESTADO DEL CM', 'combo')],
-                            [('FECHA INICIO CM', 'date'), ('FECHA TERMINO CM', 'date'), ('PAGO CM', 'lineedit')],
-                        ]
-                    )
-                row_justtime_cm.addWidget(_section_cm, 1)
-                layout_justtime_cm.addLayout(row_justtime_cm)
-                layout_justtime_cm.addStretch()
-                with medir("_setup_ui > 8c) tab_justtime_cm.addTab"):
-                    self.tabs.addTab(tab_justtime_cm, "JustTime & CM")
-                    self.tabs.addTab(self._pagina_operaciones, "Operaciones")
+        # ETAPA GESTIÓN: recalculo automático al cambiar cualquiera de sus 3
+        # disparadores (ESTADO COMERCIAL, ESTADO DE ACTIVACIÓN ACTUAL --
+        # agregado 21-09-2026, matriz de 2 ejes -- y TIPO DE FACTURACION,
+        # este último ya con su combo real, ver
+        # _on_tipo_facturacion_editado). Sin edición manual (22-09-2026,
+        # ver combo_etapa.setEnabled(False) más arriba): el combo está
+        # deshabilitado, así que no hay ninguna interacción de usuario que
+        # conectar aquí.
+        self.inputs['ESTADO COMERCIAL'].currentTextChanged.connect(self._recalcular_etapa_gestion)
+        self.inputs['ESTADO DE ACTIVACIÓN ACTUAL'].currentTextChanged.connect(self._recalcular_etapa_gestion)
+        # `activated`: solo cuando la persona elige el estado, no al precargar datos
+        self.inputs['ESTADO COMERCIAL'].activated.connect(self._sincronizar_activacion_con_estado_comercial)
+        self.inputs['ESTADO COMERCIAL'].currentTextChanged.connect(self._ajustar_justtime_manual)
+        self.inputs['CONTRATO CREADO EN JUSTTIME'].activated.connect(self._on_justtime_elegido)
 
-            with medir("_setup_ui > 9) contenido_layout.addWidget(self.tabs)"):
-                self._construir_cuerpo_pasos(contenido_layout)
-                # Antes había una lógica de foco distinta para alta vs. edición
-                # (pestaña "Cliente" vs. "Comercial", ver historial 25-09-2026);
-                # con las fusiones/separaciones de pestañas del 25-09-2026
-                # "Comercial" (0) sigue siendo el foco inicial correcto tanto
-                # para crear como para editar -- no hace falta elegir índice
-                # según el modo.
-                self.tabs.setCurrentIndex(0)
+        # Pestaña "JustTime & CM": TIPO DE FACTURACION dispara ETAPA GESTIÓN
+        # (arriba) y la habilitación de bloques; FORMA DE CONTRATO autocompleta
+        # TIPO DE CM cuando corresponde a un código de mantenimiento.
+        self.inputs['TIPO DE FACTURACION'].activated.connect(self._on_tipo_facturacion_editado)
+        # Orden importa: primero sincroniza si CM debe habilitarse/deshabilitarse
+        # (FORMA DE CONTRATO manda), y recién después autocompleta TIPO DE CM.
+        self.inputs['FORMA DE CONTRATO'].currentTextChanged.connect(self._sincronizar_tipo_facturacion_con_forma_contrato)
+        self.inputs['FORMA DE CONTRATO'].currentTextChanged.connect(self._autocompletar_tipo_cm)
+        self.inputs['FORMA DE CONTRATO'].currentTextChanged.connect(self._sincronizar_estado_con_contrato)
+        self.inputs['ESTADO DE ACTIVACIÓN ACTUAL'].currentTextChanged.connect(self._sincronizar_estado_con_contrato)
+        self.inputs['TIPO DE CM'].activated.connect(self._on_tipo_cm_editado_manualmente)
+        for campo_fecha in ('INICIO', 'TERMINO', 'FECHA INICIO CM', 'FECHA TERMINO CM'):
+            self.inputs[campo_fecha].textChanged.connect(self._on_fecha_generica_widget_changed)
 
-            with medir("_setup_ui > 10) conexiones_señales"):
-                # --- Conexiones en vivo para cálculos y autocompletado ---
-                self.inputs['VIN'].textChanged.connect(self._auto_calculate_chasis)
-                self.inputs['VIN'].textChanged.connect(self._auto_calculate_modelo)
-                # textChanged cubre tanto tipeo como pegado (Ctrl+V) del VIN.
-                self.inputs['VIN'].textChanged.connect(self._validar_vin_duplicado)
-                # MODELO: si el usuario elige un valor a mano desde el combo
-                # (`activated`, no `currentTextChanged`: así no se confunde con los
-                # setCurrentText programáticos de _auto_calculate_modelo/precarga),
-                # el autocompletado por VIN deja de pisarlo.
-                self.inputs['MODELO'].activated.connect(self._on_modelo_editado_manualmente)
-                self.inputs['INICIO CONTRATO'].textChanged.connect(self._on_inicio_contrato_changed)
-                self.inputs['DURACIÓN (MESES)'].textChanged.connect(self._auto_calculate_termino)
-                self.inputs['DURACIÓN (MESES)'].textChanged.connect(self._on_duracion_nuevo_contrato)
-                self.inputs['FECHA DE BAJA'].textChanged.connect(self._on_fecha_baja_changed)
-                self.inputs['ESTADO DE ENTREGA'].textChanged.connect(self._on_fecha_generica_widget_changed)
-                self.inputs['PAGO CM'].textChanged.connect(self._on_pago_cm_changed)
-                # textChanged (no editingFinished): autocompletar apenas se escribe o
-                # pega el RUT/CDB, sin esperar a que el campo pierda el foco.
-                self.inputs['RUT'].textChanged.connect(self._on_rut_completado)
-                self.inputs['CDB'].textChanged.connect(self._actualizar_flota_vc_por_cdb)
+        self._recalcular_etapa_gestion()
+        self._actualizar_habilitacion_justtime_cm()
+        self._actualizar_habilitacion_tipo_facturacion()
+        self._conectar_resumen()
 
-                # ETAPA GESTIÓN: recalculo automático al cambiar cualquiera de sus 3
-                # disparadores (ESTADO COMERCIAL, ESTADO DE ACTIVACIÓN ACTUAL --
-                # agregado 21-09-2026, matriz de 2 ejes -- y TIPO DE FACTURACION,
-                # este último ya con su combo real, ver
-                # _on_tipo_facturacion_editado). Sin edición manual (22-09-2026,
-                # ver combo_etapa.setEnabled(False) más arriba): el combo está
-                # deshabilitado, así que no hay ninguna interacción de usuario que
-                # conectar aquí.
-                self.inputs['ESTADO COMERCIAL'].currentTextChanged.connect(self._recalcular_etapa_gestion)
-                self.inputs['ESTADO DE ACTIVACIÓN ACTUAL'].currentTextChanged.connect(self._recalcular_etapa_gestion)
+        # --- Botones inferiores ---
+        # Fila con 2 grupos (25-09-2026, a pedido explícito): a la
+        # izquierda "Restablecer"/"Importar Excel Power BI" (ver
+        # agregar_boton_pie), a la derecha Cancelar/Guardar Registro,
+        # separados por un stretch central.
+        btn_layout = QHBoxLayout()
 
-                # Pestaña "JustTime & CM": TIPO DE FACTURACION dispara ETAPA GESTIÓN
-                # (arriba) y la habilitación de bloques; FORMA DE CONTRATO autocompleta
-                # TIPO DE CM cuando corresponde a un código de mantenimiento.
-                self.inputs['TIPO DE FACTURACION'].activated.connect(self._on_tipo_facturacion_editado)
-                # Orden importa: primero sincroniza si CM debe habilitarse/deshabilitarse
-                # (FORMA DE CONTRATO manda), y recién después autocompleta TIPO DE CM.
-                self.inputs['FORMA DE CONTRATO'].currentTextChanged.connect(self._sincronizar_tipo_facturacion_con_forma_contrato)
-                self.inputs['FORMA DE CONTRATO'].currentTextChanged.connect(self._autocompletar_tipo_cm)
-                self.inputs['FORMA DE CONTRATO'].currentTextChanged.connect(self._sincronizar_estado_con_contrato)
-                self.inputs['ESTADO DE ACTIVACIÓN ACTUAL'].currentTextChanged.connect(self._sincronizar_estado_con_contrato)
-                self.inputs['TIPO DE CM'].activated.connect(self._on_tipo_cm_editado_manualmente)
-                for campo_fecha in ('INICIO', 'TERMINO', 'FECHA INICIO CM', 'FECHA TERMINO CM'):
-                    self.inputs[campo_fecha].textChanged.connect(self._on_fecha_generica_widget_changed)
+        self._btn_layout_izquierda = QHBoxLayout()
+        self._btn_layout_izquierda.setSpacing(8)
+        btn_layout.addLayout(self._btn_layout_izquierda)
 
-                self._recalcular_etapa_gestion()
-                self._actualizar_habilitacion_justtime_cm()
-                self._actualizar_habilitacion_tipo_facturacion()
-                self._conectar_resumen()
+        btn_layout.addStretch()
 
-            with medir("_setup_ui > 10) botones_finales"):
-                # --- Botones inferiores ---
-                # Fila con 2 grupos (25-09-2026, a pedido explícito): a la
-                # izquierda "Restablecer"/"Importar Excel Power BI" (ver
-                # agregar_boton_pie), a la derecha Cancelar/Guardar Registro,
-                # separados por un stretch central.
-                btn_layout = QHBoxLayout()
+        btn_cancel = QPushButton("Cancelar")
+        # Rojo con letra blanca (25-09-2026, a pedido explícito) --
+        # hover/pressed en tonos de rojo distintos entre sí para que
+        # el clic se sienta (a pedido explícito: "no pueden tener el
+        # mismo color al cambiar").
+        btn_cancel.setStyleSheet(
+            "QPushButton { background-color: #FFFFFF; border: 1px solid #DCE3EC; color: #A8453F; "
+            "padding: 0 18px; min-height: 40px; border-radius: 8px; font-size: 13px; font-weight: 600; } "
+            "QPushButton:hover { background-color: #FBF1F0; } "
+            "QPushButton:pressed { background-color: #F5E1DF; }"
+        )
+        # Sin autoDefault: Enter en cualquier campo del formulario (ej. al
+        # pegar el RUT) no debe disparar ningun boton ni cerrar el dialogo.
+        btn_cancel.setAutoDefault(False)
+        btn_cancel.setDefault(False)
+        # En modo lote, cancelar pide confirmación (todo el lote se pierde);
+        # en los demás modos se mantiene el comportamiento de siempre.
+        btn_cancel.clicked.connect(self._handle_cancelar)
 
-                self._btn_layout_izquierda = QHBoxLayout()
-                self._btn_layout_izquierda.setSpacing(8)
-                btn_layout.addLayout(self._btn_layout_izquierda)
+        self.btn_save = QPushButton("")
+        self.btn_save.setIcon(qta.icon('fa5s.save', color='white'))
+        self.btn_save.setStyleSheet(
+            f"QPushButton {{ background-color: {self._CORP}; color: white; border: 1px solid {self._CORP}; "
+            "padding: 0 20px; min-height: 40px; border-radius: 8px; font-weight: 600; font-size: 13px; } "
+            "QPushButton:hover { background-color: #2B3D63; border-color: #2B3D63; } "
+            "QPushButton:pressed { background-color: #15213D; } "
+            "QPushButton:disabled { background-color: #A9B4C6; border-color: #A9B4C6; }"
+        )
+        self.btn_save.setAutoDefault(False)
+        self.btn_save.setDefault(False)
+        self.btn_save.clicked.connect(self._validate_and_accept)
 
-                btn_layout.addStretch()
+        btn_layout.addWidget(btn_cancel)
+        self._nav_layout.addWidget(self.btn_save)
+        # Expuesto para que ComercialUnidadFormWidget pueda agregar
+        # botones extra al grupo izquierdo de esta misma fila
+        # (25-09-2026, a pedido explícito: "Importar Excel Power BI"
+        # abajo a la izquierda junto al nuevo botón de restablecer --
+        # ver agregar_boton_pie más abajo).
+        self._btn_layout_inferior = btn_layout
 
-                btn_cancel = QPushButton("Cancelar")
-                # Rojo con letra blanca (25-09-2026, a pedido explícito) --
-                # hover/pressed en tonos de rojo distintos entre sí para que
-                # el clic se sienta (a pedido explícito: "no pueden tener el
-                # mismo color al cambiar").
-                btn_cancel.setStyleSheet(
-                    "QPushButton { background-color: #FFFFFF; border: 1px solid #DCE3EC; color: #A8453F; "
-                    "padding: 0 18px; min-height: 40px; border-radius: 8px; font-size: 13px; font-weight: 600; } "
-                    "QPushButton:hover { background-color: #FBF1F0; } "
-                    "QPushButton:pressed { background-color: #F5E1DF; }"
-                )
-                # Sin autoDefault: Enter en cualquier campo del formulario (ej. al
-                # pegar el RUT) no debe disparar ningun boton ni cerrar el dialogo.
-                btn_cancel.setAutoDefault(False)
-                btn_cancel.setDefault(False)
-                # En modo lote, cancelar pide confirmación (todo el lote se pierde);
-                # en los demás modos se mantiene el comportamiento de siempre.
-                btn_cancel.clicked.connect(self._handle_cancelar)
+        outer_layout.addLayout(btn_layout)
 
-                self.btn_save = QPushButton("")
-                self.btn_save.setIcon(qta.icon('fa5s.save', color='white'))
-                self.btn_save.setStyleSheet(
-                    f"QPushButton {{ background-color: {self._CORP}; color: white; border: 1px solid {self._CORP}; "
-                    "padding: 0 20px; min-height: 40px; border-radius: 8px; font-weight: 600; font-size: 13px; } "
-                    "QPushButton:hover { background-color: #2B3D63; border-color: #2B3D63; } "
-                    "QPushButton:pressed { background-color: #15213D; } "
-                    "QPushButton:disabled { background-color: #A9B4C6; border-color: #A9B4C6; }"
-                )
-                self.btn_save.setAutoDefault(False)
-                self.btn_save.setDefault(False)
-                self.btn_save.clicked.connect(self._validate_and_accept)
+        self._actualizar_texto_guardar()
 
-                btn_layout.addWidget(btn_cancel)
-                self._nav_layout.addWidget(self.btn_save)
-                # Expuesto para que ComercialUnidadFormWidget pueda agregar
-                # botones extra al grupo izquierdo de esta misma fila
-                # (25-09-2026, a pedido explícito: "Importar Excel Power BI"
-                # abajo a la izquierda junto al nuevo botón de restablecer --
-                # ver agregar_boton_pie más abajo).
-                self._btn_layout_inferior = btn_layout
-
-                outer_layout.addLayout(btn_layout)
-
-                self._actualizar_texto_guardar()
-
-            with medir("_setup_ui > 11) poblar_combos_flota"):
-                self._poblar_combos_flota()
-        finally:
-            qta.icon = _orig_qta_icon
-            ThemeManager.apply_combo_box = staticmethod(_orig_apply_combo)
-            print(f"[PERF][UI]   -> qta.icon(): {_perf_acc['icons_s'] * 1000:.1f} ms en {_perf_acc['icons_n']} llamadas")
-            print(f"[PERF][UI]   -> ThemeManager.apply_combo_box(): {_perf_acc['combo_s'] * 1000:.1f} ms en {_perf_acc['combo_n']} llamadas")
+        self._poblar_combos_flota()
 
     def _poblar_combos_flota(self):
         """Carga el catálogo de flotas una vez armado el formulario, en el
@@ -1129,10 +1156,11 @@ class _ComercialUnidadFormMixin:
         self._filtro_checks_tipo_servicio = _FiltroHabilitado(combo, [self.chk_civ, self.chk_sz])
         return fila
 
-    def _build_section(self, key, title, subtitle, rows):
+    def _build_section(self, key, title, subtitle, rows, padre=None):
         icon_name, accent, bg = self._SECTION_STYLE[key]
 
-        card = QFrame()
+        # Cada contenedor se cuelga antes de llenarlo (ver _setup_ui > 4)
+        card = QFrame(padre)
         card.setObjectName("sectionCard")
         card.setStyleSheet(
             "QFrame#sectionCard { background-color: #FFFFFF; border: 1px solid #E3E8F0; border-radius: 12px; }")
@@ -1140,7 +1168,7 @@ class _ComercialUnidadFormMixin:
         card_layout.setContentsMargins(1, 1, 1, 1)
         card_layout.setSpacing(0)
 
-        header = QFrame()
+        header = QFrame(card)
         header.setObjectName("sectionHeader")
         header.setStyleSheet(
             f"QFrame#sectionHeader {{ background-color: {bg}; border: none; border-bottom: 1px solid #E3E8F0; "
@@ -1182,7 +1210,10 @@ class _ComercialUnidadFormMixin:
         badge_layout.addWidget(badge_icon_lbl)
         badge_layout.addWidget(badge_text_lbl)
         badge_bloqueo.setVisible(False)
-        header_layout.addWidget(badge_bloqueo)
+        header_layout.addWidget(badge_bloqueo, 0, Qt.AlignmentFlag.AlignVCenter)
+        if key in ('justtime', 'cm'):
+            # Van lado a lado: mismo alto de encabezado aunque el subtítulo ocupe 1 o 2 líneas
+            header.setFixedHeight(78)
         if not hasattr(self, '_badges_bloqueo'):
             self._badges_bloqueo = {}
         self._badges_bloqueo[key] = {
@@ -1191,7 +1222,7 @@ class _ComercialUnidadFormMixin:
 
         card_layout.addWidget(header)
 
-        fields_frame = QFrame()
+        fields_frame = QFrame(card)
         fields_frame.setObjectName("sectionFields")
         fields_frame.setStyleSheet(
             "QFrame#sectionFields { background-color: #FFFFFF; border: none; "
@@ -1199,14 +1230,17 @@ class _ComercialUnidadFormMixin:
         fields_layout = QVBoxLayout(fields_frame)
         fields_layout.setContentsMargins(18, 16, 18, 18)
         fields_layout.setSpacing(14)
+        card_layout.addWidget(fields_frame)
 
         for row_fields in rows:
             row_layout = QHBoxLayout()
             row_layout.setSpacing(14)
+            fields_layout.addLayout(row_layout)
             hay_campo_flexible = False
             for f_name, f_type in row_fields:
                 field_box = QVBoxLayout()
                 field_box.setSpacing(6)
+                row_layout.addLayout(field_box, 0 if f_name in _ANCHO_FIJO else 1)
                 if f_name == 'TIPO DE FACTURACION':
                     self._btn_corregir_tipo_fact = self._crear_boton_corregir_tipo_facturacion()
                     field_box.addWidget(self._btn_corregir_tipo_fact)
@@ -1217,25 +1251,20 @@ class _ComercialUnidadFormMixin:
                     label = QLabel(texto_etiqueta)
                 label.setStyleSheet("background: transparent; border: none;")
                 field_box.addWidget(label)
-                _t_campo = time.perf_counter()
                 widget = self._create_widget(f_name, f_type)
-                _dt_campo = (time.perf_counter() - _t_campo) * 1000
-                if _dt_campo > 1.0:
-                    print(f"[PERF][UI]       campo '{f_name}' ({f_type}): {_dt_campo:.1f} ms")
                 field_box.addWidget(widget)
                 if f_name == 'TIPO DE SERVICIO':
                     field_box.addLayout(self._crear_checks_tipo_servicio(widget))
                 if f_name in _ANCHO_FIJO:
                     widget.setMaximumWidth(_ANCHO_FIJO[f_name])
-                    row_layout.addLayout(field_box, 0)
                 else:
                     hay_campo_flexible = True
-                    row_layout.addLayout(field_box, 1)
+                    # Ignored: el ancho lo da solo el stretch, así los campos de la fila quedan parejos
+                    widget.setSizePolicy(QSizePolicy.Policy.Ignored, widget.sizePolicy().verticalPolicy())
+                row_layout.setAlignment(field_box, Qt.AlignmentFlag.AlignTop)
             if not hay_campo_flexible:
                 row_layout.addStretch()
-            fields_layout.addLayout(row_layout)
 
-        card_layout.addWidget(fields_frame)
         return card
 
     # ------------------------------------------------------------------
@@ -1248,7 +1277,7 @@ class _ComercialUnidadFormMixin:
         ("Fecha de entrega", "ESTADO DE ENTREGA"),
     )
     # Paso (índice de self.tabs) donde vive cada campo obligatorio
-    _PASO_DE_CAMPO = {'RUT': 0, 'RAZÓN SOCIAL': 0, 'VIN': 0, 'CHASIS': 0, 'EJECUTIVO': 1}
+    _PASO_DE_CAMPO = {'RUT': 0, 'RAZÓN SOCIAL': 0, 'VIN': 0, 'CHASIS': 0}
 
     def _construir_cuerpo_pasos(self, contenido_layout):
         pasos = [("Empresa & Unidad", "Cliente y camión"), ("Comercial", "Contrato y facturación"),
@@ -1259,7 +1288,8 @@ class _ComercialUnidadFormMixin:
             # El paso queda fuera del recorrido, no se elimina
             self.tabs.setTabVisible(len(pasos), False)
 
-        barra = QFrame()
+        contenedor = contenido_layout.parentWidget()
+        barra = QFrame(contenedor)
         barra.setObjectName("pasosForm")
         barra.setStyleSheet("QFrame#pasosForm { background-color: #FFFFFF; border: 1px solid #E3E8F0; border-radius: 12px; }")
         lay_barra = QHBoxLayout(barra)
@@ -1267,7 +1297,7 @@ class _ComercialUnidadFormMixin:
         lay_barra.setSpacing(4)
         self._botones_paso = []
         for i, (titulo, sub) in enumerate(pasos):
-            btn = QPushButton()
+            btn = QPushButton(barra)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setMinimumHeight(52)
             lay = QHBoxLayout(btn)
@@ -1324,7 +1354,7 @@ class _ComercialUnidadFormMixin:
         izquierda.addLayout(self._nav_layout)
         fila.addLayout(izquierda, 1)
 
-        resumen = QFrame()
+        resumen = QFrame(contenedor)
         resumen.setObjectName("resumenForm")
         resumen.setFixedWidth(290)
         resumen.setStyleSheet("QFrame#resumenForm { background-color: #FFFFFF; border: 1px solid #E3E8F0; border-radius: 12px; }")
@@ -1382,7 +1412,7 @@ class _ComercialUnidadFormMixin:
                     "border: 1px solid #DCE3EC; border-radius: 13px; font-size: 12px; font-weight: 700; letter-spacing: 0;")
                 t.setStyleSheet("font-size: 13px; font-weight: 600; color: #66748D; letter-spacing: 0; background: transparent;")
             st.setStyleSheet("font-size: 11px; font-weight: 400; color: #8A97AB; letter-spacing: 0; background: transparent;")
-        self._btn_paso_atras.setEnabled(actual > 0)
+        self._btn_paso_atras.setEnabled(actual > self._primer_paso)
         self._btn_paso_siguiente.setVisible(actual < n - 1)
         self._actualizar_bloqueo_siguiente()
 
@@ -1443,6 +1473,10 @@ class _ComercialUnidadFormMixin:
             bloqueados = {'Vigente', 'Vencido', 'Baja', 'Baja Solicitada'} if getattr(self, '_estado_alta_restringido', False) else set()
             if self._restringir_vigentes:
                 bloqueados |= {'Vencido', 'Activación Pendiente'}
+            if self.modo_edicion and self._restringir_activacion and actual in ('Revisar', 'Activación Pendiente'):
+                # Unidad que aún no pasó por activación (Nuevas oportunidades):
+                # no puede saltarse Activación Pendiente.
+                bloqueados |= {'Vigente', 'Vencido', 'Baja', 'Baja Solicitada'}
             if self.modo_edicion and activacion == 'CONECTADO':
                 bloqueados.add('Activación Pendiente')
             elif self.modo_edicion and activacion == 'ACTIVANDO':
@@ -1461,6 +1495,35 @@ class _ComercialUnidadFormMixin:
         if nuevo != actual:
             self._recalcular_etapa_gestion()
         self._actualizar_resumen()
+
+    def _sincronizar_activacion_con_estado_comercial(self, *_args):
+        """Al crear una unidad, "Activación Pendiente" la manda a activar:
+        ESTADO DE ACTIVACIÓN ACTUAL pasa de "No aplica" a "Activando" (igual
+        que en el flujo de Nuevas oportunidades, ver _aplicar_restriccion_activacion)
+        y vuelve a "No aplica" si se cambia a otro estado sin haberlo tocado a
+        mano. No actúa al editar, en el alta desde Vista General ni cuando la
+        activación ya trae un valor real (p. ej. un registro importado). Operaciones
+        está siempre de solo lectura en el formulario de alta, pero el cambio se aplica igual."""
+        if self._forzar_activacion_pendiente or 'ESTADO DE ACTIVACIÓN ACTUAL' not in self.inputs:
+            return
+        if self.modo_edicion and not self._restringir_activacion:
+            return
+        activacion = self.inputs['ESTADO DE ACTIVACIÓN ACTUAL']
+        # Al editar desde Nuevas oportunidades la pestaña Operaciones está
+        # bloqueada, pero la activación igual debe acompañar al estado.
+        if getattr(self, '_restringir_alta_desde_general', False) \
+                or self._valor_widget('FORMA DE CONTRATO').strip().upper() == 'SIN CONTRATO':
+            return
+        estado = self.inputs['ESTADO COMERCIAL'].currentText().strip().upper()
+        actual = activacion.currentText().strip().upper()
+        if estado in ('ACTIVACIÓN PENDIENTE', 'ACTIVACION PENDIENTE'):
+            if actual == 'NO APLICA':
+                activacion.setCurrentText('Activando')
+                self._activacion_auto = True
+        elif getattr(self, '_activacion_auto', False):
+            if actual == 'ACTIVANDO':
+                activacion.setCurrentText('No aplica')
+            self._activacion_auto = False
 
     def _actualizar_resumen(self, *_args):
         if not hasattr(self, '_resumen_valores'):
@@ -1579,7 +1642,7 @@ class _ComercialUnidadFormMixin:
                 w.addItems(inds_unicas)
                 w.setCurrentText(_DEFAULTS_INICIALES.get('INDUSTRIA', ''))
             elif field_name == 'EJECUTIVO':
-                w.addItems([""])  # se completa según el RUT ingresado (es obligatorio, sin default)
+                w.addItems([""] + self._ejecutivos_todos)
             else:
                 # FLOTA VC / FLOTA VC 2 (1000+ flotas): se llenan al final de
                 # _setup_ui (_poblar_combos_flota). Con los ítems ya cargados,
@@ -1631,10 +1694,38 @@ class _ComercialUnidadFormMixin:
                 # DESPUÉS de escribirlo (se veía parpadear); ahora una letra
                 # directamente no se puede escribir.
                 w.setValidator(QRegularExpressionValidator(QRegularExpression(r"[0-9]*")))
+            elif field_name == 'DURACIÓN (MESES)':
+                # Solo dígitos o un guion: cualquier otro carácter no se puede
+                # escribir. Si el campo muestra "-" y se teclea un número, el
+                # guion se descarta para no obligar a borrarlo antes. Hasta dos
+                # dígitos: el tope es DURACION_MAXIMA_MESES (99)
+                w.setValidator(QRegularExpressionValidator(QRegularExpression(r"-?[0-9]{0,2}")))
+                w.textEdited.connect(lambda texto, campo=w: self._quitar_guion_si_hay_numero(campo, texto))
+            elif field_name == 'CDB':
+                # CDB comercial: hasta 10 dígitos (o "-" si no se conoce)
+                w.setValidator(QRegularExpressionValidator(QRegularExpression(r"-?[0-9]{0,10}")))
+                w.textEdited.connect(lambda texto, campo=w: self._quitar_guion_si_hay_numero(campo, texto))
+            elif field_name == 'VIN':
+                # Solo letras A-Z (sin tildes ni ñ) y números, siempre en
+                # mayúsculas; también limpia lo que se pegue.
+                w.textEdited.connect(lambda texto, campo=w: self._normalizar_vin_escrito(campo, texto))
 
         w.setMinimumHeight(40)
         self.inputs[field_name] = w
         return w
+
+    @staticmethod
+    def _quitar_guion_si_hay_numero(campo, texto):
+        if len(texto) > 1 and texto.startswith('-'):
+            campo.setText(texto.lstrip('-'))
+
+    @staticmethod
+    def _normalizar_vin_escrito(campo, texto):
+        limpio = re.sub(r'[^A-Za-z0-9]', '', texto).upper()
+        if limpio != texto:
+            cursor = campo.cursorPosition() - (len(texto) - len(limpio))
+            campo.setText(limpio)
+            campo.setCursorPosition(max(0, cursor))
 
     # ------------------------------------------------------------------
     # Autocompletado a partir del RUT
@@ -1730,7 +1821,7 @@ class _ComercialUnidadFormMixin:
         combo_ejecutivo = self.inputs['EJECUTIVO']
         combo_ejecutivo.blockSignals(True)
         combo_ejecutivo.clear()
-        combo_ejecutivo.addItems([""] + ejecutivos)
+        combo_ejecutivo.addItems([""] + ejecutivos + [e for e in self._ejecutivos_todos if e not in ejecutivos])
         combo_ejecutivo.setCurrentText(ejecutivos[0] if len(ejecutivos) == 1 else "")
         combo_ejecutivo.blockSignals(False)
 
@@ -1934,8 +2025,151 @@ class _ComercialUnidadFormMixin:
             self.inputs[campo].setEnabled(habilita_cm)
         self._set_badge_bloqueo('justtime', habilita_justtime)
         self._set_badge_bloqueo('cm', habilita_cm)
-        if getattr(self, 'modo_nuevo_contrato', False):
+        if self._justtime_automatico():
             self._aplicar_justtime_nuevo_contrato()
+        else:
+            self._ajustar_justtime_manual()
+
+    def _tipo_va_a_justtime(self):
+        return str(self._tipo_facturacion_actual).strip().upper() in TIPO_FACTURACION_HABILITA_JUSTTIME
+
+    def _poner_estado_justtime(self, estado):
+        combo = self.inputs['CONTRATO CREADO EN JUSTTIME']
+        combo.blockSignals(True)
+        if combo.findText(estado) < 0:
+            combo.addItem(estado)
+        combo.setCurrentText(estado)
+        combo.blockSignals(False)
+
+    def _poner_fechas_justtime(self, inicio, termino):
+        for campo, valor in (('INICIO', inicio), ('TERMINO', termino)):
+            widget = self.inputs[campo]
+            widget.blockSignals(True)
+            widget.setText(valor or JUSTTIME_ESTADO_NO_APLICA)
+            widget.blockSignals(False)
+
+    def _ajustar_justtime_correccion(self):
+        """Unidad cuyo tipo de facturación no va a JustTime pero sigue con
+        estado Si, Pendiente o Revisar pago: el estado se puede corregir a lo
+        que indica la matriz (Si/Revisar pago -> Eliminar, Pendiente -> "-");
+        las fechas siguen bloqueadas."""
+        combo = self.inputs['CONTRATO CREADO EN JUSTTIME']
+        actual = combo.currentText().strip()
+        original = (getattr(self, '_jt_original', None) or {}).get('estado', '')
+        base = actual if actual in _ESTADOS_JT_CORREGIBLES else (original if original in _ESTADOS_JT_CORREGIBLES else '')
+        if not base:
+            combo.setEnabled(False)
+            return
+        destino = JUSTTIME_ESTADO_NO_APLICA if base == JUSTTIME_ESTADO_PENDIENTE else JUSTTIME_ESTADO_ELIMINAR
+        opciones = [base, destino]
+        if [combo.itemText(i) for i in range(combo.count())] != opciones:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(opciones)
+            combo.setCurrentText(actual if actual in opciones else base)
+            combo.blockSignals(False)
+        combo.setEnabled(True)
+        self._set_badge_bloqueo('justtime', True)
+        for campo in ('INICIO', 'TERMINO'):
+            self.inputs[campo].setEnabled(False)
+
+    def _completar_fechas_justtime(self):
+        """Inicio y término de JustTime vacíos con un estado vigente: el inicio
+        es el primer día del mes de INICIO CONTRATO y el término suma la
+        duración (queda vacío si el contrato es mensual)."""
+        if self.inputs['CONTRATO CREADO EN JUSTTIME'].currentText().strip() not in _ESTADOS_JT_CORREGIBLES:
+            return
+        vacio = ('', JUSTTIME_ESTADO_NO_APLICA)
+        if self.inputs['INICIO'].text().strip() not in vacio or self.inputs['TERMINO'].text().strip() not in vacio:
+            return
+        inicio = DataFrameFormatter.parsear_fecha_segura(self._valor_widget('INICIO CONTRATO'))
+        if pd.isna(inicio):
+            return
+        inicio = inicio.replace(day=1)
+        duracion = self._valor_widget('DURACIÓN (MESES)').strip()
+        termino = ''
+        if duracion.isdigit() and int(duracion) > 0:
+            termino = (inicio + pd.DateOffset(months=int(duracion))).strftime("%d-%m-%Y")
+        self._poner_fechas_justtime(inicio.strftime("%d-%m-%Y"), termino)
+
+    def _reconciliar_justtime_por_tipo(self, anterior, nuevo):
+        """Edición manual: al cambiar el tipo de facturación, volver al tipo
+        original deja JustTime como estaba al abrir; pasar a un tipo que no va
+        a JustTime lleva el estado a lo que indica la matriz."""
+        if not self.modo_edicion or self._justtime_automatico():
+            return
+        habilita = TIPO_FACTURACION_HABILITA_JUSTTIME
+        if (str(anterior).strip().upper() in habilita) == (str(nuevo).strip().upper() in habilita):
+            return
+        original = getattr(self, '_jt_original', None)
+        if original and str(nuevo).strip().upper() == original['tipo']:
+            self._poner_estado_justtime(original['estado'])
+            self._poner_fechas_justtime(original['inicio'], original['termino'])
+        elif str(nuevo).strip().upper() not in habilita:
+            estado = self.inputs['CONTRATO CREADO EN JUSTTIME'].currentText().strip()
+            if estado in (JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_REVISAR_PAGO):
+                self._poner_estado_justtime(JUSTTIME_ESTADO_ELIMINAR)
+            elif estado == JUSTTIME_ESTADO_PENDIENTE:
+                self._poner_estado_justtime(JUSTTIME_ESTADO_NO_APLICA)
+                self._poner_fechas_justtime('', '')
+        self._ajustar_justtime_manual()
+
+    def _ajustar_justtime_manual(self, *_args):
+        """JustTime en edición manual: "-" (ya salió de JustTime) solo se
+        ofrece si el contrato terminó y las fechas quedan siempre bloqueadas."""
+        combo = self.inputs['CONTRATO CREADO EN JUSTTIME']
+        if self._justtime_automatico():
+            return
+        if not self._tipo_va_a_justtime():
+            if self.modo_edicion:
+                self._ajustar_justtime_correccion()
+            return
+        if not combo.isEnabled():
+            return
+        actual = combo.currentText().strip()
+        terminado = self.inputs['ESTADO COMERCIAL'].currentText().strip().upper() in _ESTADOS_COMERCIALES_FIN
+        opciones = [o for o in JUSTTIME_ESTADO_OPCIONES if o != JUSTTIME_ESTADO_NO_APLICA or terminado or actual == JUSTTIME_ESTADO_NO_APLICA]
+        if [combo.itemText(i) for i in range(combo.count())] != opciones:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(opciones)
+            self._set_combo_valor_precargado(combo, actual)
+            combo.blockSignals(False)
+        for campo in ('INICIO', 'TERMINO'):
+            self.inputs[campo].setEnabled(False)
+        self._completar_fechas_justtime()
+
+    def _on_justtime_elegido(self, *_args):
+        """Las fechas nunca se editan a mano: elegir "-" las limpia (guardando
+        las vigentes) y volver a otro estado las recupera."""
+        elegido = self.inputs['CONTRATO CREADO EN JUSTTIME'].currentText().strip()
+        inicio, termino = self.inputs['INICIO'], self.inputs['TERMINO']
+        vacio = ('', JUSTTIME_ESTADO_NO_APLICA)
+        if elegido == JUSTTIME_ESTADO_NO_APLICA:
+            if inicio.text().strip() not in vacio or termino.text().strip() not in vacio:
+                self._fechas_justtime_guardadas = (inicio.text(), termino.text())
+            inicio.setText(JUSTTIME_ESTADO_NO_APLICA)
+            termino.setText(JUSTTIME_ESTADO_NO_APLICA)
+        else:
+            guardadas = getattr(self, '_fechas_justtime_guardadas', None)
+            if guardadas and inicio.text().strip() in vacio and termino.text().strip() in vacio:
+                inicio.setText(guardadas[0])
+                termino.setText(guardadas[1])
+        self._ajustar_justtime_manual()
+
+    def _justtime_automatico(self):
+        """Contrato nuevo (botón Nuevo contrato, alta de unidad o unidad de
+        Nuevas oportunidades sin estado de JustTime): JustTime se completa
+        solo. En cualquier otra edición, o si la unidad ya trae un estado
+        propio, queda manual."""
+        if getattr(self, 'modo_nuevo_contrato', False):
+            return True
+        if self.modo_edicion:
+            return getattr(self, '_jt_auto_edicion', False)
+        if getattr(self, '_modo_lote', False):
+            return False
+        actual = self.inputs['CONTRATO CREADO EN JUSTTIME'].currentText().strip()
+        return actual in ('', JUSTTIME_ESTADO_NO_APLICA, JUSTTIME_ESTADO_PENDIENTE)
 
     def _aplicar_justtime_nuevo_contrato(self):
         """En "Nuevo contrato", si el tipo de facturación va a JustTime
@@ -1968,7 +2202,7 @@ class _ComercialUnidadFormMixin:
             widget.setEnabled(False)
 
     def _on_duracion_nuevo_contrato(self, _texto=''):
-        if getattr(self, 'modo_nuevo_contrato', False):
+        if self._justtime_automatico():
             self._aplicar_justtime_nuevo_contrato()
 
     def _set_badge_bloqueo(self, key, habilitado):
@@ -1993,7 +2227,7 @@ class _ComercialUnidadFormMixin:
     def _tipo_facturacion_validos_actual(self):
         """Set de valores REALES de TIPO DE FACTURACION permitidos para el
         FORMA DE CONTRATO vigente, según FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ
-        (constants.py, matriz entregada por la contraparte comercial, 24-09-2026). None si
+        (constants.py, matriz entregada por Javiera, 24-09-2026). None si
         FORMA DE CONTRATO no está en la matriz (valor legado/no reconocido):
         en ese caso no se restringe nada, mismo criterio que el resto de las
         matrices de negocio del sistema.
@@ -2004,7 +2238,7 @@ class _ComercialUnidadFormMixin:
         alimenta detectar_inconsistencias_forma_contrato_tipo_facturacion()/
         normalizar_tipo_facturacion_por_forma_contrato() en
         comercial_services.py (auditoría de datos históricos y
-        sincronización con RM_CONTRATOS), donde FORMA DE CONTRATO='-' nunca
+        sincronización con RM_JAVI), donde FORMA DE CONTRATO='-' nunca
         debe marcarse ni tocarse. Acá, en cambio, mientras el usuario no
         elige una FORMA DE CONTRATO real, TIPO DE FACTURACION tampoco
         debería quedar editable con el catálogo completo."""
@@ -2127,6 +2361,9 @@ class _ComercialUnidadFormMixin:
         self._set_tipo_facturacion_actual(valor_real)
         self._actualizar_habilitacion_justtime_cm()
         self._limpiar_bloques_si_corresponde(valor_anterior, valor_real)
+        self._reconciliar_justtime_por_tipo(valor_anterior, valor_real)
+        self._autocompletar_duracion_mensual()
+        self._actualizar_resumen()
 
     def _limpiar_bloques_si_corresponde(self, valor_anterior, valor_nuevo):
         """Limpia a '-' los campos de un bloque (JustTime o CM) cuando ese
@@ -2140,7 +2377,9 @@ class _ComercialUnidadFormMixin:
         anterior = str(valor_anterior).strip().upper()
         nuevo = str(valor_nuevo).strip().upper()
 
-        if anterior in TIPO_FACTURACION_HABILITA_JUSTTIME and nuevo not in TIPO_FACTURACION_HABILITA_JUSTTIME:
+        edicion_manual = self.modo_edicion and not self._justtime_automatico()
+        if anterior in TIPO_FACTURACION_HABILITA_JUSTTIME and nuevo not in TIPO_FACTURACION_HABILITA_JUSTTIME \
+                and not edicion_manual:
             self._limpiar_bloque(_CAMPOS_BLOQUE_JUSTTIME)
 
         if anterior in TIPO_FACTURACION_HABILITA_CM and nuevo not in TIPO_FACTURACION_HABILITA_CM:
@@ -2246,6 +2485,8 @@ class _ComercialUnidadFormMixin:
         if not vin_upper:
             return False
         if self.modo_edicion and vin_upper == self._vin_original:
+            return False
+        if self.modo_renovacion:
             return False
         if self.modo_nuevo_contrato:
             return vin_upper in self._vins_con_contrato_abierto
@@ -2578,11 +2819,13 @@ class _ComercialUnidadFormMixin:
 
         # DURACIÓN (MESES) nunca puede quedar vacía: número entero o "-"
         # (25-09-2026, a pedido explícito -- "Mensual" ya NO es un valor
-        # válido de entrada: era un dato legado del Excel de RM_CONTRATOS,
+        # válido de entrada: era un dato legado del Excel de RM_JAVI,
         # corregido; DURACIÓN="-" es el valor real para "contrato mes a
         # mes", que sigue autocompletando TÉRMINO CONTRATO="MENSUAL", ver
         # _auto_calculate_termino).
         # Sin señales: no debe recalcular TÉRMINO CONTRATO a "MENSUAL".
+        if _editable('DURACIÓN (MESES)'):
+            self._autocompletar_duracion_mensual()
         if not _editable('DURACIÓN (MESES)') and not self._valor_widget('DURACIÓN (MESES)').strip():
             widget_duracion = self.inputs['DURACIÓN (MESES)']
             widget_duracion.blockSignals(True)
@@ -2623,7 +2866,15 @@ class _ComercialUnidadFormMixin:
                     )
                     return
 
-        if not self._confirmar_resumen():
+        if self.cantidad_multiple > 1:
+            confirmar = QMessageBox.question(
+                self, "Renovar contratos",
+                f"Se renovarán {self.cantidad_multiple} contratos con los datos de Comercial y JustTime & CM de este "
+                "formulario. Cada contrato actual quedará como Renovado.\n\n¿Continuar?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if confirmar != QMessageBox.StandardButton.Yes:
+                return
+        elif not self._confirmar_resumen():
             return  # "Volver al formulario": no se toca ni se limpia nada
 
         if self._modo_lote:
@@ -2821,112 +3072,169 @@ class _ComercialUnidadFormMixin:
         self._overlay_transicion.setVisible(False)
         self._contenido_widget.setVisible(True)
 
-    def _crear_par_resumen(self, campo, valor):
-        par_layout = QHBoxLayout()
-        par_layout.setSpacing(4)
-        lbl_campo = QLabel(f"{campo}:")
-        lbl_campo.setStyleSheet("font-size: 9px; font-weight: bold; color: #6B7280; background: transparent;")
-        vacio = not valor
-        lbl_valor = QLabel(str(valor) if valor else "(vacío)")
-        lbl_valor.setWordWrap(True)
-        lbl_valor.setStyleSheet(
-            f"font-size: 9px; font-weight: normal; background: transparent; "
-            f"color: {'#9CA3AF' if vacio else '#1E293B'}; font-style: {'italic' if vacio else 'normal'};"
-        )
-        par_layout.addWidget(lbl_campo)
-        par_layout.addWidget(lbl_valor, 1)
-        return par_layout
+    # Color e ícono de cada tarjeta del resumen de confirmación
+    _ESTILO_RESUMEN = {
+        "Cliente": ('fa5s.building', '#1B2B4E', '#E6ECF6'),
+        "Comercial": ('fa5s.file-contract', '#1B2B4E', '#E6ECF6'),
+        "Operaciones": ('fa5s.truck', '#1B2B4E', '#E6ECF6'),
+        "JustTime & CM": ('fa5s.stopwatch', '#1B2B4E', '#E6ECF6'),
+    }
+    # Datos del cliente que van en el encabezado del resumen y no se repiten en su tarjeta
+    _RESUMEN_EN_ENCABEZADO = ('RUT', 'RAZÓN SOCIAL', 'VIN', 'CHASIS')
 
-    def _crear_tarjeta_resumen(self, titulo, pares, accent='#374151', bg='#F9FAFB'):
-        """Tarjeta compacta de 2 columnas (campo: valor) con el mismo
-        lenguaje visual que _build_section (encabezado con fondo suave +
-        título de color, cuerpo blanco) -- para que el resumen de
-        confirmación se sienta como una versión compacta del formulario en
-        vez de una lista plana sin relación con él (16-09-2026)."""
+    def _crear_tarjeta_resumen(self, titulo, pares):
+        """Tarjeta compacta del resumen de confirmación: encabezado y una fila
+        por dato con valor (valores largos acortados con "..."). Los datos
+        vacíos se juntan en una sola línea al final."""
+        icono, color, suave = self._ESTILO_RESUMEN[titulo]
         card = QFrame()
-        card.setStyleSheet("QFrame { background-color: white; border: 1px solid #E5E7EB; border-radius: 8px; }")
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(0, 0, 0, 0)
-        card_layout.setSpacing(0)
+        card.setObjectName("tarjetaResumen")
+        card.setStyleSheet("QFrame#tarjetaResumen { background-color: white; border: 1px solid #E3E8F0; border-radius: 10px; }")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(1, 1, 1, 6)
+        lay.setSpacing(0)
 
-        header = QFrame()
-        header.setStyleSheet(f"background-color: {bg}; border-top-left-radius: 8px; border-top-right-radius: 8px;")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 4, 8, 4)
+        enc = QFrame()
+        enc.setStyleSheet(f"QFrame {{ background-color: {suave}; border: none; border-top-left-radius: 9px; border-top-right-radius: 9px; }}")
+        enc_lay = QHBoxLayout(enc)
+        enc_lay.setContentsMargins(12, 5, 12, 5)
+        enc_lay.setSpacing(7)
+        lbl_icono = QLabel()
+        lbl_icono.setPixmap(qta.icon(icono, color=color).pixmap(11, 11))
+        lbl_icono.setStyleSheet("background: transparent; border: none;")
         lbl_titulo = QLabel(titulo)
-        lbl_titulo.setStyleSheet(f"font-size: 10px; font-weight: bold; color: {accent}; background: transparent;")
-        header_layout.addWidget(lbl_titulo)
-        card_layout.addWidget(header)
+        lbl_titulo.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 700; background: transparent; border: none;")
+        enc_lay.addWidget(lbl_icono)
+        enc_lay.addWidget(lbl_titulo)
+        enc_lay.addStretch()
+        lay.addWidget(enc)
 
-        grid_frame = QFrame()
-        grid_frame.setStyleSheet("background-color: white; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;")
-        grid = QGridLayout(grid_frame)
-        grid.setContentsMargins(8, 6, 8, 6)
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(3)
-        for i, (campo, valor) in enumerate(pares):
-            fila, col = divmod(i, 2)
-            grid.addLayout(self._crear_par_resumen(campo, valor), fila, col)
-        card_layout.addWidget(grid_frame)
+        def vacio(valor):
+            return str(valor).strip() in ('', '-', 'nan')
+
+        llenos = [(c, v) for c, v in pares if not vacio(v)]
+        vacios = [c for c, v in pares if vacio(v)]
+        for i, (campo, valor) in enumerate(llenos):
+            fila = QWidget()
+            fila_lay = QHBoxLayout(fila)
+            fila_lay.setContentsMargins(12, 3, 12, 3)
+            fila_lay.setSpacing(10)
+            lbl_campo = QLabel(_ETIQUETAS_CAMPO.get(campo, campo).capitalize())
+            lbl_campo.setStyleSheet("color: #66748D; font-size: 10px; background: transparent; border: none;")
+            lbl_valor = _EtiquetaElidida(valor)
+            lbl_valor.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            lbl_valor.setStyleSheet("color: #0F1B33; font-size: 11px; font-weight: 600; background: transparent; border: none;")
+            fila_lay.addWidget(lbl_campo)
+            fila_lay.addWidget(lbl_valor, 1)
+            if i:
+                separador = QFrame()
+                separador.setFixedHeight(1)
+                separador.setStyleSheet("background-color: #EEF1F6; border: none;")
+                lay.addWidget(separador)
+            lay.addWidget(fila)
+        if vacios:
+            nombres = ", ".join(_ETIQUETAS_CAMPO.get(c, c).capitalize() for c in vacios)
+            lbl_vacios = QLabel(f"Sin dato: {nombres}")
+            lbl_vacios.setWordWrap(True)
+            lbl_vacios.setContentsMargins(12, 4, 12, 0)
+            lbl_vacios.setStyleSheet("color: #A7B1C2; font-size: 10px; background: transparent; border: none;")
+            lay.addWidget(lbl_vacios)
+        lay.addStretch(1)
         return card
 
     def _confirmar_resumen(self):
-        """Muestra un resumen de todos los campos antes de guardar, agrupado
-        en tarjetas con el mismo estilo visual que las pestañas del
-        formulario (16-09-2026: reemplaza el QMessageBox de lista plana,
-        percibido como feo/simple). Devuelve True si el usuario confirma
-        ("Confirmar y Guardar"), o False si elige volver al formulario (en
-        cuyo caso no se modifica ni se limpia ningún dato ingresado)."""
+        """Resumen compacto de todos los campos antes de guardar: encabezado
+        con la empresa y el VIN y cuatro tarjetas en dos columnas, sin
+        desplazamiento. Devuelve True si el usuario confirma ("Confirmar y
+        guardar"), o False si elige volver al formulario (en cuyo caso no se
+        modifica ni se limpia ningún dato ingresado)."""
         data = self.get_data()
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Confirmar " + ("Cambios" if self.modo_edicion else "Nueva Unidad"))
-        dialog.setStyleSheet("QDialog { background-color: #F3F4F6; }")
-        dialog.resize(520, 600)
+        dialog.setWindowTitle("Confirmar " + ("cambios" if self.modo_edicion else "nueva unidad"))
+        dialog.setStyleSheet("QDialog { background-color: #F6F8FB; }")
+        dialog.setFixedWidth(760)
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(8)
 
-        header_lbl = QLabel("Revisa los datos antes de guardar:")
-        header_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #003057;")
-        layout.addWidget(header_lbl)
+        cabecera = QHBoxLayout()
+        cabecera.setSpacing(10)
+        icono = QLabel()
+        icono.setFixedSize(32, 32)
+        icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icono.setPixmap(qta.icon('fa5s.clipboard-check', color='#1B2B4E').pixmap(15, 15))
+        icono.setStyleSheet("background: #E6ECF6; border-radius: 10px;")
+        titulo = QLabel("Confirmar " + ("cambios" if self.modo_edicion else "nueva unidad"))
+        titulo.setStyleSheet("color: #0F1B33; font-size: 15px; font-weight: 700;")
+        chip = QLabel(f"Periodo interno \u00b7 {data.get('PERIODO INTERNO', '')}")
+        chip.setStyleSheet("background: #E6ECF6; color: #1B2B4E; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 10px;")
+        cabecera.addWidget(icono)
+        cabecera.addWidget(titulo, 1)
+        cabecera.addWidget(chip, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(cabecera)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(0, 0, 4, 0)
-        scroll_layout.setSpacing(6)
+        # Encabezado de la empresa y la unidad
+        ident = QFrame()
+        ident.setObjectName("identResumen")
+        ident.setStyleSheet("QFrame#identResumen { background: white; border: 1px solid #E3E8F0; border-radius: 10px; } "
+                            "QLabel { background: transparent; border: none; }")
+        ident_lay = QVBoxLayout(ident)
+        ident_lay.setContentsMargins(12, 7, 12, 7)
+        ident_lay.setSpacing(1)
+        nombre = _EtiquetaElidida(data.get('RAZÓN SOCIAL', '') or 'Sin razón social')
+        nombre.setStyleSheet("color: #0F1B33; font-size: 13px; font-weight: 700;")
+        partes = [f"VIN {data.get('VIN', '')}"]
+        for etiqueta, campo in (("Chasis", 'CHASIS'), ("RUT", 'RUT')):
+            if data.get(campo):
+                partes.append(f"{etiqueta} {data[campo]}")
+        detalle = _EtiquetaElidida("  \u00b7  ".join(partes))
+        detalle.setStyleSheet("color: #66748D; font-size: 10px;")
+        ident_lay.addWidget(nombre)
+        ident_lay.addWidget(detalle)
+        layout.addWidget(ident)
 
-        scroll_layout.addWidget(self._crear_tarjeta_resumen(
-            "Gestión", [('PERIODO INTERNO', data.get('PERIODO INTERNO', ''))],
-            accent='#1C6BBA', bg='#EFF6FF',
-        ))
-        for titulo, campos in _RESUMEN_GRUPOS:
-            scroll_layout.addWidget(self._crear_tarjeta_resumen(titulo, [(c, data.get(c, '')) for c in campos]))
-        scroll_layout.addStretch()
+        grupos = []
+        for titulo_g, campos in _RESUMEN_GRUPOS:
+            if titulo_g == "Cliente":
+                campos = [c for c in campos if c not in self._RESUMEN_EN_ENCABEZADO]
+            grupos.append((titulo_g, self._crear_tarjeta_resumen(titulo_g, [(c, data.get(c, '')) for c in campos])))
+        tarjetas = dict(grupos)
+        # Rejilla de 2 x 2: las tarjetas de una misma fila quedan del mismo alto
+        columnas = QGridLayout()
+        columnas.setSpacing(8)
+        columnas.setColumnStretch(0, 1)
+        columnas.setColumnStretch(1, 1)
+        for posicion, nombre_g in enumerate(("Cliente", "Operaciones", "Comercial", "JustTime & CM")):
+            columnas.addWidget(tarjetas[nombre_g], posicion // 2, posicion % 2)
+        layout.addLayout(columnas)
 
-        scroll.setWidget(scroll_content)
-        layout.addWidget(scroll, 1)
-
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
+        pie = QHBoxLayout()
+        pie.setSpacing(8)
         btn_volver = QPushButton("Volver al formulario")
-        btn_volver.setStyleSheet(f"background-color: white; border: 1px solid {DANGER}; color: {DANGER}; padding: 7px 14px; border-radius: 6px; font-weight: bold; font-size: 11px;")
+        btn_volver.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_volver.setStyleSheet("QPushButton { background: white; border: 1px solid #D9DEE8; color: #3B4A66; padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 11px; }")
         btn_volver.clicked.connect(dialog.reject)
-        btn_confirmar = QPushButton(" Confirmar y Guardar")
-        btn_confirmar.setIcon(qta.icon('fa5s.save', color='white'))
-        btn_confirmar.setStyleSheet("background-color: #10B981; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: bold; font-size: 11px;")
+        btn_confirmar = QPushButton(" Confirmar y guardar")
+        btn_confirmar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_confirmar.setIcon(qta.icon('fa5s.check', color='white'))
+        btn_confirmar.setStyleSheet("QPushButton { background: #1B2B4E; color: white; border: none; padding: 7px 16px; border-radius: 8px; font-weight: 700; font-size: 11px; }")
         btn_confirmar.clicked.connect(dialog.accept)
-        btn_row.addWidget(btn_volver)
-        btn_row.addWidget(btn_confirmar)
-        layout.addLayout(btn_row)
+        pie.addStretch()
+        pie.addWidget(btn_volver)
+        pie.addWidget(btn_confirmar)
+        layout.addLayout(pie)
 
         return dialog.exec() == QDialog.DialogCode.Accepted
 
     def get_data(self):
         data = {key: self._valor_widget(key) for key in self.inputs}
+
+        # VIN y CHASIS siempre en mayúsculas: las bandejas buscan la unidad por
+        # el VIN en mayúsculas y uno guardado en minúsculas no se encontraba.
+        for campo in ('VIN', 'CHASIS'):
+            if data.get(campo):
+                data[campo] = data[campo].strip().upper()
 
         # Campos de fecha simples y de texto de JustTime/CM: si quedaron
         # vacíos, se guardan como "-" (mismo criterio que el resto del
@@ -2949,7 +3257,7 @@ class _ComercialUnidadFormMixin:
         # Columnas que no viven en este formulario (hoy solo OBSERVACIONES:
         # los campos de JustTime/CM y FECHA DE BAJA ya tienen su propio
         # widget desde las Fases 2 y 4): siempre "-" AL CREAR una unidad
-        # nueva (definido con la contraparte comercial). En modo edición no se tocan, por si
+        # nueva (definido con Javiera). En modo edición no se tocan, por si
         # ya tuvieran un dato real que este formulario no muestra ni debe
         # pisar con "-".
         if not self.modo_edicion:
@@ -3106,6 +3414,7 @@ class _ComercialUnidadFormMixin:
         # lote, donde este método se vuelve a llamar por cada registro nuevo.
         if self._restringir_alta_desde_general:
             self._aplicar_restriccion_alta_general()
+        self._actualizar_resumen()
 
 
 # ==========================================================================
@@ -3215,6 +3524,7 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
         de _avanzar_lote/_mostrar_transicion_lote/_cargar_siguiente_registro_lote
         del mixin (construida siempre en _setup_ui, sin importar el modo),
         solo que el primer registro se precarga aquí en vez de en __init__."""
+        self._configurar_modo_multiple(1)
         self.modo_edicion = False
         self._vin_original = None
         self._restringir_activacion = False
@@ -3261,6 +3571,15 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
         frescos cada vez) esta instancia persiste y df_comercial puede
         haber cambiado entretanto (guardados, recargas)."""
         self._rut_lookup, self._flota_by_cdb = self._construir_lookups(df_comercial)
+        self._ejecutivos_todos = self._construir_lista_ejecutivos(df_comercial)
+        combo_ejecutivo = self.inputs.get('EJECUTIVO')
+        if combo_ejecutivo is not None:
+            texto = combo_ejecutivo.currentText()
+            combo_ejecutivo.blockSignals(True)
+            combo_ejecutivo.clear()
+            combo_ejecutivo.addItems([""] + self._ejecutivos_todos)
+            combo_ejecutivo.setCurrentText(texto)
+            combo_ejecutivo.blockSignals(False)
         self._vins_existentes = set()
         if isinstance(df_comercial, pd.DataFrame) and not df_comercial.empty and 'VIN' in df_comercial.columns:
             self._vins_existentes = set(df_comercial['VIN'].dropna().astype(str).str.strip().str.upper())
@@ -3327,6 +3646,7 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
     def _reiniciar_estado_contrato(self):
         era_nuevo_contrato = self.modo_nuevo_contrato
         self.modo_nuevo_contrato = False
+        self.modo_renovacion = False
         if era_nuevo_contrato:
             self._exigir_forma_contrato_real(False)
             self._desbloquear_justtime_nuevo_contrato()
@@ -3394,10 +3714,21 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
         en comercial.py, único llamador)."""
         self._btn_layout_izquierda.addWidget(widget)
 
+    def _configurar_modo_multiple(self, cantidad):
+        """Con varias unidades a la vez se oculta el paso "Empresa & Unidad": solo se editan
+        Comercial y JustTime & CM, y lo que se cambie vale para todas."""
+        multiple = cantidad > 1
+        self.cantidad_multiple = cantidad
+        self._primer_paso = 1 if multiple else 0
+        self.tabs.setTabVisible(0, not multiple)
+        if getattr(self, '_botones_paso', None):
+            self._botones_paso[0].setVisible(not multiple)
+
     def resetear_para_crear(self):
         """Deja el formulario listo para dar de alta una unidad nueva:
         mismo estado que tenía ComercialAgregarDialog recién creado sin
         `datos_iniciales` ni `modo_edicion`."""
+        self._configurar_modo_multiple(1)
         self.modo_edicion = False
         self._restringir_activacion = False
         self._forzar_activacion_pendiente = False
@@ -3433,12 +3764,17 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
         """Precarga la unidad `datos_iniciales` en modo edición, con las
         mismas restricciones que antes aplicaba _handle_editar_unidad al
         abrir ComercialAgregarDialog(modo_edicion=True, ...)."""
+        self._configurar_modo_multiple(1)
         self.modo_edicion = True
         self._restringir_activacion = restringir_activacion
         self._forzar_activacion_pendiente = forzar_activacion_pendiente
         self._restringir_vigentes = restringir_vigentes
         self._restringir_alta_desde_general = False
         self._vin_original = (datos_iniciales or {}).get('VIN', '').strip().upper()
+        estado_jt = str((datos_iniciales or {}).get('CONTRATO CREADO EN JUSTTIME', '') or '').strip()
+        self._jt_auto_edicion = bool(restringir_activacion) and estado_jt in ('', JUSTTIME_ESTADO_NO_APLICA)
+        self._fechas_justtime_guardadas = None
+        self._jt_original = None
 
         self._habilitar_todos_los_campos()
         self._resetear_campos_a_default()
@@ -3448,6 +3784,13 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
             _tipo_facturacion_default_para_forma_contrato(_forma_contrato_inicial)
 
         self._aplicar_datos_iniciales(datos_iniciales or {})
+        datos_jt = datos_iniciales or {}
+        self._jt_original = {
+            'tipo': str(datos_jt.get('TIPO DE FACTURACION', '')).strip().upper(),
+            'estado': str(datos_jt.get('CONTRATO CREADO EN JUSTTIME', '') or '').strip() or JUSTTIME_ESTADO_NO_APLICA,
+            'inicio': str(datos_jt.get('INICIO', '') or '').strip(),
+            'termino': str(datos_jt.get('TERMINO', '') or '').strip(),
+        }
         self._id_contrato = str((datos_iniciales or {}).get('ID', '')).strip()
         if self._parsear_periodo_interno((datos_iniciales or {}).get('PERIODO INTERNO', ''))[0]:
             self._bloquear_periodo_interno()
@@ -3476,17 +3819,25 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
         self._validar_vin_duplicado()
         if self._contrato_cerrado:
             self._bloquear_contrato_cerrado()
+        self._actualizar_resumen()
 
-    def cargar_para_nuevo_contrato(self, datos_unidad):
+    def cargar_para_nuevo_contrato(self, datos_unidad, renovacion=False, cantidad=1):
         """Formulario para un contrato nuevo sobre una unidad que ya existe
         (reactivación): hereda los datos de la unidad y del cliente, deja las
         condiciones comerciales en blanco y fija el VIN. Entra en Activación
         Pendiente/Activando como una unidad por activar. Solo se permite si el
-        contrato actual de la unidad está cerrado (ver _vin_duplicado)."""
+        contrato actual de la unidad está cerrado (ver _vin_duplicado).
+
+        Con `renovacion` (contrato Vigente o Vencido que se reemplaza por otro,
+        20-10-2026) la unidad ya está activa: conserva ejecutivo, tipo de
+        servicio y todos los datos de Operaciones (solo lectura); ESTADO
+        COMERCIAL queda Vigente y bloqueado; INICIO CONTRATO es hoy; DURACIÓN
+        queda vacía y la forma de contrato se elige (sin "Sin Contrato")."""
         datos_unidad = datos_unidad or {}
+        self._configurar_modo_multiple(cantidad if renovacion else 1)
         self.modo_edicion = False
-        self._restringir_activacion = True
-        self._forzar_activacion_pendiente = True
+        self._restringir_activacion = not renovacion
+        self._forzar_activacion_pendiente = not renovacion
         self._restringir_vigentes = False
         self._restringir_alta_desde_general = False
         self._vin_original = None
@@ -3497,23 +3848,43 @@ class ComercialUnidadFormWidget(_ComercialUnidadFormMixin, QWidget):
         self._actualizar_boton_chasis_bi()
 
         self._habilitar_todos_los_campos()
-        self._restringir_estado_comercial_alta(True)
+        self._restringir_estado_comercial_alta(not renovacion)
         self._resetear_campos_a_default()
         self._tipo_facturacion_actual = _tipo_facturacion_default_para_forma_contrato(_DEFAULTS_INICIALES['FORMA DE CONTRATO'])
-        heredados = {k: v for k, v in datos_unidad.items() if k not in _CAMPOS_CONDICION_CONTRATO}
+        conservados = _CAMPOS_RENOVACION_CONSERVADOS if renovacion else ()
+        heredados = {k: v for k, v in datos_unidad.items()
+                     if k not in _CAMPOS_CONDICION_CONTRATO or k in conservados}
         self._aplicar_datos_iniciales(heredados)
-        self._aplicar_restriccion_activacion(True)
+        self._aplicar_restriccion_activacion(not renovacion)
         self._aplicar_restriccion_operaciones_solo_lectura()
         self._bloquear_periodo_interno()
         self._sincronizar_estado_con_contrato()
         self.inputs['VIN'].setEnabled(False)
 
         self.modo_nuevo_contrato = True
+        self.modo_renovacion = renovacion
         self._vin_contrato_nuevo = str(datos_unidad.get('VIN', '')).strip().upper()
-        self._set_combo_valor_precargado(self.inputs['TIPO DE SERVICIO'], 'Basico')
-        self.inputs['INICIO CONTRATO'].setText('')
+        if renovacion:
+            inicio = self.inputs['INICIO CONTRATO']
+            inicio.setText(datetime.now().strftime("%d-%m-%Y"))
+            duracion = self.inputs['DURACIÓN (MESES)']
+            duracion.blockSignals(True)
+            duracion.setText('')
+            duracion.blockSignals(False)
+            self.inputs['TÉRMINO CONTRATO'].setText('')
+        else:
+            self._set_combo_valor_precargado(self.inputs['TIPO DE SERVICIO'], 'Basico')
+            self.inputs['INICIO CONTRATO'].setText('')
         self._exigir_forma_contrato_real(True)
+        if renovacion:
+            estado = self.inputs['ESTADO COMERCIAL']
+            estado.blockSignals(True)
+            self._set_combo_valor_precargado(estado, 'Vigente')
+            estado.blockSignals(False)
+            estado.setEnabled(False)
+            self._recalcular_etapa_gestion()
         self._actualizar_titulo()
         self._actualizar_texto_guardar()
-        self.tabs.setCurrentIndex(0)
+        self.tabs.setCurrentIndex(self._primer_paso)
         self._validar_vin_duplicado()
+        self._actualizar_resumen()

@@ -1,4 +1,4 @@
-"""Cache de lectura para BBDD CLIENTES CM.xlsx (Power BI, "del equipo Power BI").
+"""Cache de lectura para BBDD CLIENTES CM.xlsx (Power BI, "de David").
 
 BBDD CLIENTES CM.xlsx es ~13 MB / 53k filas y se lee de forma independiente
 en 5 sitios (contactos.py, instalaciones.py, mail_dialog.py,
@@ -15,11 +15,11 @@ si el cache falla por cualquier motivo, se cae a la lectura directa del
 
 import hashlib
 import os
+import threading
 
 import openpyxl
 import pandas as pd
 
-from src.core.perf_log import medir
 
 _CACHE_DIR = os.path.join(os.getcwd(), 'data', 'cache')
 
@@ -43,6 +43,30 @@ def _cache_vigente(ruta_xlsx, ruta_csv):
     return os.path.getmtime(ruta_csv) >= os.path.getmtime(ruta_xlsx)
 
 
+def _leer_cache(ruta_csv):
+    """DataFrame del espejo CSV a través de un .pkl hermano (mismos tipos que
+    read_csv, ~4 veces más rápido de cargar). El .pkl se rehace cuando el CSV
+    es más nuevo; si no se puede leer o escribir, se usa el CSV."""
+    ruta_pkl = os.path.splitext(ruta_csv)[0] + '.pkl'
+    if os.path.exists(ruta_pkl) and os.path.getmtime(ruta_pkl) >= os.path.getmtime(ruta_csv):
+        try:
+            return pd.read_pickle(ruta_pkl)
+        except Exception:
+            pass
+    df = pd.read_csv(ruta_csv)
+# Escritura atómica: varios hilos pueden leer el cache a la vez
+    temporal = f"{ruta_pkl}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        df.to_pickle(temporal)
+        os.replace(temporal, ruta_pkl)
+    except Exception:
+        try:
+            os.remove(temporal)
+        except OSError:
+            pass
+    return df
+
+
 def _limpiar_cache_huerfano(ruta_csv_vigente):
     """Deja un único archivo en _CACHE_DIR: el de la fuente que se acaba de
     leer con éxito (`ruta_csv_vigente`). Corregido (25-09-2026): el nombre
@@ -60,11 +84,12 @@ def _limpiar_cache_huerfano(ruta_csv_vigente):
     try:
         if not os.path.isdir(_CACHE_DIR):
             return
-        nombre_vigente = os.path.basename(ruta_csv_vigente)
+        base_vigente = os.path.splitext(os.path.basename(ruta_csv_vigente))[0]
         for nombre in os.listdir(_CACHE_DIR):
-            if nombre == nombre_vigente:
+            base, extension = os.path.splitext(nombre)
+            if base == base_vigente:
                 continue
-            if nombre.startswith('bbdd_clientes_cm_') and nombre.endswith('.csv'):
+            if nombre.startswith('bbdd_clientes_cm_') and extension in ('.csv', '.pkl'):
                 try:
                     os.remove(os.path.join(_CACHE_DIR, nombre))
                 except OSError:
@@ -122,10 +147,10 @@ def leer_bbdd_clientes_cm(ruta_xlsx, columnas=None):
     ruta_csv = _ruta_cache(ruta_xlsx)
     try:
         if not _cache_vigente(ruta_xlsx, ruta_csv):
-            with medir("BBDD CLIENTES CM: regenerar cache CSV", hilo="WORKER"):
-                _regenerar_cache(ruta_xlsx, ruta_csv)
-        with medir("BBDD CLIENTES CM: lectura desde cache CSV", hilo="WORKER"):
-            df = pd.read_csv(ruta_csv, usecols=usecols)
+            _regenerar_cache(ruta_xlsx, ruta_csv)
+        df = _leer_cache(ruta_csv)
+        if usecols is not None:
+            df = df[[c for c in df.columns if usecols(c)]]
         _limpiar_cache_huerfano(ruta_csv)
         return df
     except Exception:

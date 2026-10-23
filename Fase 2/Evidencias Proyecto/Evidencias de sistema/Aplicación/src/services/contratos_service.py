@@ -13,7 +13,7 @@ existian antes en la barra de controles.
 import pandas as pd
 
 from src.core.constants import (COL_RAZON_SOCIAL, COL_RUT, COL_VIN, COL_CHASIS, COL_ID, COL_ESTADO_COMERCIAL,
-                                COL_ESTADO_ACTIVACION, COL_FORMA_CONTRATO, COL_TIPO_FACTURACION,
+                                COL_ESTADO_ACTIVACION, COL_FORMA_CONTRATO, COL_TIPO_FACTURACION, COL_CDB_FLOTA,
                                 FORMA_CONTRATO_TIPO_CM_MAP, TIPO_FACTURACION_HABILITA_CM)
 
 COL_N_CONTRATO = "N CONTRATO 3PC"
@@ -24,15 +24,15 @@ COL_ESTADO_CM = "ESTADO DEL CM"
 COL_PAGO_CM = "PAGO CM"
 
 COLUMNAS_BASE = [
-    COL_ID, COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_VIN, COL_CHASIS, COL_RAZON_SOCIAL, COL_RUT, COL_N_CONTRATO,
-    COL_FECHA_INICIO_CM, COL_FECHA_TERMINO_CM, COL_TIPO_CM, COL_ESTADO_CM, COL_PAGO_CM,
+    COL_ID, COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_VIN, COL_CHASIS, COL_RAZON_SOCIAL, COL_RUT, COL_CDB_FLOTA,
+    COL_N_CONTRATO, COL_FECHA_INICIO_CM, COL_FECHA_TERMINO_CM, COL_TIPO_CM, COL_ESTADO_CM, COL_PAGO_CM,
 ]
 
 # Columnas mostradas en el nivel 2 (tarjetas de contratos de una empresa ya
 # elegida en el nivel 1). RAZÓN SOCIAL/RUT no se repiten aqui porque ya se
 # conocen por el nivel 1 (quedan solo en el titulo de la pantalla).
 COLUMNAS_DETALLE_EMPRESA = [
-    COL_ID, COL_ESTADO_COMERCIAL, COL_VIN, COL_CHASIS, COL_N_CONTRATO, COL_FECHA_INICIO_CM,
+    COL_ID, COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_VIN, COL_CHASIS, COL_N_CONTRATO, COL_FECHA_INICIO_CM,
     COL_FECHA_TERMINO_CM, COL_TIPO_CM, COL_ESTADO_CM, COL_PAGO_CM,
 ]
 
@@ -103,8 +103,9 @@ def construir_cambios_limpieza_cm(df):
 
 def obtener_empresas(df_filtrado):
     """Una fila por empresa (RAZÓN SOCIAL unica dentro del universo ya
-    filtrado), con su RUT y la cantidad de contratos asociados."""
-    columnas_vacio = [COL_RAZON_SOCIAL, COL_RUT, "UNIDADES"]
+    filtrado), con su RUT, la cantidad de contratos asociados, cuántos están
+    Vigentes, cuántos Desconectados o Activando y su CDB FLOTA."""
+    columnas_vacio = [COL_RAZON_SOCIAL, COL_RUT, "UNIDADES", "VIGENTES", "DESCONECTADOS", "ACTIVANDO", COL_CDB_FLOTA, "CDB_VARIOS"]
     if df_filtrado.empty or COL_RAZON_SOCIAL not in df_filtrado.columns:
         return pd.DataFrame(columns=columnas_vacio)
 
@@ -115,6 +116,40 @@ def obtener_empresas(df_filtrado):
         rut_por_empresa = agrupado[COL_RUT].first().reset_index()
         resumen = resumen.merge(rut_por_empresa, on=COL_RAZON_SOCIAL, how="left")
         resumen = resumen[[COL_RAZON_SOCIAL, COL_RUT, "UNIDADES"]]
+
+    def _conteo(columna, valor):
+        if columna not in df_filtrado.columns:
+            return pd.Series(0, index=resumen[COL_RAZON_SOCIAL])
+        marcada = df_filtrado[columna].astype(str).str.strip().str.upper() == valor
+        return marcada.groupby(df_filtrado[COL_RAZON_SOCIAL], dropna=False).sum()
+
+    resumen["VIGENTES"] = resumen[COL_RAZON_SOCIAL].map(_conteo(COL_ESTADO_COMERCIAL, "VIGENTE")).fillna(0).astype(int)
+    resumen["DESCONECTADOS"] = resumen[COL_RAZON_SOCIAL].map(_conteo(COL_ESTADO_ACTIVACION, "DESCONECTADO")).fillna(0).astype(int)
+    resumen["ACTIVANDO"] = resumen[COL_RAZON_SOCIAL].map(_conteo(COL_ESTADO_ACTIVACION, "ACTIVANDO")).fillna(0).astype(int)
+
+    # CDB FLOTA: solo el más repetido de la empresa (ambos si empatan); CDB_VARIOS
+    # avisa que tiene más de uno distinto
+    def _cdbs_limpios(valores):
+        limpios = [str(v).strip() for v in valores]
+        return [v for v in limpios if v.upper() not in ("", "-", "NAN", "NONE")]
+
+    def _cdb_mas_repetido(valores):
+        limpios = _cdbs_limpios(valores)
+        if not limpios:
+            return "-"
+        conteo = pd.Series(limpios).value_counts()
+        return ", ".join(sorted(conteo[conteo == conteo.max()].index))
+
+    def _cdb_varios(valores):
+        return len(set(_cdbs_limpios(valores))) > 1
+
+    if COL_CDB_FLOTA in df_filtrado.columns:
+        por_empresa = df_filtrado.groupby(COL_RAZON_SOCIAL, dropna=False)[COL_CDB_FLOTA]
+        resumen[COL_CDB_FLOTA] = resumen[COL_RAZON_SOCIAL].map(por_empresa.agg(_cdb_mas_repetido)).fillna("-")
+        resumen["CDB_VARIOS"] = resumen[COL_RAZON_SOCIAL].map(por_empresa.agg(_cdb_varios)).fillna(False).astype(bool)
+    else:
+        resumen[COL_CDB_FLOTA] = "-"
+        resumen["CDB_VARIOS"] = False
 
     return resumen.sort_values(COL_RAZON_SOCIAL, kind="mergesort").reset_index(drop=True)
 
@@ -135,9 +170,9 @@ def obtener_contratos_empresa(df_filtrado, empresa):
 def calcular_resumen_importacion(df_master, cambios_comercial, total_filas_excel, vins_ausentes_info, vins_nuevos_info=None,
                                  contratos_nuevos=None):
     """Resumen mostrado en el panel previo a inyectar un import de Contratos
-    CM (ver contratos.py::importar_excel_reporte). No decide ni modifica
+    CM (ver contratos.py::importar_excel_javiera). No decide ni modifica
     nada -- solo compara `cambios_comercial` (lo que ya calculo
-    importar_excel_reporte) contra el valor ACTUAL de cada VIN en
+    importar_excel_javiera) contra el valor ACTUAL de cada VIN en
     `df_master` para saber cuantos de esos cambios son reales.
 
     `vins_ausentes_info` es la lista de dicts que devuelve
@@ -194,13 +229,13 @@ def calcular_resumen_importacion(df_master, cambios_comercial, total_filas_excel
 
 def construir_registro_nuevo_desde_contrato_cm(vin, fila_cm, candidato=None):
     """Arma el registro completo de una unidad nueva de Comercial a partir
-    de un VIN que trae el Excel de Contratos CM (3PC de la contraparte comercial) pero que
+    de un VIN que trae el Excel de Contratos CM (3PC de Javiera) pero que
     todavia no tiene ficha en Comercial. Mismo patron que
     provisiones.py::_construir_registro_nuevo_desde_provisiones (reutiliza
     los defaults de comercial_agregar.py, no reinventa reglas de negocio),
     pero al reves: aca SI hay datos reales de contrato CM (N CONTRATO 3PC,
     fechas, tipo, estado, pago -- ya vienen en `fila_cm`, la misma forma
-    que arma importar_excel_reporte) y NO hay plan/duracion de Provisiones,
+    que arma importar_excel_javiera) y NO hay plan/duracion de Provisiones,
     que quedan en blanco para completar despues a mano.
 
     `candidato` es una de las combinaciones {RAZÓN SOCIAL, RUT, CDB,

@@ -86,7 +86,7 @@ class DataFrameFormatter:
         depender de pd.to_datetime(dayfirst=True) directo sobre un valor que
         ya viene en formato ISO: esa combinación intercambia día y mes
         cuando ambos son <=12 (bug confirmado con datos reales de
-        RM_CONTRATOS/PruebasFM -- primero en INICIO CONTRATO/TÉRMINO CONTRATO al
+        RM_JAVI/PruebasFM -- primero en INICIO CONTRATO/TÉRMINO CONTRATO al
         calcular, ~60% de los registros con duración numérica quedaban
         incorrectos; el mismo bug se replicó luego en
         comercial_services.clasificar_vigencia_contrato, 25-09-2026, donde
@@ -159,7 +159,7 @@ class DataFrameFormatter:
         matriz NO resuelve -- ESTADO COMERCIAL no está en la matriz, o
         ESTADO DE ACTIVACIÓN ACTUAL no es ninguno de sus valores conocidos
         para esa fila): TIPO DE FACTURACION contiene SIN REGISTRO, o es
-        FACTURACIÓN MANUAL (definida con la contraparte comercial, 16-09-2026, para el flujo
+        FACTURACIÓN MANUAL (definida con Javiera, 16-09-2026, para el flujo
         futuro de la app -- ver ComercialAgregarDialog) -> COMERCIAL.
 
         Prioridad 3 (fallback final, "no inventar"): se conserva el valor
@@ -225,10 +225,10 @@ class DataFrameFormatter:
             'FECHA DE BAJA',
             'FECHA INICIO CM',
             'FECHA TERMINO CM',
-            # Corregido (25-09-2026): esta lista tenía los nombres de RM_CONTRATOS
-            # ANTES del renombrado (RM_CONTRATOS_COLUMN_ALIASES en constants.py),
+            # Corregido (25-09-2026): esta lista tenía los nombres de RM_JAVI
+            # ANTES del renombrado (RM_JAVI_COLUMN_ALIASES en constants.py),
             # que nunca llegan a existir en el DataFrame que recibe clean()
-            # -- para cuando RMReporteSyncWorker.run() llama a clean(), esas
+            # -- para cuando RMJaviSyncWorker.run() llama a clean(), esas
             # columnas ya se renombraron a COL_FECHA_INICIO_FACT/
             # COL_FECHA_TERMINO_FACT ("INICIO"/"TERMINO"). Por eso nunca se
             # formateaban: llegaban tal cual las entrega pandas al leer una
@@ -246,6 +246,21 @@ class DataFrameFormatter:
 
         # --- RECALCULO A PRUEBA DE BALAS (FORMATO CHILENO DD-MM-YYYY) ---
         if 'INICIO CONTRATO' in df.columns and 'DURACIÓN (MESES)' in df.columns and 'TÉRMINO CONTRATO' in df.columns:
+            # Con duración numérica el resultado solo depende de inicio y
+            # meses; el caché por fila también incluye el término y casi no acierta
+            sumas = {}
+
+            def inicio_mas_meses(inicio, meses):
+                clave = (type(inicio), inicio, meses)
+                if clave not in sumas:
+                    try:
+                        inicio_dt = DataFrameFormatter.parsear_fecha_segura(inicio)
+                        sumas[clave] = "" if pd.isna(inicio_dt) else \
+                            (inicio_dt + pd.DateOffset(months=meses)).strftime("%d-%m-%Y")
+                    except Exception:
+                        sumas[clave] = ""
+                return sumas[clave]
+
             def calcular_termino(row):
                 duracion_raw = str(row.get('DURACIÓN (MESES)', '')).strip().upper()
                 inicio = row.get('INICIO CONTRATO')
@@ -261,7 +276,7 @@ class DataFrameFormatter:
                     # '-' explicito en DURACIÓN (MESES) es mensual, EXCEPTO si
                     # TÉRMINO CONTRATO tambien es '-' explicito: ese combo
                     # ('-' / '-') significa que el dato aun no fue informado/
-                    # gestionado (ej. VIN nuevo en RM_CONTRATOS), no que sea mensual.
+                    # gestionado (ej. VIN nuevo en RM_JAVI), no que sea mensual.
                     # Cualquier otro TÉRMINO CONTRATO (fecha real, 'MENSUAL' o
                     # vacio) si confirma mensual, reemplazando lo que hubiera.
                     termino_previo = str(termino_manual).strip().upper() if pd.notna(termino_manual) else ''
@@ -274,11 +289,7 @@ class DataFrameFormatter:
                 try:
                     meses = int(float(duracion_limpia))
                     if not inicio or pd.isna(inicio) or str(inicio).strip().upper() in ['NAN', '']: return ""
-
-                    inicio_dt = DataFrameFormatter.parsear_fecha_segura(inicio)
-
-                    if pd.isna(inicio_dt): return ""
-                    return (inicio_dt + pd.DateOffset(months=meses)).strftime("%d-%m-%Y")
+                    return inicio_mas_meses(inicio, meses)
 
                 except ValueError:
                     return ""
@@ -346,7 +357,7 @@ class DataFrameFormatter:
             df.loc[mask_mensual_texto | mask_guion_informado, 'TÉRMINO CONTRATO'] = 'MENSUAL'
 
         # Desactivado (30-09-2026, a pedido explícito): "PROVISION +" ya NO se
-        # fuerza a mensual. RM_CONTRATOS siempre trae una fecha real de término
+        # fuerza a mensual. RM_JAVI siempre trae una fecha real de término
         # para estas filas (nunca 'Mensual'); esta regla la sobrescribía y
         # ocultaba contratos ya caducados. Ahora Provisión + sigue la regla
         # general de DURACIÓN/TÉRMINO de arriba, igual que el resto de los

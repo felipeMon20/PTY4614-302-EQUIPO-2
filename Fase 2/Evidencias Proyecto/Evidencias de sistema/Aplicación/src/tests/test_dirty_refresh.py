@@ -122,7 +122,7 @@ class TestActualizacionDiferidaComercial(unittest.TestCase):
     def test_07_pending_changes_no_se_pierden_si_usuario_cancela(self, mock_msgbox_cls):
         self.modulo._data_dirty = True
         self.modulo.pending_changes = {
-            'YV2TEST0000900054': {'VIN': 'YV2TEST0000900054', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
+            'YV2TEST0000000001': {'VIN': 'YV2TEST0000000001', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
         }
         mock_instance = _configurar_dialogo(mock_msgbox_cls, boton_elegido=2)  # Cancelar
 
@@ -138,7 +138,7 @@ class TestActualizacionDiferidaComercial(unittest.TestCase):
     def test_08_descartar_y_recargar_limpia_pending_changes_y_dirty(self, mock_msgbox_cls):
         self.modulo._data_dirty = True
         self.modulo.pending_changes = {
-            'YV2TEST0000900054': {'VIN': 'YV2TEST0000900054', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
+            'YV2TEST0000000001': {'VIN': 'YV2TEST0000000001', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
         }
         _configurar_dialogo(mock_msgbox_cls, boton_elegido=1)  # Descartar y Recargar
 
@@ -151,7 +151,7 @@ class TestActualizacionDiferidaComercial(unittest.TestCase):
     def test_09_guardar_mis_cambios_invoca_confirm_save_sin_descartar_nada(self, mock_msgbox_cls):
         self.modulo._data_dirty = True
         self.modulo.pending_changes = {
-            'YV2TEST0000900054': {'VIN': 'YV2TEST0000900054', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
+            'YV2TEST0000000001': {'VIN': 'YV2TEST0000000001', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
         }
         _configurar_dialogo(mock_msgbox_cls, boton_elegido=0)  # Guardar mis cambios
 
@@ -209,7 +209,7 @@ class TestActualizacionDiferidaOtrosModulos(unittest.TestCase):
             spy_load.assert_not_called()
         self.assertTrue(modulo._data_dirty)
 
-        modulo.pending_changes = {'YV2TEST0000900054': {'cambios': {'ESTADO DEL CM': 'Running'}}}
+        modulo.pending_changes = {'YV2TEST0000000001': {'cambios': {'ESTADO DEL CM': 'Running'}}}
         with patch('src.ui.contratos.QMessageBox') as mock_msgbox_cls:
             _configurar_dialogo(mock_msgbox_cls, boton_elegido=2)  # Cancelar
             modulo.refresh_if_dirty()

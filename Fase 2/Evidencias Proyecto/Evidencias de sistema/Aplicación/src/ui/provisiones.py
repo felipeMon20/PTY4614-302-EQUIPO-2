@@ -1,4 +1,5 @@
 import shutil
+from collections import Counter
 
 import pandas as pd
 import qtawesome as qta
@@ -16,7 +17,7 @@ from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QStyledItemDelegate, QStyle
 from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui import comercial_estilo as estilo_com
 from src.ui.ingresos_base import (PantallaIngresosBase, ModeloTablaIngresos, ComboFiltroBarra, boton_barra, estilo_combo_barra,
                                   aplicar_estilo_tabla_lectura)
@@ -243,7 +244,7 @@ def _construir_registro_nuevo_desde_provisiones(vin, plan, cantidad_meses, candi
     y JUSTTIME_ESTADO_OPCIONES/CONTRATO_JUSTTIME_MAP en constants.py):
     Provisión NO implica contrato creado en JustTime -- el registro queda
     en 'Pendiente' (hay una gestión por hacer), nunca 'Si' (eso solo lo
-    confirma la contraparte comercial a mano contra el sistema externo, que esta app no
+    confirma Javiera a mano contra el sistema externo, que esta app no
     puede consultar). INICIO/TERMINO se calculan con
     provisiones_services.calcular_fechas_justtime(), a partir del mes
     ACTUAL (mes en que se vincula, no el mes que Provisiones tenía
@@ -302,7 +303,7 @@ def _construir_registro_nuevo_desde_provisiones(vin, plan, cantidad_meses, candi
         'FECHA INICIO CM': '-',
         'FECHA TERMINO CM': '-',
         'PAGO CM': '-',
-        'OBSERVACIONES': 'Viene de Provisiones',
+        'OBSERVACIONES': comercial_services.OBSERVACION_VIENE_DE_PROVISIONES,
         'ETAPA GESTIÓN': etapa_gestion,
     }
 
@@ -616,7 +617,7 @@ class VinsHuerfanosAlertDialog(QDialog):
 # (título, ayuda) de cada paso del proceso; coinciden con las fases de SharePointSyncWorker
 _PASOS_SYNC = [
     ("Descargar archivo", "Abrimos SharePoint en tu navegador y esperamos la descarga."),
-    ("Leer y adaptar", "Tomamos la hoja 2026 y la dejamos con el formato de Provisiones."),
+    ("Leer y adaptar", "Tomamos la hoja del año en curso y la dejamos con el formato de Provisiones."),
     ("Comparar", "Buscamos los contratos (VIN + mes) que aún no están en tu Excel."),
     ("Revisar", "Confirmas los registros nuevos antes de agregarlos."),
     ("Guardar", "Respaldo, escritura de las filas nuevas y fórmulas."),
@@ -625,7 +626,7 @@ _MENSAJE_PASO_SYNC = [
     ("Descargando desde SharePoint",
      "Se abrió SharePoint en tu navegador. Si te pide iniciar sesión en Microsoft 365, hazlo: "
      "la descarga empieza sola y la app la detecta en tu carpeta Descargas."),
-    ("Leyendo el archivo", "Tomamos la hoja 2026 y la dejamos con las columnas y el formato de Provisiones."),
+    ("Leyendo el archivo", "Tomamos la hoja del año en curso y la dejamos con las columnas y el formato de Provisiones."),
     ("Buscando contratos nuevos", "Comparamos cada VIN y mes con tu Excel para no duplicar nada."),
     ("Revisa los registros nuevos", ""),
     ("Guardando en tu Excel",
@@ -644,12 +645,12 @@ class AnilloTiempo(QWidget):
         self.fraccion = None
         self.texto = ""
         self.subtexto = ""
-        self.color = QColor(BRAND_BLUE)
+        self.color = QColor(VOLVO_BLUE)
         self.quieto = True
 
     def definir(self, texto, subtexto, fraccion=None, color=None, quieto=False):
         self.texto, self.subtexto, self.fraccion, self.quieto = texto, subtexto, fraccion, quieto
-        self.color = QColor(color or BRAND_BLUE)
+        self.color = QColor(color or VOLVO_BLUE)
         self.update()
 
     def paintEvent(self, _event):
@@ -682,7 +683,7 @@ class PasoSync(QFrame):
 
     ESTILOS = {
         "pendiente": ("#EEF1F6", "#6B7A90", "#6B7A90"),
-        "activo": (BRAND_BLUE, "white", "#0F1B33"),
+        "activo": (VOLVO_BLUE, "white", "#0F1B33"),
         "hecho": ("#16A34A", "white", "#0F1B33"),
         "error": ("#DC2626", "white", "#0F1B33"),
     }
@@ -891,7 +892,7 @@ class SyncTerminalDialog(QDialog):
             "color: #0F1B33; font-size: 16px; font-weight: 800; background: transparent;")
         self.chip_cantidad = QLabel("0")
         self.chip_cantidad.setStyleSheet(
-            f"background: #E1EAF4; color: {BRAND_BLUE}; border-radius: 11px; padding: 3px 12px;"
+            f"background: #E1EAF4; color: {VOLVO_BLUE}; border-radius: 11px; padding: 3px 12px;"
             " font-size: 11px; font-weight: 800;")
         fila.addWidget(self.lbl_titulo_revision)
         fila.addWidget(self.chip_cantidad)
@@ -899,13 +900,13 @@ class SyncTerminalDialog(QDialog):
         lay.addLayout(fila)
 
         aviso = QLabel(
-            "Se agregan al final de la hoja «Prov» de provisionContratos.xlsx con Plan vacío y 0 meses; "
+            "Se agregan al final de la hoja «Prov» de provisionFelipe.xlsx con Plan vacío y 0 meses; "
             "después defines el plan y los meses en cada registro. Antes se guarda una copia de seguridad.")
         aviso.setWordWrap(True)
         aviso.setStyleSheet("color: #52607A; font-size: 11px; background: transparent;")
         lay.addWidget(aviso)
 
-        self.preview_table = AppTableWidget()
+        self.preview_table = VolvoTableWidget()
         aplicar_estilo_tabla_lectura(self.preview_table, 42)
         self.preview_model = ModeloTablaIngresos(
             alineacion=Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
@@ -1046,7 +1047,7 @@ class SyncTerminalDialog(QDialog):
             paso.definir("hecho")
         cantidad = len(self.worker.new_data_df) if self.worker.new_data_df is not None else 0
         self._mostrar_resultado('fa5s.check', "#065F46", "#D1FAE5", "Proceso completado",
-                                f"Se agregaron {cantidad} registros a provisionContratos.xlsx. Tiempo total: {tiempo}.")
+                                f"Se agregaron {cantidad} registros a provisionFelipe.xlsx. Tiempo total: {tiempo}.")
 
     def handle_error(self, error_msg):
         self._detener_reloj()
@@ -1198,7 +1199,7 @@ class CostosDialog(QDialog):
             writer_backup = ExcelWriter()
             writer_backup._crear_backup(config.settings.PROVISION_EXCEL_PATH)
             if not writer_backup.last_backup_ok:
-                QMessageBox.critical(self, "Error", "No se pudo crear la copia de seguridad de provisionContratos.xlsx. La operación fue cancelada y no se realizó ningún cambio.")
+                QMessageBox.critical(self, "Error", "No se pudo crear la copia de seguridad de provisionFelipe.xlsx. La operación fue cancelada y no se realizó ningún cambio.")
                 return
             wb = openpyxl.load_workbook(config.settings.PROVISION_EXCEL_PATH)
             if "Variables" in wb.sheetnames:
@@ -1497,8 +1498,8 @@ class ProvisionFormDialog(QDialog):
 
 
 class _ProvisionesModuleLegacy(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.data_manager = DataManager()
         self.writer = ExcelWriter()
         self.data_manager.provisiones_ready.connect(self._on_data_ready)
@@ -1614,7 +1615,7 @@ class _ProvisionesModuleLegacy(QWidget):
         table_layout = QVBoxLayout(self.table_widget_container)
         table_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         self.table.menu_type = "general"  # Provisiones no tiene "Eliminar Camión"
         self.model = ProvisionesTableModel(self)
         self.table.set_model_and_delegate(self.model, {'Plan': ["Basico", "Medio", "Full", "Full + CIV", "Medio + CIV"]})
@@ -2042,7 +2043,7 @@ class _ProvisionesModuleLegacy(QWidget):
 # ya no existe la pestaña "Vista Completa", el formulario de registro es la
 # única vía de edición.
 # =========================================================
-_CHIP_EMPRESA = ("#E1EAF4", BRAND_BLUE)
+_CHIP_VOLVO = ("#E1EAF4", VOLVO_BLUE)
 _CHIP_COBRO = {"CON COBRO": ("#D1FAE5", "#065F46"), "SIN COBRO": ("#F3F4F6", "#4B5563")}
 _CHIP_VAR_NEGATIVA = ("#FEE2E2", "#991B1B")
 _CHIP_VAR_POSITIVA = ("#D1FAE5", "#065F46")
@@ -2169,8 +2170,8 @@ class ProvisionesModule(PantallaIngresosBase):
         super().__init__()
         self.setFont(estilo_com.fuente_comercial(self.font()))
         self.setStyleSheet(estilo_com.QSS_FUENTE_MODULO)
-        self.legacy = _ProvisionesModuleLegacy()
-        self.legacy.setParent(self)
+        # Nace con su padre: reparentarlo ya armado re-aplicaba los estilos a toda la tabla oculta
+        self.legacy = _ProvisionesModuleLegacy(self)
         self.legacy.hide()
 
         self.search_input = QLineEdit()
@@ -2202,7 +2203,7 @@ class ProvisionesModule(PantallaIngresosBase):
             ThemeManager.apply_combo_box(combo)
             combo.setStyleSheet(estilo_combo_barra())
             combo.setMaxVisibleItems(9)
-            self.agregar_filtro(combo)
+            self.agregar_filtro_compacto(combo)
         self.combo_periodo_prov.currentIndexChanged.connect(self._on_filtro_cambiado)
         self.combo_plan_prov.currentIndexChanged.connect(self._on_filtro_cambiado)
 
@@ -2210,14 +2211,18 @@ class ProvisionesModule(PantallaIngresosBase):
         self.btn_descartar_prov.setToolTip("Descartar los cambios sin guardar")
         self.btn_descartar_prov.clicked.connect(self._descartar_cambios)
         self.agregar_capsula(self.btn_descartar_prov)
-        self.btn_guardar_prov = boton_barra("Guardar", 'fa5s.save')
+        self.btn_guardar_prov = boton_barra("", 'fa5s.save')
+        self.btn_guardar_prov.setToolTip("Guardar los cambios")
+        self.btn_guardar_prov.setFixedWidth(44)
         self.btn_guardar_prov.clicked.connect(self._guardar_cambios)
         self.agregar_capsula(self.btn_guardar_prov)
 
-        self.btn_excel_prov = boton_barra("Excel", 'fa5s.file-excel', 'excel')
+        self.btn_excel_prov = boton_barra("", 'fa5s.file-excel', 'excel')
+        self.btn_excel_prov.setToolTip("Exportar a Excel")
+        self.btn_excel_prov.setFixedWidth(44)
         self.btn_excel_prov.setIcon(ThemeManager.icon('fa5s.file-excel', color='#1B2B4E'))
         self.btn_excel_prov.clicked.connect(self._exportar_excel)
-        self.agregar_blanco(self.btn_excel_prov)
+        self.agregar_general(self.btn_excel_prov)
 
         self.btn_copiar_vins_prov = boton_barra("", 'fa5s.copy')
         self.btn_copiar_vins_prov.setIcon(ThemeManager.icon('fa5s.copy', color='#1B2B4E'))
@@ -2238,11 +2243,11 @@ class ProvisionesModule(PantallaIngresosBase):
         self.btn_recargar_prov = boton_barra("", 'fa5s.sync-alt')
         self.btn_recargar_prov.setToolTip("Recargar")
         self.btn_recargar_prov.clicked.connect(lambda: self.legacy._trigger_reload(is_manual_reload=True))
-        self.agregar_capsula(self.btn_recargar_prov)
+        self.agregar_general(self.btn_recargar_prov)
 
         self.btn_editar_prov = estilo_com.BotonAccionPanel(
             'fa5s.edit', 'Editar provisión',
-            "Abre el formulario del registro (Dynafleet, cantidad de meses y plan).", BRAND_BLUE)
+            "Abre el formulario del registro (Dynafleet, cantidad de meses y plan).", VOLVO_BLUE)
         self.btn_editar_prov.setEnabled(False)
         self.btn_editar_prov.clicked.connect(self._on_editar_clicado)
         self.agregar_accion_panel(self.btn_editar_prov)
@@ -2257,7 +2262,7 @@ class ProvisionesModule(PantallaIngresosBase):
     def resolver_color(self, columna, valor, es_fondo):
         texto = str(valor).strip()
         if columna == COL_PROV_REGISTROS:
-            return _CHIP_EMPRESA[0 if es_fondo else 1]
+            return _CHIP_VOLVO[0 if es_fondo else 1]
         if columna == COL_PROV_COBRO:
             colores = _CHIP_COBRO.get(texto.upper())
             return colores[0 if es_fondo else 1] if colores else None
@@ -2596,16 +2601,22 @@ class ProvisionesModule(PantallaIngresosBase):
 
         pending = getattr(self.legacy, 'pending_changes', {}) or {}
         if pending and 'VIN' in df.columns and 'AÑO - MES' in df.columns:
-            for _key, data in pending.items():
-                v_val = str(data.get('VIN', '')).strip().upper()
-                m_val = str(data.get('AÑO - MES', '')).strip().upper()
-                mask = (df['VIN'].astype(str).str.strip().str.upper() == v_val) & \
-                       (df['AÑO - MES'].astype(str).str.strip().str.upper() == m_val)
-                if mask.any():
-                    for col_c, val_c in data.get('cambios', {}).items():
-                        if col_c in df.columns:
-                            df[col_c] = df[col_c].astype(object)
-                            df.loc[mask, col_c] = val_c
+            # Una sola pasada: normalizar todas las filas por cada cambio
+            # pendiente tardaba segundos con cientos de autocompletados
+            cambios_por_col = {}
+            for data in pending.values():
+                llave = f"{str(data.get('VIN', '')).strip().upper()}|{str(data.get('AÑO - MES', '')).strip().upper()}"
+                for col_c, val_c in data.get('cambios', {}).items():
+                    if col_c in df.columns:
+                        cambios_por_col.setdefault(col_c, {})[llave] = val_c
+            if cambios_por_col:
+                llaves = (df['VIN'].astype(str).str.strip().str.upper() + '|'
+                          + df['AÑO - MES'].astype(str).str.strip().str.upper())
+                for col_c, valores in cambios_por_col.items():
+                    tiene = llaves.isin(list(valores))
+                    if tiene.any():
+                        df[col_c] = df[col_c].astype(object)
+                        df.loc[tiene, col_c] = llaves[tiene].map(valores).to_numpy()
 
         texto = self.search_input.text().strip().lower()
         if texto:
@@ -2882,9 +2893,18 @@ class ProvisionesModule(PantallaIngresosBase):
         vacios = ('', '-', '0', 'NAN', 'NONE')
         candidatos = df[(pd.to_numeric(df['DYNAFLEET'], errors='coerce').fillna(0) > 0)
                         & ~df['OBSERVACIONES'].astype(str).str.strip().str.upper().isin(vacios)]
-        for _i, fila in candidatos.iterrows():
-            vin = str(fila.get('VIN', '')).strip().upper()
-            periodo = str(fila.get('AÑO - MES', '')).strip().upper()
+        # Los ya intentados se descartan antes de recorrer fila por fila
+        def normalizar(col):
+            if col not in candidatos.columns:
+                return [""] * len(candidatos)
+            return [str(v).strip().upper() for v in candidatos[col]]
+        vins, periodos = normalizar('VIN'), normalizar('AÑO - MES')
+        nuevos = [f"{v}_{p}" not in self._autocompletados for v, p in zip(vins, periodos)]
+        if not any(nuevos):
+            return
+        for (_i, fila), vin, periodo in zip(candidatos[nuevos].iterrows(),
+                                            (v for v, n in zip(vins, nuevos) if n),
+                                            (p for p, n in zip(periodos, nuevos) if n)):
             llave = f"{vin}_{periodo}"
             if llave in self._autocompletados:
                 continue
@@ -2908,11 +2928,13 @@ class ProvisionesModule(PantallaIngresosBase):
                 pendiente['cambios'].setdefault(columna, valor)
 
     def _texto_uf(self, texto):
+        mes = self.combo_periodo_prov.currentText() if self.combo_periodo_prov.currentData() else ""
         try:
             uf, _civ = self.legacy.data_manager.get_variables()
-            return f"{texto} · UF ${uf:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            texto = f"{texto} · UF ${uf:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         except Exception:
-            return texto
+            pass
+        return f"{texto} · {mes}" if mes else texto
 
     def _armar_tabla_clientes(self, df_clientes):
         self._fila_por_vin = {}
@@ -2966,38 +2988,54 @@ class ProvisionesModule(PantallaIngresosBase):
         })
         industrias, _ = self._mapas_prov()
         modelo_de_vin = self._mapa_modelos()
+        # Grupos armados en una pasada sobre listas: con pandas por grupo
+        # tardaba ~4 ms por empresa
+        col = {k: aux[k].tolist() for k in aux.columns}
+        posiciones_grupo = {}
+        for i, llave in enumerate(zip(col['norm'], col['per'], col['dyna'])):
+            posiciones_grupo.setdefault(llave, []).append(i)
+
+        def valor_grupo(nombre, posiciones):
+            distintos = dict.fromkeys(col[nombre][p] for p in posiciones)
+            return next(iter(distintos)) if len(distintos) == 1 else _VARIOS
+
+        def moda(valores):
+            conteo = Counter(valores)
+            maximo = max(conteo.values())
+            return min(v for v, n in conteo.items() if n == maximo)
+
         filas = []
-        for (norm, per, dyna), sub in aux.groupby(['norm', 'per', 'dyna'], sort=False):
-            primera = sub.iloc[0]
+        for (norm, per, dyna), posiciones in posiciones_grupo.items():
+            primera = posiciones[0]
             clave = f"G|{norm}|{per}|{int(dyna)}"
-            miembros = list(zip(sub['vin'], sub['per']))
+            miembros = [(col['vin'][p], col['per'][p]) for p in posiciones]
             modelos = sorted({
-                modelo_de_vin.get(v.strip().upper()) or obtener_modelo_desde_vin(v) or "-" for v in sub['vin']} - {"-"})
+                modelo_de_vin.get(v.strip().upper()) or obtener_modelo_desde_vin(v) or "-" for v, _ in miembros} - {"-"})
             self._grupos[clave] = {'miembros': miembros, 'modelos': modelos}
             for vin, periodo in miembros:
                 self._grupo_de_registro[f"{vin.strip().upper()}|{periodo.strip().upper()}"] = clave
-            observaciones = sub.loc[sub['obs'] != '-', 'obs']
-
-            def valor_grupo(col, sub=sub):
-                distintos = sub[col].unique()
-                return distintos[0] if len(distintos) == 1 else _VARIOS
+            observaciones = [col['obs'][p] for p in posiciones if col['obs'][p] != '-']
             filas.append({
-                COL_PROV_CLAVE: clave, COL_VIN: "\n".join(v for v, _ in miembros), COL_PROV_CLIENTE: primera['cli'], '_NORM': norm, '_N': len(sub),
-                COL_PROV_PERIODO: per, COL_UNIDADES: str(len(sub)),
+                COL_PROV_CLAVE: clave, COL_VIN: "\n".join(v for v, _ in miembros), COL_PROV_CLIENTE: col['cli'][primera], '_NORM': norm, '_N': len(posiciones),
+                COL_PROV_PERIODO: per, COL_UNIDADES: str(len(posiciones)),
                 COL_PROV_INDUSTRIA: industrias.get(norm, "NO DEFINIDO"),
-                COL_PROV_MODELO: _texto_modelo(modelos, " ".join(sub['plan'].unique())),
-                COL_PROV_PLAN: valor_grupo('plan'), COL_PROV_MESES: valor_grupo('meses'),
-                COL_PROV_DYNAFLEET: primera['dyna_txt'], COL_PROV_VALOR_PLAN: valor_grupo('vp'),
-                COL_PROV_MONTO: valor_grupo('monto'), COL_PROV_VARIACION: valor_grupo('var'),
-                COL_PROV_OBS: observaciones.mode().iloc[0] if not observaciones.empty else "-",
+                COL_PROV_MODELO: _texto_modelo(modelos, " ".join(dict.fromkeys(col['plan'][p] for p in posiciones))),
+                COL_PROV_PLAN: valor_grupo('plan', posiciones), COL_PROV_MESES: valor_grupo('meses', posiciones),
+                COL_PROV_DYNAFLEET: col['dyna_txt'][primera], COL_PROV_VALOR_PLAN: valor_grupo('vp', posiciones),
+                COL_PROV_MONTO: valor_grupo('monto', posiciones), COL_PROV_VARIACION: valor_grupo('var', posiciones),
+                COL_PROV_OBS: moda(observaciones) if observaciones else "-",
                 '_VINES': [m[0] for m in miembros],
             })
+        por_cliente_periodo = {}
+        for i, fila in enumerate(filas):
+            por_cliente_periodo.setdefault((fila['_NORM'], fila[COL_PROV_PERIODO]), []).append(i)
+        for indices in por_cliente_periodo.values():
+            if len(indices) > 1:
+                principal = max(indices, key=lambda i: filas[i]['_N'])
+                for i in indices:
+                    if i != principal:
+                        filas[i][COL_PROV_CLIENTE] = f"{filas[i][COL_PROV_CLIENTE]} · otro Dynafleet"
         df = pd.DataFrame(filas)
-        for (_norm, _per), sub in df.groupby(['_NORM', COL_PROV_PERIODO], sort=False):
-            if len(sub) > 1:
-                principal = sub['_N'].idxmax()
-                for i in sub.index.difference([principal]):
-                    df.at[i, COL_PROV_CLIENTE] = f"{df.at[i, COL_PROV_CLIENTE]} · otro Dynafleet"
         df = df.sort_values(['_NORM', COL_PROV_PERIODO, '_N'], ascending=[True, False, False],
                             kind="stable").reset_index(drop=True)
         for registro in df.to_dict('records'):

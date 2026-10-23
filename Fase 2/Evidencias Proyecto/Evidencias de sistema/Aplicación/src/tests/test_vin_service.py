@@ -9,46 +9,46 @@ class TestObtenerModeloDesdeVin(unittest.TestCase):
     electrica, las posiciones 5-7 (indices 4:7)."""
 
     def test_posicion_r_es_fh(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2RB00CXRA900064"), "FH")
+        self.assertEqual(obtener_modelo_desde_vin("YV2RB00CXRA334990"), "FH")
 
     def test_posicion_x_es_fm(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2XB00C0RA900056"), "FM")
+        self.assertEqual(obtener_modelo_desde_vin("YV2XB00C0RA339736"), "FM")
 
     def test_posicion_k_es_vm(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2KB00C0RA900056"), "VM")
+        self.assertEqual(obtener_modelo_desde_vin("YV2KB00C0RA339736"), "VM")
 
     def test_posicion_p_es_vm(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2PB00C0RA900056"), "VM")
+        self.assertEqual(obtener_modelo_desde_vin("YV2PB00C0RA339736"), "VM")
 
     def test_posicion_t_es_fl(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2TB00C0RA900056"), "FL")
+        self.assertEqual(obtener_modelo_desde_vin("YV2TB00C0RA339736"), "FL")
 
     def test_posicion_v_es_fe(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2VB00C0RA900056"), "FE")
+        self.assertEqual(obtener_modelo_desde_vin("YV2VB00C0RA339736"), "FE")
 
     def test_posicion_a_es_fh_generacion_anterior(self):
         # A representa FH de generacion anterior, pero MODELO no distingue
         # generacion: el valor oficial resultante sigue siendo "FH".
-        self.assertEqual(obtener_modelo_desde_vin("YV2AB00C0RA900056"), "FH")
+        self.assertEqual(obtener_modelo_desde_vin("YV2AB00C0RA339736"), "FH")
 
     def test_posicion_j_es_fm_generacion_anterior(self):
         # J representa FM de generacion anterior, pero MODELO no distingue
         # generacion: el valor oficial resultante sigue siendo "FM".
-        self.assertEqual(obtener_modelo_desde_vin("YV2JB00C0RA900056"), "FM")
+        self.assertEqual(obtener_modelo_desde_vin("YV2JB00C0RA339736"), "FM")
 
     def test_r_mas_b40_es_fhe(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2RB40CXRA900064"), "FHE")
-        self.assertEqual(obtener_modelo_desde_vin("YV2RB40DXRA900072"), "FHE")
+        self.assertEqual(obtener_modelo_desde_vin("YV2RB40CXRA334990"), "FHE")
+        self.assertEqual(obtener_modelo_desde_vin("YV2RB40DXRA337140"), "FHE")
 
     def test_x_mas_b40_es_fme(self):
-        self.assertEqual(obtener_modelo_desde_vin("YV2XB40C0RA900056"), "FME")
+        self.assertEqual(obtener_modelo_desde_vin("YV2XB40C0RA339736"), "FME")
 
     def test_vin_en_minusculas_da_mismo_resultado(self):
         self.assertEqual(obtener_modelo_desde_vin("yv2rb40cxra334990"), "FHE")
         self.assertEqual(obtener_modelo_desde_vin("yv2xb00c0ra339736"), "FM")
 
     def test_codigo_desconocido_no_inventa_modelo(self):
-        self.assertIsNone(obtener_modelo_desde_vin("YV2ZB00C0RA900056"))
+        self.assertIsNone(obtener_modelo_desde_vin("YV2ZB00C0RA339736"))
 
     def test_vin_vacio_no_genera_modelo(self):
         self.assertIsNone(obtener_modelo_desde_vin(""))

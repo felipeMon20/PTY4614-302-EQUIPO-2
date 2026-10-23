@@ -1,12 +1,13 @@
 """Administración de clientes: un cliente por RUT (sin RUT utilizable, por razón
 social). Al seleccionar un cliente se abre un panel a la derecha, como las
 acciones rápidas de Comercial, donde se cambia su razón social en todas sus
-unidades y el RUT de una de sus razones; desde el formulario de una unidad ese
-nombre queda bloqueado."""
+unidades, el RUT de una de sus razones y su CDB comercial cuando tiene más de
+uno; desde el formulario de una unidad ese nombre queda bloqueado."""
 import unicodedata
 
 import pandas as pd
-from PyQt6.QtCore import Qt, QPoint, QRect, QPropertyAnimation, QEasingCurve, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QRect, QPropertyAnimation, QEasingCurve, QTimer, QRegularExpression, pyqtSignal
+from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QFrame,
                              QMessageBox, QComboBox, QCheckBox, QScrollArea, QStackedWidget)
 
@@ -16,12 +17,12 @@ from src.services import comercial_services
 from src.theme.colors import WARNING
 from src.theme.theme_manager import ThemeManager
 from src.ui import admin_estilo, comercial_estilo as estilo_com
-from src.ui.custom_table import AppTableWidget
+from src.ui.custom_table import VolvoTableWidget
 from src.ui.formulario_unidad import GuardadoUnidadesMixin
 from src.ui.ingresos_base import ModeloTablaIngresos
 
-SUBTABS = ("Todos", "Varias razones", "Sin RUT")
-COLUMNAS = ["RUT", "RAZÓN SOCIAL", "OTRAS RAZONES", "UNIDADES"]
+SUBTABS = ("Todos", "Varias razones", "Varios CDB", "Sin RUT")
+COLUMNAS = ["RUT", "RAZÓN SOCIAL", "OTRAS RAZONES", "CDB", "UNIDADES"]
 
 
 def _sin_formato(texto):
@@ -40,6 +41,7 @@ class PanelCliente(QFrame):
     cerrar_pedido = pyqtSignal()
     guardar_razon = pyqtSignal(str, str)
     guardar_rut = pyqtSignal(str, str, str, object)
+    guardar_cdb = pyqtSignal(str, object, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -48,6 +50,8 @@ class PanelCliente(QFrame):
         self.cliente = None
         self._razones = []
         self._otros = {}
+        self._cdbs = []
+        self._cdb_ajenos = {}
         marco = QVBoxLayout(self)
         marco.setContentsMargins(1, 1, 1, 1)
 
@@ -96,10 +100,12 @@ class PanelCliente(QFrame):
         self.chip_rut = QLabel("")
         self.chip_unidades = QLabel("")
         self.chip_razones = QLabel("")
+        self.chip_cdb = QLabel("")
         self.chip_rut.setStyleSheet(estilo_com.qss_chip(estilo_com.PIZARRA_SUAVE, estilo_com.TINTA))
         self.chip_unidades.setStyleSheet(estilo_com.qss_chip("#E0F2FE", "#0369A1"))
         self.chip_razones.setStyleSheet(estilo_com.qss_chip("#FEE2E2", "#B91C1C"))
-        for chip in (self.chip_rut, self.chip_unidades, self.chip_razones):
+        self.chip_cdb.setStyleSheet(estilo_com.qss_chip("#FEE2E2", "#B91C1C"))
+        for chip in (self.chip_rut, self.chip_unidades, self.chip_razones, self.chip_cdb):
             self.fila_chips.addWidget(chip)
         self.fila_chips.addStretch()
         lay.addLayout(self.fila_chips)
@@ -113,7 +119,7 @@ class PanelCliente(QFrame):
         fila_sel.setSpacing(4)
         self.pila = QStackedWidget()
         self._pestanas = []
-        for i, texto in enumerate(("Razón social", "RUT")):
+        for i, texto in enumerate(("Razón social", "RUT", "CDB")):
             btn = QPushButton(texto)
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -172,6 +178,32 @@ class PanelCliente(QFrame):
         lt.addStretch()
         self.pila.addWidget(pag_rut)
 
+        pag_cdb = QWidget()
+        lc = QVBoxLayout(pag_cdb)
+        lc.setContentsMargins(0, 6, 0, 0)
+        lc.setSpacing(8)
+        lc.addWidget(self._titulo_seccion("CDB comercial a corregir"))
+        self.cmb_cdb = QComboBox()
+        self.cmb_cdb.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_cdb.setMinimumContentsLength(10)
+        self.cmb_cdb.currentIndexChanged.connect(self._actualizar_cdb)
+        lc.addWidget(self.cmb_cdb)
+        lc.addWidget(self._titulo_seccion("CDB nuevo"))
+        self.txt_cdb = QLineEdit()
+        self.txt_cdb.setValidator(QRegularExpressionValidator(QRegularExpression(r"[0-9]{0,10}")))
+        self.txt_cdb.setPlaceholderText("Hasta 10 dígitos")
+        self.txt_cdb.textChanged.connect(self._actualizar_cdb)
+        lc.addWidget(self.txt_cdb)
+        self.lbl_aviso_cdb = self._aviso(estilo_com.APAGADO)
+        self.lbl_ajeno_cdb = self._aviso(WARNING, negrita=True)
+        lc.addWidget(self.lbl_aviso_cdb)
+        lc.addWidget(self.lbl_ajeno_cdb)
+        self.btn_cdb = self._boton_guardar("Guardar CDB")
+        self.btn_cdb.clicked.connect(self._on_guardar_cdb)
+        lc.addWidget(self.btn_cdb)
+        lc.addStretch()
+        self.pila.addWidget(pag_cdb)
+
         lay.addStretch()
         self._ir_a_pestana(0)
 
@@ -201,12 +233,15 @@ class PanelCliente(QFrame):
         btn.setStyleSheet(estilo_com.QSS_BOTON_GUARDAR)
         return btn
 
-    def set_cliente(self, cliente, razones, otros_clientes):
+    def set_cliente(self, cliente, razones, otros_clientes, cdbs=(), cdb_ajenos=None):
         """Carga el cliente (dict de resumen_clientes), sus razones
-        [(nombre, unidades)] y los demás clientes."""
+        [(nombre, unidades)], los demás clientes, sus CDB [(cdb, unidades)] y
+        los CDB que usan otros clientes {cdb: razón social}."""
         self.cliente = cliente
         self._razones = razones
         self._otros = {c["CLAVE"]: c for c in otros_clientes}
+        self._cdbs = list(cdbs)
+        self._cdb_ajenos = cdb_ajenos or {}
         self.lbl_nombre.setText(str(cliente["RAZÓN SOCIAL"]))
         self.chip_rut.setText(f"RUT {cliente['RUT']}")
         self.chip_unidades.setText(_unidades(int(cliente["UNIDADES"])))
@@ -223,8 +258,22 @@ class PanelCliente(QFrame):
         self.txt_rut.blockSignals(True)
         self.txt_rut.clear()
         self.txt_rut.blockSignals(False)
+        reales = [c for c, _n in self._cdbs if c != '-']
+        self.chip_cdb.setText(f"{len(reales)} CDB")
+        self.chip_cdb.setVisible(len(reales) > 1)
+        self.cmb_cdb.blockSignals(True)
+        self.cmb_cdb.clear()
+        if len(self._cdbs) > 1:
+            self.cmb_cdb.addItem(f"Todos  ({_unidades(sum(n for _c, n in self._cdbs))})", None)
+        for cdb, n in self._cdbs:
+            self.cmb_cdb.addItem(f"{'Sin CDB' if cdb == '-' else cdb}  ({_unidades(n)})", cdb)
+        self.cmb_cdb.blockSignals(False)
+        self.txt_cdb.blockSignals(True)
+        self.txt_cdb.clear()
+        self.txt_cdb.blockSignals(False)
         self._actualizar_razon()
         self._actualizar_rut()
+        self._actualizar_cdb()
 
     # ---------------------------------------------------------- razón social
     def _actualizar_razon(self):
@@ -288,6 +337,35 @@ class PanelCliente(QFrame):
         self.guardar_rut.emit(self.cliente["CLAVE"], self.cmb_razon.currentData(), self.txt_rut.text().strip(),
                               destino["RAZÓN SOCIAL"] if usar_nombre else None)
 
+    # ------------------------------------------------------------------- CDB
+    def _unidades_a_cambiar_cdb(self, nuevo):
+        origen = self.cmb_cdb.currentData()
+        return sum(n for cdb, n in self._cdbs if cdb != nuevo and (origen is None or cdb == origen))
+
+    def _actualizar_cdb(self):
+        if self.cliente is None:
+            return
+        nuevo = self.txt_cdb.text().strip()
+        n = self._unidades_a_cambiar_cdb(nuevo) if nuevo else 0
+        if not nuevo:
+            texto = "Escribe el CDB comercial nuevo (hasta 10 dígitos)."
+        elif n == 0:
+            texto = "Esas unidades ya tienen ese CDB."
+        else:
+            texto = f"Se asignará el CDB {nuevo} en {_unidades(n)}; el CDB flota no se modifica."
+        self.lbl_aviso_cdb.setText(texto)
+        ajeno = self._cdb_ajenos.get(nuevo) if nuevo else None
+        if ajeno:
+            self.lbl_ajeno_cdb.setText(f"Ese CDB ya lo usa {ajeno}. Confirma que sea el correcto.")
+            self.lbl_ajeno_cdb.show()
+        else:
+            self.lbl_ajeno_cdb.hide()
+        self.btn_cdb.setEnabled(n > 0)
+
+    def _on_guardar_cdb(self):
+        if self.cliente is not None and self.txt_cdb.text().strip():
+            self.guardar_cdb.emit(self.cliente["CLAVE"], self.cmb_cdb.currentData(), self.txt_cdb.text().strip())
+
 
 class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
     MODULO_LOG = "Administración (Clientes)"
@@ -298,6 +376,7 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
         self.writer = ExcelWriter()
         self.df_clientes = pd.DataFrame(columns=comercial_services.COLUMNAS_RESUMEN_CLIENTES)
         self.df_tabla = pd.DataFrame(columns=COLUMNAS)
+        self._cdbs = {}
         self._data_dirty = False
         self._clave_panel = None
         self._panel_abierto = False
@@ -320,13 +399,13 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
         self._barra = admin_estilo.barra_opciones('fa5s.building', "Clientes", "")
         layout.addWidget(self._barra.marco)
 
-        self.btn_exportar = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel")
+        self.btn_exportar = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel", grupo='generales')
         self.btn_exportar.clicked.connect(lambda: self.table.export_to_excel("Clientes"))
-        self.btn_recargar = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Recargar")
+        self.btn_recargar = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Recargar", grupo='generales')
         self.btn_recargar.clicked.connect(self.load_data)
 
         marco, capas = admin_estilo.tarjeta_contenido("tarjetaClientesAdmin")
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         self.table.menu_type = "solo_lectura"
         admin_estilo.estilar_tabla(self.table)
         self.model = ModeloTablaIngresos(
@@ -337,13 +416,14 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
         capas.addWidget(self.table, 1)
         layout.addWidget(marco, 1)
 
-        self.panel = PanelCliente()
-        self.panel.setParent(self)
+        # Con su padre desde el inicio: reparentarlo ya armado re-aplicaba los estilos a todo el panel
+        self.panel = PanelCliente(self)
         estilo_com.crear_sombra_panel(self.panel)
         self.panel.hide()
         self.panel.cerrar_pedido.connect(self.table.clearSelection)
         self.panel.guardar_razon.connect(self._on_guardar_razon)
         self.panel.guardar_rut.connect(self._on_guardar_rut)
+        self.panel.guardar_cdb.connect(self._on_guardar_cdb)
         self._anim_panel = QPropertyAnimation(self.panel, b"pos", self)
         self._anim_panel.setDuration(240)
         self._anim_panel.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -354,6 +434,8 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
     @staticmethod
     def _color_celda(columna, valor, es_fondo):
         if columna == "OTRAS RAZONES" and valor != "-" and not es_fondo:
+            return "#E04848"
+        if columna == "CDB" and ',' in str(valor) and not es_fondo:
             return "#E04848"
         if columna == "RUT" and valor == "Sin RUT" and not es_fondo:
             return "#D98404"
@@ -417,13 +499,32 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
             self._clave_panel = cliente["CLAVE"]
             otros = [c for c in self.df_clientes.to_dict('records') if c["CLAVE"] != cliente["CLAVE"]]
             razones = comercial_services.razones_de_cliente(self.data_manager.get_comercial_df(), cliente["CLAVE"])
-            self.panel.set_cliente(cliente, razones, otros)
+            cdbs = self._cdbs.get(cliente["CLAVE"], [])
+            self.panel.set_cliente(cliente, razones, otros, cdbs, self._cdb_ajenos(cliente["CLAVE"], cdbs))
         self._mostrar_panel(True)
 
+    def _cdb_ajenos(self, clave, cdbs):
+        """{CDB: razón social} de los CDB que ya usa otro cliente, para avisar al escribirlos."""
+        razon_de = dict(zip(self.df_clientes["CLAVE"], self.df_clientes["RAZÓN SOCIAL"]))
+        ajenos = {}
+        for otra, lista in self._cdbs.items():
+            if otra == clave:
+                continue
+            for cdb, _n in lista:
+                if cdb != '-' and cdb not in ajenos:
+                    ajenos[cdb] = razon_de.get(otra, "otro cliente")
+        return ajenos
+
     # --------------------------------------------------------------- datos
+    def _texto_cdbs(self, clave):
+        reales = [c for c, _n in self._cdbs.get(clave, []) if c != '-']
+        return ', '.join(reales) or '-'
+
     def load_data(self):
         self._data_dirty = False
         self.df_clientes = comercial_services.resumen_clientes(self.data_manager.get_comercial_df())
+        self._cdbs = comercial_services.cdbs_por_cliente(self.data_manager.get_contratos_actuales_df())
+        self.df_clientes["CDB"] = self.df_clientes["CLAVE"].map(self._texto_cdbs)
         self._clave_panel = None
         self._actualizar_kpis_y_contadores()
         self._pintar_tabla()
@@ -444,6 +545,8 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
         if idx == 1:
             return df[df["OTRAS RAZONES"] != "-"]
         if idx == 2:
+            return df[df["CDB"].str.contains(',', regex=False)]
+        if idx == 3:
             return df[df["CLAVE"].str.startswith("RS:")]
         return df
 
@@ -451,11 +554,13 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
         df = self.df_clientes
         total = len(df)
         varias = int((df["OTRAS RAZONES"] != "-").sum()) if total else 0
+        varios_cdb = int(df["CDB"].str.contains(',', regex=False).sum()) if total else 0
         sin_rut = int(df["CLAVE"].str.startswith("RS:").sum()) if total else 0
         for i in range(len(SUBTABS)):
             admin_estilo.actualizar_contador(self.subtabs, self._badges, i, len(self._filtrar_subtab(df, i)))
         unidades = int(df["UNIDADES"].sum()) if total else 0
-        self._barra.lbl_subtitulo.setText(f"{total} clientes · {varias} con varias razones · {unidades} unidades")
+        self._barra.lbl_subtitulo.setText(
+            f"{total} clientes · {varias} con varias razones · {varios_cdb} con varios CDB · {unidades} unidades")
 
     def _pintar_tabla(self):
         df = self._filtrar_subtab(self.df_clientes, self.subtabs.currentIndex())
@@ -466,7 +571,7 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
             df = df[mascara]
         self.df_tabla = self.table.apply_sort(df).reset_index(drop=True)
         self.model.set_data(self.df_tabla)
-        for col, ancho in (("RUT", 150), ("RAZÓN SOCIAL", 360), ("OTRAS RAZONES", 360), ("UNIDADES", 110)):
+        for col, ancho in (("RUT", 150), ("RAZÓN SOCIAL", 340), ("OTRAS RAZONES", 320), ("CDB", 190), ("UNIDADES", 110)):
             if col in self.df_tabla.columns:
                 self.table.setColumnWidth(self.df_tabla.columns.get_loc(col), ancho)
         self._actualizar_panel()
@@ -499,3 +604,11 @@ class ClientesAdminModule(GuardadoUnidadesMixin, QWidget):
             QMessageBox.information(self, "Sin cambios", "No hay unidades para actualizar con esos datos.")
             return
         self.guardar_lote_unidades(lote, "Guardando el RUT de la razón social…")
+
+    def _on_guardar_cdb(self, clave, cdb_origen, nuevo_cdb):
+        lote = comercial_services.cambios_cdb_cliente(
+            self.data_manager.get_contratos_actuales_df(), clave, cdb_origen, nuevo_cdb)
+        if not lote:
+            QMessageBox.information(self, "Sin cambios", "No hay unidades para actualizar con ese CDB.")
+            return
+        self.guardar_lote_unidades(lote, "Guardando el CDB del cliente…")

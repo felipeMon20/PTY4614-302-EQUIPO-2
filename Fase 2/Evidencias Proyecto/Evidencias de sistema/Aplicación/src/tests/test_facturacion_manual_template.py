@@ -18,14 +18,14 @@ class TestConstruirPlantillaBase(unittest.TestCase):
     """Plantilla base de Facturación Manual (fase 'Crear plantilla base', ver
     Notas del proyecto.txt, sección 7): solo estructura visual, sin cálculos ni conexión
     a 'Facturación Manual - BBDD.xlsx'. Todo campo financiero debe quedar
-    literalmente marcado como PENDIENTE CONTRAPARTE COMERCIAL."""
+    literalmente marcado como PENDIENTE JAVIERA."""
 
     def test_incluye_textos_fijos_reales(self):
         documento = construir_plantilla_base()
         texto = _texto_completo(documento)
         self.assertIn("Estimado(a) cliente:", texto)
         self.assertIn("El impuesto al valor agregado (IVA)", texto)
-        self.assertIn("Ana Ejemplo Demo", texto)
+        self.assertIn("Javiera González Maldonado", texto)
 
     def test_incluye_placeholders_de_datos_confirmados(self):
         documento = construir_plantilla_base()
@@ -73,7 +73,7 @@ class TestGenerarPlantillaBase(unittest.TestCase):
             self.assertTrue(os.path.exists(destino))
 
             documento_leido = docx.Document(destino)
-            self.assertIn("Ana Ejemplo Demo", _texto_completo(documento_leido))
+            self.assertIn("Javiera González Maldonado", _texto_completo(documento_leido))
             self.assertEqual(len(documento_leido.tables), 2)
 
 

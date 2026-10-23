@@ -1,6 +1,6 @@
 ﻿CARGAS DE PRUEBA - OCTUBRE 2026
 Datos ficticios, pensados para los archivos de esta carpeta "archivos de referencia".
-Conviene probarlas en una copia: cada carga modifica RM_CONTRATOS.csv, provisionContratos.xlsx y CasosBajaCM.csv.
+Conviene probarlas en una copia: cada carga modifica RM_JAVI.csv, provisionFelipe.xlsx y CasosBajaCM.csv.
 
 
 1) 3PC Contratos CM - Octubre 2026.xlsx
@@ -8,13 +8,13 @@ Conviene probarlas en una copia: cada carga modifica RM_CONTRATOS.csv, provision
 
    Qué deberías ver:
    - 7 contratos siguen igual (Running) y 3 siguen Expired (su caso sigue abierto en Gestionar CM).
-   - 9BVRT4ZC4SA900029 pasa a Expired: queda en ESTADO COMERCIAL "Revisar" y aparece un caso nuevo en Comercial > Gestionar CM.
-   - YV2XT4ZD1SE900124 se renovó (contrato 159900015, Running): su caso "Contrato expirado" se cierra solo.
-   - YV2RB40B2PE900066 y 9BVK20AD9RA900008 eran "Sin Contrato" y reciben un CM nuevo: pasan a CMG y CMB, con facturación CM.
-   - YV2RT4ZA6TE900083 y YV2XT4ZC7TE900123 no existen en Comercial: la app ofrece vincularlos con LOGISTICA ATACAMA FICTICIA SPA.
-   - 9BVXT4ZD0SE900052 y 9BVRT4ZA6SE900022 no vienen en el archivo: quedan como "Ausente de 3PC" en Gestionar CM
+   - 9BVRT4ZC4SA836169 pasa a Expired: queda en ESTADO COMERCIAL "Revisar" y aparece un caso nuevo en Comercial > Gestionar CM.
+   - YV2XT4ZD1SE547662 se renovó (contrato 153010411, Running): su caso "Contrato expirado" se cierra solo.
+   - YV2RB40B2PE367359 y 9BVK20AD9RA673942 eran "Sin Contrato" y reciben un CM nuevo: pasan a CMG y CMB, con facturación CM.
+   - YV2RT4ZA6TE904512 y YV2XT4ZC7TE904873 no existen en Comercial: la app ofrece vincularlos con LOGISTICA ATACAMA FICTICIA SPA.
+   - 9BVXT4ZD0SE588612 y 9BVRT4ZA6SE480789 no vienen en el archivo: quedan como "Ausente de 3PC" en Gestionar CM
      (el primero ya tenía caso y suma un mes más ausente).
-   - Comportamiento actual de la app: 9BVK20AB0TE900002 y 9BVTE2AB1PA900040 (contratos "Terminated")
+   - Comportamiento actual de la app: 9BVK20AB0TE256833 y 9BVTE2AB1PA932820 (contratos "Terminated")
      también quedan como "Ausente de 3PC", porque la app considera Terminated como un CM con datos.
 
 
@@ -30,7 +30,7 @@ Conviene probarlas en una copia: cada carga modifica RM_CONTRATOS.csv, provision
    Qué deberías ver:
    - 13 filas en el archivo, pero solo 8 nuevas: las 5 de septiembre ya existen y se descartan (llave AÑO - MES + VIN).
    - 5 cuotas de octubre de los Provision + vigentes.
-   - 2 provisiones nuevas de camiones "Sin Contrato" (YV2XT4ZA8SE900114 y 9BVRB40C1SE900013).
+   - 2 provisiones nuevas de camiones "Sin Contrato" (YV2XT4ZA8SE716676 y 9BVRB40C1SE434372).
      Al completar Plan y Cantidad de Meses y guardar, se actualiza Comercial.
-   - 1 VIN que no está en Comercial (9BVRT4ZC9TE900034): la app lo trata como contrato huérfano.
+   - 1 VIN que no está en Comercial (9BVRT4ZC9TE911626): la app lo trata como contrato huérfano.
      Es uno de los VIN de "Detalle.xlsx". Si antes lo importas por "Importar Excel Power BI", deja de ser huérfano.

@@ -304,7 +304,7 @@ def _resumen_reporte(wb, data, obsoletas=0):
         ws.column_dimensions[letra].width = ancho
 
     _titulo(ws, 1, "Resultado de las pruebas automáticas",
-            f"Gestor SSCC App · ejecución del {_fecha_legible(meta.get('generated_at'))} · generado por el auditor automático")
+            f"Volvo Dashboard App · ejecución del {_fecha_legible(meta.get('generated_at'))} · generado por el auditor automático")
     ws.row_dimensions[1].height = 28
 
     ws.merge_cells("A4:G4")
@@ -508,7 +508,7 @@ def _resumen_casos(wb, data, filas_casos):
     for letra, ancho in {"A": 34, "B": 16, "C": 16, "D": 16, "E": 22}.items():
         ws.column_dimensions[letra].width = ancho
     _titulo(ws, 1, "Casos de prueba",
-            f"Gestor SSCC App · actualizado el {_fecha_legible(data['metadata'].get('generated_at'))} · generado por el auditor automático")
+            f"Volvo Dashboard App · actualizado el {_fecha_legible(data['metadata'].get('generated_at'))} · generado por el auditor automático")
     ws.row_dimensions[1].height = 28
     _parrafo(ws, 4, (
         "Este archivo describe QUÉ se prueba. Cada fila es un grupo de pruebas automáticas (una «clase»): explica qué se verifica, "

@@ -112,12 +112,12 @@ COLUMNAS_EXCEL_BOT = ['CDB', 'Flota', 'Nombre', 'Apellidos', 'Correo electrónic
 
 
 def leer_administradores_bot(ruta):
-    """Hoja "Administradores" del Excel que genera el bot de Servicios Conectados.
+    """Hoja "Administradores" del Excel que genera el bot de Volvo Connect.
     Lanza ValueError con un mensaje legible si el archivo no es ese Excel."""
     try:
         df = pd.read_excel(ruta, sheet_name='Administradores', dtype=object, keep_default_na=False)
     except ValueError:
-        raise ValueError('El Excel no tiene la hoja "Administradores" del bot de Servicios Conectados.')
+        raise ValueError('El Excel no tiene la hoja "Administradores" del bot de Volvo Connect.')
     df.columns = [str(c).strip() for c in df.columns]
     faltantes = [c for c in COLUMNAS_EXCEL_BOT if c not in df.columns]
     if faltantes:
@@ -457,7 +457,7 @@ def buscar_texto_global(df, columnas, search_text):
     Corregido (25-09-2026): la version anterior partia `search_text` solo
     por espacios y combinaba TODOS los terminos con OR (`mask |= t_mask` por
     cada palabra suelta) -- buscar una razon social completa como "SERVICIO
-    Y MANUFACTURAS DEMO SPA" se partia en 5 terminos sueltos y bastaba con
+    Y MANUFACTURAS ANTO SPA" se partia en 5 terminos sueltos y bastaba con
     que CUALQUIERA apareciera en cualquier columna para que la fila
     quedara; "SPA" (sufijo legal de sociedad, comun a cientos de empresas
     chilenas) o hasta "y" hacian que devolviera decenas de razones sociales

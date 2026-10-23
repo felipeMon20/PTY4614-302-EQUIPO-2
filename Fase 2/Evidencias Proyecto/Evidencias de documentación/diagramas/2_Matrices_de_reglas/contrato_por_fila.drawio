@@ -1,0 +1,115 @@
+<mxfile host="65bd71144e">
+    <diagram id="contrato-por-fila" name="Un contrato por fila">
+        <mxGraphModel dx="729" dy="1999" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1400" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;whiteSpace=wrap;html=1;fontFamily=Helvetica;align=left;verticalAlign=middle;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Un contrato por fila&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Cada fila del Registro Maestro es un contrato: una unidad puede tener varios a lo largo del tiempo y las pantallas muestran siempre el último&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="950" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley0" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pantalla" vertex="1">
+                    <mxGeometry height="36" width="150" x="1000" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Acción del usuario" vertex="1">
+                    <mxGeometry height="36" width="150" x="1165" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sistema" vertex="1">
+                    <mxGeometry height="36" width="150" x="1330" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Fuera de la app" vertex="1">
+                    <mxGeometry height="36" width="150" x="1495" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;" value="Decisión" vertex="1">
+                    <mxGeometry height="46" width="110" x="1660" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_ini" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="1790" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_fin" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="1860" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_c" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Un VIN, varios contratos" vertex="1">
+                    <mxGeometry height="1060" width="40" x="20" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_c" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="1060" width="1260" x="70" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="u" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Una unidad&lt;br&gt;(un camión, identificado por su VIN)" vertex="1">
+                    <mxGeometry height="110" width="250" x="110" y="270" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Contrato N° 115&lt;br&gt;Baja · desconectada&lt;br&gt;solo lectura" vertex="1">
+                    <mxGeometry height="110" width="290" x="450" y="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Contrato N° 4200&lt;br&gt;Renovado&lt;br&gt;solo lectura" vertex="1">
+                    <mxGeometry height="110" width="290" x="450" y="265" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Contrato N° 9031&lt;br&gt;Vigente · conectada&lt;br&gt;&lt;b&gt;CONTRATO ACTUAL&lt;/b&gt; (el de mayor N°)" vertex="1">
+                    <mxGeometry height="120" width="290" x="450" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Comercial, Operaciones, JustTime, Dashboard y las demás pantallas trabajan con este contrato" vertex="1">
+                    <mxGeometry height="120" width="330" x="840" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Clientes y Flota › Contratos anteriores: se consultan, no se editan" vertex="1">
+                    <mxGeometry height="130" width="330" x="840" y="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Crear contrato»: la unidad tiene el contrato en Baja y ya no está Activando ni Conectada" vertex="1">
+                    <mxGeometry height="110" width="290" x="110" y="620" as="geometry"/>
+                </mxCell>
+                <mxCell id="a2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Renovar contrato»: contrato Vigente o Vencido que se reemplaza por uno nuevo" vertex="1">
+                    <mxGeometry height="110" width="290" x="110" y="790" as="geometry"/>
+                </mxCell>
+                <mxCell id="a3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Extender duración»: se suman meses a un contrato Vigente o Vencido" vertex="1">
+                    <mxGeometry height="110" width="290" x="110" y="970" as="geometry"/>
+                </mxCell>
+                <mxCell id="n1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Nace un contrato con N° nuevo; el anterior no se toca" vertex="1">
+                    <mxGeometry height="110" width="330" x="450" y="620" as="geometry"/>
+                </mxCell>
+                <mxCell id="n2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Nace un contrato con N° nuevo; el anterior queda Renovado y, si estaba en JustTime como Si o Pendiente, pasa a Eliminar" vertex="1">
+                    <mxGeometry height="130" width="330" x="450" y="780" as="geometry"/>
+                </mxCell>
+                <mxCell id="n3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sigue el mismo contrato y el mismo N°: solo cambian duración y término (un Vencido vuelve a Vigente)" vertex="1">
+                    <mxGeometry height="130" width="330" x="450" y="960" as="geometry"/>
+                </mxCell>
+                <mxCell id="n4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="El contrato nuevo, al tener el mayor N°, pasa a ser el actual de la unidad" vertex="1">
+                    <mxGeometry height="120" width="340" x="880" y="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="notas" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontSize=12;align=left;verticalAlign=top;spacing=12;" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;• Los números de contrato del dibujo son un ejemplo.&lt;br&gt;• Un contrato terminado (Baja o Baja solicitada) no se edita. Si el cliente vuelve no se reabre: se crea un contrato nuevo con otro N° de contrato, y así se conserva el historial.&lt;br&gt;• Un contrato Renovado queda como historial: ya no es el actual de la unidad porque lo reemplaza uno con mayor N°.&lt;br&gt;• Las tarjetas del Dashboard cuentan un VIN una sola vez (contrato actual); sus altas y bajas miran todos los contratos del VIN." vertex="1">
+                    <mxGeometry height="150" width="1750" x="20" y="1150" as="geometry"/>
+                </mxCell>
+                <mxCell id="f1" edge="1" parent="1" source="u" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="c1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f2" edge="1" parent="1" source="u" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="c2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f3" edge="1" parent="1" source="u" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="c3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f4" edge="1" parent="1" source="c3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="p1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f5" edge="1" parent="1" source="c1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="p2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f6" edge="1" parent="1" source="c2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="p2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f7" edge="1" parent="1" source="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f8" edge="1" parent="1" source="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f9" edge="1" parent="1" source="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f10" edge="1" parent="1" source="n1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" target="n4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f11" edge="1" parent="1" source="n2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.75;" target="n4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

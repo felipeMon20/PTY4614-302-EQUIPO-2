@@ -1,4 +1,4 @@
-"""Modo claro/oscuro de toda la app (30-09-2026).
+﻿"""Modo claro/oscuro de toda la app (30-09-2026).
 
 Los colores de la UI están escritos a mano en cientos de setStyleSheet, así
 que el modo oscuro no reescribe cada llamada: QWidget.setStyleSheet queda
@@ -10,9 +10,10 @@ sus colores con color() y escuchan GestorTema.tema_cambiado.
 import colorsys
 import re
 
-from PyQt6.QtCore import QEvent, QObject, QSettings, pyqtSignal
+from PyQt6 import sip
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSettings, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QApplication, QToolTip, QWidget
+from PyQt6.QtWidgets import QAbstractScrollArea, QApplication, QToolTip, QWidget
 
 CLARO = "claro"
 OSCURO = "oscuro"
@@ -295,6 +296,10 @@ class GestorTema(QObject):
         # (~0,3 s) y los diálogos/menús hijos la heredan.
         self._oscuro_en_app = False
         self._ventanas = []
+        self._diferidos = {}
+        self._colas = {}
+        self._esqueletos = {}
+        self._areas_por_viewport = {}
 
     @property
     def modo(self):
@@ -306,7 +311,7 @@ class GestorTema(QObject):
         self._filtro_globos = _FiltroGlobos(app)
         app.installEventFilter(self._filtro_globos)
         self._qss_app_claro = app.styleSheet()
-        oscuro = QSettings("GestorApp", "Dashboard").value(CLAVE_AJUSTE, False, type=bool)
+        oscuro = QSettings("VolvoApp", "Dashboard").value(CLAVE_AJUSTE, False, type=bool)
         self._oscuro_en_app = oscuro
         if oscuro:
             app.setStyleSheet(convertir_qss(self._qss_app_claro))
@@ -340,7 +345,7 @@ class GestorTema(QObject):
         for ventana in list(self._ventanas):
             self._aplicar_hoja_global(ventana)
         if guardar:
-            QSettings("GestorApp", "Dashboard").setValue(CLAVE_AJUSTE, oscuro)
+            QSettings("VolvoApp", "Dashboard").setValue(CLAVE_AJUSTE, oscuro)
         self.tema_cambiado.emit(self.modo)
 
     def _aplicar_hoja_global(self, ventana):
@@ -352,16 +357,116 @@ class GestorTema(QObject):
             _set_style_sheet_original(ventana, hoja)
 
     def _reaplicar_hojas_de_widgets(self, oscuro):
-        """Los widgets visibles se reestilizan al instante; los ocultos
-        (otras pestañas, paneles cerrados) esperan a mostrarse, que es donde
-        setStyleSheet cuesta más y nadie lo ve."""
+        """Los widgets que se ven en pantalla se reestilizan al instante; los
+        ocultos (otras pestañas, paneles cerrados) esperan a mostrarse, y los
+        que están dentro de una lista con scroll pero fuera de la vista
+        esperan a que se desplace hasta ellos (ver _al_desplazar)."""
+        self._cancelar_diferidos()
         for widget in QApplication.allWidgets():
             if widget in self._ventanas:
                 continue
             if widget.isVisible():
+                if widget.styleSheet() or widget.property(_PROP_ORIGINAL) is not None:
+                    area = self._area_de_desplazamiento(widget)
+                    if area is not None and widget.visibleRegion().isEmpty():
+                        self._diferidos.setdefault(area, []).append(widget)
+                        continue
                 self._sincronizar_widget(widget, oscuro)
             elif widget.styleSheet() or widget.property(_PROP_ORIGINAL) is not None:
                 widget.installEventFilter(self)
+        for area in self._diferidos:
+            self._conectar_area(area)
+
+    # ------------------------------------------------------------------
+    # Listas con scroll: lo que está fuera de la vista se estiliza al llegar
+    # ------------------------------------------------------------------
+    TANDA_WIDGETS = 25          # por tick: ~10 ms, deja fluida la animación de carga
+    UMBRAL_ESQUELETO = 40       # menos widgets que esto se estilizan sin animación
+
+    @staticmethod
+    def _area_de_desplazamiento(widget):
+        actual = widget.parentWidget()
+        while actual is not None:
+            padre = actual.parentWidget()
+            if isinstance(padre, QAbstractScrollArea) and padre.viewport() is actual:
+                return padre
+            actual = padre
+        return None
+
+    def _conectar_area(self, area):
+        if area.property("_tema_diferido"):
+            return
+        area.setProperty("_tema_diferido", True)
+        for barra in (area.verticalScrollBar(), area.horizontalScrollBar()):
+            barra.valueChanged.connect(lambda _v, a=area: self._al_desplazar(a))
+        self._areas_por_viewport[area.viewport()] = area
+        area.viewport().installEventFilter(self)
+
+    def _cancelar_diferidos(self):
+        for area in list(self._colas):
+            self._detener_carga(area)
+        self._diferidos = {}
+        self._colas = {}
+
+    def _detener_carga(self, area):
+        esqueleto = self._esqueletos.get(area)
+        if esqueleto is not None and not sip.isdeleted(esqueleto):
+            esqueleto._ocultar()
+
+    def _al_desplazar(self, area):
+        if sip.isdeleted(area):
+            self._diferidos.pop(area, None)
+            return
+        lista = [w for w in self._diferidos.get(area, []) if not sip.isdeleted(w)]
+        self._diferidos[area] = lista
+        if not lista:
+            return
+        viewport = area.viewport()
+        zona = viewport.rect().adjusted(0, -viewport.height() // 2, 0, viewport.height() // 2)
+        cerca, lejos = [], []
+        for w in lista:
+            caja = QRect(w.mapTo(viewport, QPoint(0, 0)), w.size())
+            (cerca if zona.intersects(caja) else lejos).append(w)
+        if not cerca:
+            return
+        self._diferidos[area] = lejos
+        if area in self._colas:
+            self._colas[area].extend(cerca)
+            return
+        if len(cerca) < self.UMBRAL_ESQUELETO:
+            for w in cerca:
+                if not sip.isdeleted(w):
+                    self._sincronizar_widget(w, es_oscuro())
+            return
+        self._colas[area] = cerca
+        esqueleto = self._esqueletos.get(area)
+        if esqueleto is None or sip.isdeleted(esqueleto):
+            from src.ui.esqueleto_carga import EsqueletoCarga
+            esqueleto = self._esqueletos[area] = EsqueletoCarga(area.viewport(), 'tarjetas')
+        esqueleto.iniciar_ya()
+        QTimer.singleShot(0, lambda: self._procesar_tanda(area))
+
+    def _procesar_tanda(self, area):
+        cola = self._colas.get(area)
+        if cola is None:
+            return
+        if sip.isdeleted(area):
+            self._colas.pop(area, None)
+            return
+        oscuro = es_oscuro()
+        for _ in range(self.TANDA_WIDGETS):
+            if not cola:
+                break
+            w = cola.pop()
+            if not sip.isdeleted(w):
+                self._sincronizar_widget(w, oscuro)
+        if cola:
+            QTimer.singleShot(0, lambda: self._procesar_tanda(area))
+            return
+        del self._colas[area]
+        esqueleto = self._esqueletos.get(area)
+        if esqueleto is not None and not sip.isdeleted(esqueleto):
+            esqueleto.terminar()
 
     @staticmethod
     def _sincronizar_widget(widget, oscuro):
@@ -381,7 +486,13 @@ class GestorTema(QObject):
             _set_style_sheet_original(widget, original)
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.Show:
+        tipo = event.type()
+        if tipo == QEvent.Type.Resize:
+            area = self._areas_por_viewport.get(obj)
+            if area is not None and self._diferidos.get(area):
+                QTimer.singleShot(0, lambda a=area: self._al_desplazar(a))
+            return False
+        if tipo == QEvent.Type.Show and obj not in self._areas_por_viewport:
             obj.removeEventFilter(self)
             self._sincronizar_widget(obj, es_oscuro())
         return False

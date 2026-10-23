@@ -1,0 +1,307 @@
+<mxfile host="65bd71144e">
+    <diagram id="operaciones" name="Operaciones">
+        <mxGraphModel dx="608" dy="2099" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1600" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;whiteSpace=wrap;html=1;fontFamily=Helvetica;align=left;verticalAlign=middle;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Operaciones: las cinco pestañas&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Qué unidades entran a cada cola, qué hace Operaciones y adónde pasa la unidad&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="900" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley0" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pantalla" vertex="1">
+                    <mxGeometry height="36" width="150" x="960" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Acción del usuario" vertex="1">
+                    <mxGeometry height="36" width="150" x="1125" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sistema" vertex="1">
+                    <mxGeometry height="36" width="150" x="1290" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Fuera de la app" vertex="1">
+                    <mxGeometry height="36" width="150" x="1455" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;" value="Decisión" vertex="1">
+                    <mxGeometry height="46" width="110" x="1620" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_ini" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="1750" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_act" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Activaciones" vertex="1">
+                    <mxGeometry height="270" width="40" x="20" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_act" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="270" width="2010" x="70" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_sf" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Sin Flota" vertex="1">
+                    <mxGeometry height="270" width="40" x="20" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_sf" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="270" width="2010" x="70" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_baj" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Bajas" vertex="1">
+                    <mxGeometry height="170" width="40" x="20" y="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_baj" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="170" width="2010" x="70" y="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_con" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Contactos" vertex="1">
+                    <mxGeometry height="170" width="40" x="20" y="840" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_con" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="170" width="2010" x="70" y="840" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_cnx" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Conectados" vertex="1">
+                    <mxGeometry height="200" width="40" x="20" y="1040" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_cnx" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="200" width="2010" x="70" y="1040" as="geometry"/>
+                </mxCell>
+                <mxCell id="i1" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="98" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_e" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Entra si Activación = Activando, No entregado o Desconectado, Etapa de gestión = Operaciones y el contrato no está en Baja ni Baja solicitada" vertex="1">
+                    <mxGeometry height="110" width="250" x="170" y="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_p" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Operaciones › Activaciones" vertex="1">
+                    <mxGeometry height="70" width="180" x="460" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Selecciona las unidades y, si quiere, escribe CDB flota y Flota VC en el panel" vertex="1">
+                    <mxGeometry height="90" width="230" x="680" y="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_d" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿La unidad ya aparece en Volvo Connect? (se revisa en ISOS)" vertex="1">
+                    <mxGeometry height="110" width="220" x="940" y="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_a2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Marcar como CONECTADO" vertex="1">
+                    <mxGeometry height="70" width="180" x="1200" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Exige CDB flota y Flota VC reales («NO EXISTE EN VC» no sirve). Si estaba en Activación pendiente, pide la fecha de activación en Volvo Connect" vertex="1">
+                    <mxGeometry height="120" width="300" x="1420" y="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_s2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Activación = Conectado y Estado comercial = Vigente. El inicio es la fecha elegida y el término se calcula con la duración. Pasa a Conectados" vertex="1">
+                    <mxGeometry height="120" width="290" x="1760" y="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_a3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Marcar como SIN FLOTA" vertex="1">
+                    <mxGeometry height="70" width="180" x="960" y="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_s3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Activación = Sin flota. Si Flota VC estaba vacía queda «NO EXISTE EN VC». Pasa a Sin Flota" vertex="1">
+                    <mxGeometry height="80" width="300" x="1180" y="205" as="geometry"/>
+                </mxCell>
+                <mxCell id="i2" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="438" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_e" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Entra si Activación = Sin flota (Etapa = Operaciones), o si el contrato tiene solo uno de los dos datos: Flota VC o CDB flota" vertex="1">
+                    <mxGeometry height="110" width="250" x="170" y="410" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_p" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Operaciones › Sin Flota" vertex="1">
+                    <mxGeometry height="70" width="180" x="460" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Completa CDB flota y Flota VC en el panel. Al escribir un CDB conocido se sugiere su flota" vertex="1">
+                    <mxGeometry height="90" width="230" x="680" y="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_f" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="La unidad aparece en Volvo Connect" vertex="1">
+                    <mxGeometry height="70" width="210" x="950" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_a2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Marcar como CONECTADO" vertex="1">
+                    <mxGeometry height="70" width="180" x="1200" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Exige CDB flota y Flota VC reales y la fecha de activación si estaba en Activación pendiente. Activación = Conectado y Estado comercial = Vigente" vertex="1">
+                    <mxGeometry height="120" width="300" x="1420" y="405" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_p2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Operaciones › Conectados" vertex="1">
+                    <mxGeometry height="70" width="230" x="1760" y="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_a3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Si todavía no corresponde conectar: «Guardar flota» o «Limpiar flota» (deja «-» en CDB flota y Flota VC)" vertex="1">
+                    <mxGeometry height="60" width="480" x="680" y="540" as="geometry"/>
+                </mxCell>
+                <mxCell id="i3" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="698" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_e" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Entra si Etapa = Operaciones y la unidad está Conectada con Baja, Baja solicitada o contrato vencido o por vencer (30 días), o Activando con Baja o Baja solicitada" vertex="1">
+                    <mxGeometry height="120" width="290" x="170" y="665" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_p" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Operaciones › Bajas" vertex="1">
+                    <mxGeometry height="70" width="170" x="500" y="690" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Selecciona las unidades. Solo se habilita con Baja o Baja solicitada" vertex="1">
+                    <mxGeometry height="90" width="230" x="710" y="680" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_f" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Desconecta la unidad en Volvo Connect" vertex="1">
+                    <mxGeometry height="80" width="220" x="980" y="685" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_a2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Marcar como DESCONECTADO" vertex="1">
+                    <mxGeometry height="70" width="190" x="1240" y="690" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Activación = Desconectado y Fecha de baja = hoy. Si era Baja solicitada pasa a Baja. Recalcula la etapa" vertex="1">
+                    <mxGeometry height="110" width="290" x="1470" y="670" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_p2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Comercial › Recuperar clientes" vertex="1">
+                    <mxGeometry height="80" width="230" x="1800" y="685" as="geometry"/>
+                </mxCell>
+                <mxCell id="i4" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="898" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_e" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Entra si el CDB no tiene ningún contacto en contactos.xlsx (se omite Flota VC = «NO EXISTE EN VC»). Primero los de más unidades vigentes" vertex="1">
+                    <mxGeometry height="120" width="290" x="170" y="865" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_p" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Operaciones › Contactos" vertex="1">
+                    <mxGeometry height="70" width="170" x="500" y="890" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Hace clic en un CDB (una fila a la vez)" vertex="1">
+                    <mxGeometry height="70" width="230" x="710" y="890" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Abre en el panel el formulario de contactos con CDB y Flota VC ya cargados" vertex="1">
+                    <mxGeometry height="90" width="250" x="980" y="880" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_a2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Completa y guarda el contacto" vertex="1">
+                    <mxGeometry height="70" width="190" x="1270" y="890" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_s2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Agrega el contacto a contactos.xlsx y recarga los contactos. El CDB sale de la lista" vertex="1">
+                    <mxGeometry height="90" width="280" x="1500" y="880" as="geometry"/>
+                </mxCell>
+                <mxCell id="i5" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="1098" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_e" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Entra si Estado comercial = Vigente y Activación = Conectado" vertex="1">
+                    <mxGeometry height="90" width="240" x="170" y="1080" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_p" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Operaciones › Conectados (contador rojo: sin Flota VC o CDB)" vertex="1">
+                    <mxGeometry height="90" width="210" x="450" y="1080" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Filtra con «Faltantes» (sin Flota VC o CDB) o «CDB con varias flotas»" vertex="1">
+                    <mxGeometry height="90" width="230" x="700" y="1080" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_a2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Selecciona unidades, escribe CDB flota y Flota VC en el panel y presiona «Guardar flota»" vertex="1">
+                    <mxGeometry height="90" width="250" x="970" y="1080" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_d" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Otras unidades con el mismo CDB sin Flota VC?" vertex="1">
+                    <mxGeometry height="100" width="220" x="1260" y="1075" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pregunta si completar también esa Flota VC en las demás unidades" vertex="1">
+                    <mxGeometry height="80" width="230" x="1520" y="1085" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_s2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Guarda CDB flota y Flota VC. No cambia ningún estado" vertex="1">
+                    <mxGeometry height="80" width="240" x="1790" y="1085" as="geometry"/>
+                </mxCell>
+                <mxCell id="notas" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontSize=12;align=left;verticalAlign=top;spacing=12;" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;• Cada unidad vive en una sola cola. Cada acción guarda en el Registro Maestro y recalcula la Etapa de gestión con la matriz de estados.&lt;br&gt;• Un contrato en Baja no se puede conectar ni marcar Sin flota: solo se desconecta. Si el cliente vuelve, Comercial crea un contrato nuevo.&lt;br&gt;• Para editar Flota VC y CDB flota con varias unidades, todas deben ser de la misma empresa. Un campo vacío conserva el valor que cada unidad ya tenía.&lt;br&gt;• Al guardar una Flota VC distinta de la ya conocida para ese CDB, la app avisa y pide confirmar.&lt;br&gt;• «Contactar ejecutivo» (todas menos Contactos): abre en Outlook un borrador por ejecutivo con sus unidades seleccionadas. Los correos salen de Ejecutivos_VC.csv.&lt;br&gt;• «Exportar VIN &amp;amp; CDB» (todas menos Contactos) deja un Excel en el Escritorio. «Exportar contactos» (solo Activaciones) arma un Excel por CDB con sus contactos.&lt;br&gt;• ISOS está fuera de este proyecto: la app no se comunica con Volvo Connect y Operaciones marca a mano el resultado." vertex="1">
+                    <mxGeometry height="200" width="1700" x="20" y="1280" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" edge="1" parent="1" source="i1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_e" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" edge="1" parent="1" source="a_e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_p" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" edge="1" parent="1" source="a_p" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_a1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" edge="1" parent="1" source="a_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_d" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" edge="1" parent="1" source="a_d" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;" target="a_a2" value="Sí">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" edge="1" parent="1" source="a_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_s1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" edge="1" parent="1" source="a_s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_s2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" edge="1" parent="1" source="a_d" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="a_a3" value="No">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" edge="1" parent="1" source="a_a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a_s3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e10" edge="1" parent="1" source="a_s3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="s_p" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" edge="1" parent="1" source="i2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_e" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e12" edge="1" parent="1" source="s_e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_p" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e13" edge="1" parent="1" source="s_p" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_a1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e14" edge="1" parent="1" source="s_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_f" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e15" edge="1" parent="1" source="s_f" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_a2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e16" edge="1" parent="1" source="s_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_s1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e17" edge="1" parent="1" source="s_s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_p2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e18" edge="1" parent="1" source="s_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.24;entryY=0;" target="s_a3" value="o">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e19" edge="1" parent="1" source="i3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_e" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e20" edge="1" parent="1" source="b_e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_p" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e21" edge="1" parent="1" source="b_p" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_a1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e22" edge="1" parent="1" source="b_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_f" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e23" edge="1" parent="1" source="b_f" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_a2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e24" edge="1" parent="1" source="b_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_s1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e25" edge="1" parent="1" source="b_s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="b_p2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e26" edge="1" parent="1" source="i4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c_e" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e27" edge="1" parent="1" source="c_e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c_p" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e28" edge="1" parent="1" source="c_p" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c_a1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e29" edge="1" parent="1" source="c_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c_s1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e30" edge="1" parent="1" source="c_s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c_a2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e31" edge="1" parent="1" source="c_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c_s2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e32" edge="1" parent="1" source="i5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d_e" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e33" edge="1" parent="1" source="d_e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d_p" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e34" edge="1" parent="1" source="d_p" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d_a1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e35" edge="1" parent="1" source="d_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d_a2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e36" edge="1" parent="1" source="d_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d_d" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e37" edge="1" parent="1" source="d_d" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;" target="d_s1" value="Sí">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e38" edge="1" parent="1" source="d_s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d_s2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e39" edge="1" parent="1" source="d_d" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=1;" target="d_s2" value="No">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

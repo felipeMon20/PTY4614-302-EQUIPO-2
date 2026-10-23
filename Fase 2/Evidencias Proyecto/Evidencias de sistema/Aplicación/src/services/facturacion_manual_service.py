@@ -13,13 +13,16 @@ cualquier dato que solo exista en 'Facturación Manual - BBDD.xlsx' real, no en
 PruebasFM.xlsx.
 """
 
+import re
+import unicodedata
+
 import pandas as pd
 
 from src.core.constants import (
     COL_TIPO_FACTURACION, VALOR_TIPO_FACT_FACTURACION_MANUAL,
     COL_RAZON_SOCIAL, COL_RUT, COL_VIN, COL_CHASIS,
     COL_TIPO_SERVICIO, COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION,
-    COL_FLOTA_VC, COL_MODELO,
+    COL_FLOTA_VC, COL_MODELO, VALOR_ESTADO_COMERCIAL_VIGENTE, ESTADO_CONECTADO,
 )
 
 # Columnas mostradas en el nivel 2 (tarjetas de unidades de una empresa ya
@@ -33,13 +36,18 @@ COLUMNAS_DETALLE_EMPRESA = [
 
 def filtrar_facturacion_manual(df_master):
     """Devuelve solo las filas con TIPO DE FACTURACION == 'FACTURACIÓN MANUAL'
-    del contrato actual de cada VIN, sin los contratos en Baja que ya no tienen
-    pendientes (la unidad dejó de facturarse). No modifica df_master."""
+    del contrato actual de cada VIN, que además estén VIGENTE y CONECTADO: las
+    unidades en Activación Pendiente o Activando todavía no se facturan, y los
+    contratos en Baja ya dejaron de facturarse. No modifica df_master."""
     if df_master.empty or COL_TIPO_FACTURACION not in df_master.columns:
         return pd.DataFrame(columns=df_master.columns)
     from src.services.comercial_services import contratos_actuales, excluir_contratos_finalizados_inactivos
     vigentes = excluir_contratos_finalizados_inactivos(contratos_actuales(df_master))
-    return vigentes[vigentes[COL_TIPO_FACTURACION] == VALOR_TIPO_FACT_FACTURACION_MANUAL].copy()
+    filtrado = vigentes[vigentes[COL_TIPO_FACTURACION] == VALOR_TIPO_FACT_FACTURACION_MANUAL]
+    for columna, valor in ((COL_ESTADO_COMERCIAL, VALOR_ESTADO_COMERCIAL_VIGENTE), (COL_ESTADO_ACTIVACION, ESTADO_CONECTADO)):
+        if columna in filtrado.columns:
+            filtrado = filtrado[filtrado[columna].astype(str).str.strip().str.upper() == valor]
+    return filtrado.copy()
 
 
 def seleccionar_columnas_detalle(df_filtrado):
@@ -86,7 +94,7 @@ def obtener_unidades_empresa(df_filtrado, empresa):
 # reales encontrados en la carpeta de Facturacion Manual (ver informe de
 # investigacion, 19-09-2026) -- con la salvedad de que 'Nombre' en esos
 # documentos es una patente y no existe ninguna columna de patente en
-# PruebasFM (ver PENDIENTE DE CONFIRMAR CON CONTRAPARTE COMERCIAL en el informe de esta
+# PruebasFM (ver PENDIENTE DE CONFIRMAR CON JAVIERA en el informe de esta
 # fase). No se agrega nada mas: precio UF, monto CLP, N° OC, HES y CC solo
 # existen en 'Facturación Manual - BBDD.xlsx' real, que esta fase
 # deliberadamente no conecta a la aplicacion.
@@ -111,7 +119,7 @@ def construir_contexto_empresa(empresa, df_filtrado):
     confirmados o derivados directamente de df_master (PruebasFM.xlsx) para
     una empresa ya filtrada a Facturacion Manual. No incluye precio UF,
     monto CLP, N° OC, HES ni CC: esos dependen de 'Facturación Manual -
-    BBDD.xlsx' real y de decisiones aun pendientes con la contraparte comercial (ver informe
+    BBDD.xlsx' real y de decisiones aun pendientes con Javiera (ver informe
     de esta fase, 19-09-2026) -- agregarlos aqui como claves en None seria
     inventar estructura sin un dato real detras. Cuando esa informacion se
     confirme, se agrega como una clave nueva de este mismo dict, no como un
@@ -255,6 +263,14 @@ def periodo_por_defecto(claves, hoy=None):
     return max(anteriores) if anteriores else max(claves)
 
 
+def periodos_con_sin_registro(claves, hoy=None):
+    """Períodos donde se listan las empresas de PruebasFM que aún no tienen fila:
+    el que se está facturando (mes vencido) y el mes en curso, para poder
+    adelantar el trabajo."""
+    hoy = hoy or datetime.now()
+    return {periodo_por_defecto(claves, hoy), f"{hoy.year}-{hoy.month:02d}"}
+
+
 def etiqueta_periodo(clave):
     anio, mes = clave.split("-")
     return f"{MESES_ES[int(mes) - 1]} {anio}"
@@ -273,6 +289,14 @@ def calcular_totales(precio_uf, unidades, uf):
     return float(neto_uf), int(neto_clp)
 
 
+def uf_de_facturacion(precio_uf, unidades, pago_clp):
+    """UF con la que se calculó un pago ya registrado (pago / (precio × unidades)),
+    a 4 decimales para que al recalcular dé el mismo pago; None si falta algún dato."""
+    if precio_uf is None or pago_clp is None or not unidades or precio_uf <= 0 or pago_clp <= 0:
+        return None
+    return round(float(Decimal(str(pago_clp)) / (Decimal(str(precio_uf)) * Decimal(int(unidades)))), 4)
+
+
 def parsear_precio(texto):
     """Precio escrito por el usuario ('0,55' o '0.55'); None si está vacío o
     no es un número positivo."""
@@ -288,6 +312,15 @@ def unidades_de_rut(df_filtrado, rut):
     return df_filtrado[df_filtrado[COL_RUT].map(normalizar_rut) == objetivo]
 
 
+def _flota_serie(df):
+    """FLOTA VC de cada unidad; la razón social cuando la flota viene vacía."""
+    razon = df[COL_RAZON_SOCIAL].astype(str).str.strip() if COL_RAZON_SOCIAL in df.columns else pd.Series("", index=df.index)
+    if COL_FLOTA_VC not in df.columns:
+        return razon
+    flota = df[COL_FLOTA_VC].astype(str).str.strip()
+    return flota.where(~flota.str.upper().isin(["", "-", "NAN", "NONE"]), razon)
+
+
 def nivel_servicio_dominante(df_unidades):
     """('BASICO'|'MEDIO'|'FULL', con_civ) más frecuente en TIPO DE SERVICIO."""
     if df_unidades.empty or COL_TIPO_SERVICIO not in df_unidades.columns:
@@ -298,8 +331,20 @@ def nivel_servicio_dominante(df_unidades):
         return "MEDIO", False
     tipo = serie.value_counts().idxmax()
     civ = "CIV" in tipo
-    base = tipo.replace("+ CIV", "").replace("CIV", "").replace("Á", "A").strip()
+    base = tipo.replace("+ CIV", "").replace("CIV", "").replace("+ SZ", "").replace("SZ", "").replace("Á", "A").strip(" +")
     return (base if base in ("BASICO", "MEDIO", "FULL") else "MEDIO"), civ
+
+
+def tiene_safety_zone(df_unidades):
+    """True si el plan más frecuente de la flota incluye Safety Zone (SZ)."""
+    if df_unidades.empty or COL_TIPO_SERVICIO not in df_unidades.columns:
+        return False
+    serie = df_unidades[COL_TIPO_SERVICIO].astype(str).str.strip().str.upper()
+    serie = serie[~serie.isin(["", "-", "NAN"])]
+    if serie.empty:
+        return False
+    partes = {p.strip() for p in serie.value_counts().idxmax().split("+")[1:]}
+    return "SZ" in partes
 
 
 def guardar_cambios_fm(ruta, cambios):
@@ -346,66 +391,300 @@ def guardar_cambios_fm(ruta, cambios):
 # =========================================================
 ORIGEN_EXCEL = "excel"
 ORIGEN_PRUEBASFM = "pruebasfm"
-COLUMNAS_REGISTROS_PERIODO = COLUMNAS_REGISTROS_FM + ["UNIDADES_EXCEL", "UNIDADES_PF", "ORIGEN"]
+COLUMNAS_REGISTROS_PERIODO = COLUMNAS_REGISTROS_FM + [
+    "UNIDADES_EXCEL", "UNIDADES_PF", "ORIGEN", "FLOTA", "CLAVE_FLOTA", "GRUPO", "RUTS", "FILAS"]
+
+
+def clave_flota(texto):
+    """FLOTA VC sin tildes, mayúsculas ni espacios repetidos, para comparar nombres."""
+    normal = unicodedata.normalize('NFKD', " ".join(str(texto).split()))
+    return "".join(c for c in normal if not unicodedata.combining(c)).upper()
 
 
 def resumen_unidades_fm(df_fm):
-    """Una fila por RUT con unidades en Facturación Manual: RUT, RAZON (la más
-    frecuente) y N (cantidad de unidades)."""
+    """Una fila por razón social (RUT) y FLOTA VC con unidades en Facturación
+    Manual: RUT, RAZON (razón social más frecuente), FLOTA (nombre más
+    frecuente), CLAVE_FLOTA (clave_flota) y N (unidades)."""
+    columnas = ["RUT", "RAZON", "FLOTA", "CLAVE_FLOTA", "N"]
     if df_fm.empty or COL_RUT not in df_fm.columns or COL_RAZON_SOCIAL not in df_fm.columns:
-        return pd.DataFrame(columns=["RUT", "RAZON", "N"])
+        return pd.DataFrame(columns=columnas)
+    flota = _flota_serie(df_fm)
     d = pd.DataFrame({
-        "RUT": df_fm[COL_RUT].map(normalizar_rut),
-        "RAZON": df_fm[COL_RAZON_SOCIAL].astype(str).str.strip(),
-    })
+        "RUT": df_fm[COL_RUT].map(normalizar_rut), "RAZON": df_fm[COL_RAZON_SOCIAL].astype(str).str.strip(),
+        "FLOTA": flota, "CLAVE_FLOTA": flota.map(clave_flota)})
     d = d[d["RUT"] != ""]
     if d.empty:
-        return pd.DataFrame(columns=["RUT", "RAZON", "N"])
-    grupos = d.groupby("RUT")
-    return pd.DataFrame({
-        "RUT": list(grupos.size().index),
-        "RAZON": [g["RAZON"].value_counts().idxmax() for _, g in grupos],
-        "N": [int(n) for n in grupos.size().values],
-    })
+        return pd.DataFrame(columns=columnas)
+    filas = [(rut, g["RAZON"].value_counts().idxmax(), g["FLOTA"].value_counts().idxmax(), clave, len(g))
+             for (rut, clave), g in d.groupby(["RUT", "CLAVE_FLOTA"])]
+    return pd.DataFrame(filas, columns=columnas)
+
+
+def _asignar_flotas(filas, n_rut):
+    """Clave de flota de cada fila del Excel del período (None si no tiene RUT o
+    su RUT no tiene unidades). Primero por el nombre de la fila, que puede ser la
+    flota o llevarla entre paréntesis ("RAZÓN SOCIAL (FLOTA)"); el resto toma la
+    flota más grande de su RUT que aún no tenga fila de ese RUT."""
+    por_rut = {}
+    for rut, clave in n_rut:
+        por_rut.setdefault(rut, []).append(clave)
+    asignadas, tomadas = [None] * len(filas), set()
+    for i, r in enumerate(filas):
+        if not r["RUT"]:
+            continue
+        nombre = clave_flota(r["CLIENTE"])
+        coinciden = [c for c in por_rut.get(r["RUT"], []) if (r["RUT"], c) not in tomadas
+                     and (c == nombre or (len(c) >= 6 and c in nombre))]
+        if coinciden:
+            asignadas[i] = max(coinciden, key=len)
+            tomadas.add((r["RUT"], asignadas[i]))
+    for i, r in enumerate(filas):
+        if asignadas[i] is not None or not r["RUT"] or r["RUT"] not in por_rut:
+            continue
+        libres = [c for c in por_rut[r["RUT"]] if (r["RUT"], c) not in tomadas] or por_rut[r["RUT"]]
+        asignadas[i] = max(libres, key=lambda c: n_rut[(r["RUT"], c)])
+        tomadas.add((r["RUT"], asignadas[i]))
+    return asignadas
+
+
+def _primero(valores, vacio=None):
+    return next((v for v in valores if v is not None and not (isinstance(v, float) and pd.isna(v)) and v != ""), vacio)
+
+
+def _registro_base(periodo, filas):
+    """Campos comunes de un registro a partir de sus filas del Excel (precio y
+    tipo de la primera que los tenga, pago sumado, etapa Facturado solo si
+    todas lo están)."""
+    etapas = [f["ETAPA"] for f in filas]
+    pagos = [f["PAGO"] for f in filas if f["PAGO"] is not None and not pd.isna(f["PAGO"])]
+    if filas and all(e == ETAPA_FACTURADO for e in etapas):
+        etapa = ETAPA_FACTURADO
+    else:
+        etapa = ETAPA_PENDIENTE if any(etapas) else ""
+    return {
+        "FILA": filas[0]["FILA"] if filas else None, "PERIODO": periodo,
+        "TIPO": _primero([f["TIPO"] for f in filas], ""), "PRECIO": _primero([f["PRECIO"] for f in filas]),
+        "PAGO": sum(pagos) if pagos else None, "ETAPA": etapa,
+        "UNIDADES_EXCEL": sum(int(f["UNIDADES"]) for f in filas), "FILAS": filas,
+    }
 
 
 def armar_registros_periodo(df_excel, df_fm, clave, incluir_sin_registro):
-    """Registros de un período ('AAAA-MM').
+    """Registros de un período ('AAAA-MM'), uno por razón social (RUT) y FLOTA
+    VC: cada razón social se factura y se envía por separado, con su propio
+    precio, total, PDF y Excel; los montos nunca se suman entre razones.
 
-    - Cada fila del Excel del período, con UNIDADES tomadas de PruebasFM por
-      RUT. Un registro ya Facturado conserva las unidades del Excel (su pago
-      se calculó con esa cantidad); lo mismo una fila sin RUT.
-    - Si `incluir_sin_registro`, cada RUT con unidades en PruebasFM que no
-      tiene fila ese mes (ORIGEN pruebasfm, FILA None).
+    - CLIENTE es la razón social, FLOTA la FLOTA VC (agrupa las razones en la
+      lista) y GRUPO la clave de esa agrupación. Sus unidades salen de
+      PruebasFM; FILAS son las filas del Excel del período que le corresponden
+      (cada fila se liga a la flota de su RUT, o por nombre si el RUT tiene
+      varias flotas). Un registro Facturado conserva las unidades del Excel (su
+      pago se calculó con esa cantidad).
+    - Una fila del Excel sin RUT o con un RUT sin unidades en PruebasFM queda
+      como registro propio (su propio GRUPO).
+    - Si `incluir_sin_registro`, cada razón social con unidades en PruebasFM que
+      no tiene fila ese mes (ORIGEN pruebasfm).
     UNIDADES_EXCEL y UNIDADES_PF permiten avisar las diferencias."""
+    anio, mes = (int(x) for x in clave.split("-"))
+    periodo = datetime(anio, mes, 1)
     resumen = resumen_unidades_fm(df_fm)
-    n_pf = dict(zip(resumen["RUT"], resumen["N"]))
-    registros = []
-    ruts_con_fila = set()
+    n_rut = {(r, c): int(n) for r, c, n in zip(resumen["RUT"], resumen["CLAVE_FLOTA"], resumen["N"])}
+    razon_de = {(r, c): z for r, c, z in zip(resumen["RUT"], resumen["CLAVE_FLOTA"], resumen["RAZON"])}
+    nombres_flota = {}
+    for c, nombre, n in zip(resumen["CLAVE_FLOTA"], resumen["FLOTA"], resumen["N"]):
+        nombres = nombres_flota.setdefault(c, {})
+        nombres[nombre] = nombres.get(nombre, 0) + int(n)
+    filas = []
     if not df_excel.empty:
-        deldf = df_excel[df_excel["PERIODO"].map(clave_periodo) == clave]
-        for r in deldf.to_dict("records"):
-            en_pf = int(n_pf.get(r["RUT"], 0)) if r["RUT"] else int(r["UNIDADES"])
-            conserva_excel = r["ETAPA"] == ETAPA_FACTURADO or not r["RUT"]
-            r = dict(r)
-            r["UNIDADES_EXCEL"] = int(r["UNIDADES"])
-            r["UNIDADES_PF"] = en_pf
-            r["UNIDADES"] = int(r["UNIDADES"]) if conserva_excel else en_pf
-            r["ORIGEN"] = ORIGEN_EXCEL
-            registros.append(r)
-            if r["RUT"]:
-                ruts_con_fila.add(r["RUT"])
-    if incluir_sin_registro and not resumen.empty:
-        anio, mes = (int(x) for x in clave.split("-"))
-        for rut, razon, n in zip(resumen["RUT"], resumen["RAZON"], resumen["N"]):
-            if rut in ruts_con_fila:
-                continue
-            registros.append({
-                "FILA": None, "PERIODO": datetime(anio, mes, 1), "CLIENTE": razon, "RUT": rut, "TIPO": "",
-                "UNIDADES": int(n), "PRECIO": None, "PAGO": None, "ETAPA": "",
-                "UNIDADES_EXCEL": 0, "UNIDADES_PF": int(n), "ORIGEN": ORIGEN_PRUEBASFM,
-            })
+        filas = [dict(f) for f in df_excel[df_excel["PERIODO"].map(clave_periodo) == clave].to_dict("records")]
+    por_razon, sueltas = {}, []
+    for f, c in zip(filas, _asignar_flotas(filas, n_rut)):
+        if c is None:
+            sueltas.append(f)
+        else:
+            por_razon.setdefault((f["RUT"], c), []).append(f)
+    registros = []
+    for (rut, c), n in n_rut.items():
+        propias = por_razon.get((rut, c), [])
+        if not propias and not incluir_sin_registro:
+            continue
+        base = _registro_base(periodo, propias)
+        registros.append({
+            **base, "CLIENTE": razon_de[(rut, c)], "FLOTA": max(nombres_flota[c], key=nombres_flota[c].get),
+            "RUT": rut, "UNIDADES": base["UNIDADES_EXCEL"] if base["ETAPA"] == ETAPA_FACTURADO else n,
+            "UNIDADES_PF": n, "ORIGEN": ORIGEN_EXCEL if propias else ORIGEN_PRUEBASFM,
+            "CLAVE_FLOTA": c, "GRUPO": c, "RUTS": [(rut, n)],
+        })
+    for f in sueltas:
+        base = _registro_base(periodo, [f])
+        en_pf = 0 if f["RUT"] else int(f["UNIDADES"])
+        registros.append({
+            **base, "CLIENTE": f["CLIENTE"], "FLOTA": f["CLIENTE"], "RUT": f["RUT"],
+            "UNIDADES": base["UNIDADES_EXCEL"] if base["ETAPA"] == ETAPA_FACTURADO or not f["RUT"] else 0,
+            "UNIDADES_PF": en_pf, "ORIGEN": ORIGEN_EXCEL, "CLAVE_FLOTA": "",
+            "GRUPO": f"SUELTA|{f['RUT']}|{f['CLIENTE']}|{f['FILA']}", "RUTS": [],
+        })
     return pd.DataFrame(registros, columns=COLUMNAS_REGISTROS_PERIODO)
+
+
+def agrupar_flotas(df_razones, visibles=None):
+    """Una entrada por FLOTA VC a partir de los registros por razón social:
+    FLOTA, RAZONES (sus registros, por nombre), N_RAZONES, UNIDADES, ETAPA y
+    ORIGEN. Su etapa es Facturado solo si todas sus razones lo están; sin
+    registro si ninguna tiene fila del mes; si no, Pendiente. No suma precios
+    ni pagos: cada razón social los tiene por separado. `visibles` (registros ya
+    filtrados) limita qué flotas se devuelven, pero cada una describe a todas
+    sus razones."""
+    if df_razones is None or df_razones.empty:
+        return []
+    grupos = {}
+    for r in df_razones.to_dict("records"):
+        grupos.setdefault(r["GRUPO"], []).append(r)
+    permitidos = None if visibles is None else set(visibles["GRUPO"])
+    flotas = []
+    for grupo, razones in grupos.items():
+        if permitidos is not None and grupo not in permitidos:
+            continue
+        sin_registro = all(r["ORIGEN"] == ORIGEN_PRUEBASFM for r in razones)
+        if all(r["ETAPA"] == ETAPA_FACTURADO for r in razones):
+            etapa = ETAPA_FACTURADO
+        else:
+            etapa = "" if sin_registro else ETAPA_PENDIENTE
+        flotas.append({
+            "GRUPO": grupo, "FLOTA": razones[0]["FLOTA"], "PERIODO": razones[0]["PERIODO"],
+            "RAZONES": sorted(razones, key=lambda r: (str(r["CLIENTE"]), str(r["RUT"]))), "N_RAZONES": len(razones),
+            "UNIDADES": sum(int(r["UNIDADES"]) for r in razones), "ETAPA": etapa,
+            "ORIGEN": ORIGEN_PRUEBASFM if sin_registro else ORIGEN_EXCEL,
+        })
+    return sorted(flotas, key=lambda f: str(f["FLOTA"]))
+
+
+def buscar_unidades_en_lista(df_unidades, texto):
+    """Compara una lista pegada (VIN, chasis o terminación del VIN de 6 o más
+    caracteres, separados por espacios, comas, punto y coma o saltos de línea)
+    con las unidades de la flota abierta. Devuelve (máscara de las unidades que
+    están en la lista, valores pegados que no están en la flota, cantidad de
+    valores pegados distintos). Solo sirve para comprobar: no cambia las unidades
+    ni el total de la flota."""
+    valores = list(dict.fromkeys(t for t in re.split(r"[\s,;]+", str(texto).upper()) if t))
+    n = len(df_unidades)
+    if n == 0 or "VIN" not in df_unidades.columns:
+        return [False] * n, valores, len(valores)
+    vins = df_unidades["VIN"].astype(str).str.strip().str.upper()
+    chasis = df_unidades["CHASIS"].astype(str).str.strip().str.upper() if "CHASIS" in df_unidades.columns else vins
+    mascara = pd.Series(False, index=df_unidades.index)
+    faltan = []
+    for valor in valores:
+        coincide = (vins == valor) | (chasis == valor)
+        if len(valor) >= 6:
+            coincide |= vins.str.endswith(valor)
+        if coincide.any():
+            mascara |= coincide
+        else:
+            faltan.append(valor)
+    return mascara.tolist(), faltan, len(valores)
+
+
+def unidades_de_registro(df_filtrado, registro):
+    """Unidades de PruebasFM (ya filtradas a Facturación Manual) de un registro:
+    las de su RUT y su flota, o todas las de su RUT si es una fila suelta del Excel."""
+    unidades = unidades_de_rut(df_filtrado, registro["RUT"])
+    if unidades.empty or not registro["CLAVE_FLOTA"]:
+        return unidades
+    return unidades[_flota_serie(unidades).map(clave_flota) == registro["CLAVE_FLOTA"]]
+
+
+def armar_guardado(registro, valores, uf=None):
+    """(cambios, nuevas) para escribir una razón social en el Excel, listos para
+    guardar_registros_fm. `valores` son las celdas: {'etapa'} o {'precio', 'tipo'};
+    con precio, el pago se calcula con las unidades de esa razón social y la UF.
+    Cada fila existente se actualiza (las ya Facturadas conservan sus unidades) y,
+    si no tiene fila ese mes, se crea una nueva con el nombre "RAZÓN SOCIAL
+    (FLOTA)" cuando la flota no es el mismo nombre."""
+    periodo = clave_periodo(registro["PERIODO"])
+    unidades_rut = dict(registro["RUTS"])
+
+    fijo_pendiente = [valores.get("precio_fijo")]
+
+    def celdas_cobro(n):
+        if fijo_pendiente[0] is not None:
+            # Precio fijo: el monto neto en CLP se guarda como pago, sin precio unitario, y queda Facturado.
+            # Con varias filas del mismo RUT el monto va una sola vez, en la primera
+            celdas = {"tipo": valores["tipo"], "precio": "-", "etapa": ETAPA_FACTURADO}
+            if fijo_pendiente[0]:
+                celdas["pago"] = int(fijo_pendiente[0])
+                fijo_pendiente[0] = 0
+            return celdas
+        celdas = {k: valores[k] for k in ("precio", "tipo") if k in valores}
+        if "precio" in valores:
+            pago = calcular_totales(valores["precio"], n, uf)[1]
+            if pago is not None:
+                celdas["pago"] = pago
+        return celdas
+
+    cambios, nuevas = [], []
+    for fila in registro["FILAS"]:
+        facturada = fila["ETAPA"] == ETAPA_FACTURADO
+        if registro["RUTS"]:
+            n = int(fila["UNIDADES"]) if facturada else unidades_rut.get(fila["RUT"], 0)
+        else:
+            n = int(registro["UNIDADES"])
+        if "etapa" in valores:
+            if fila["ETAPA"] == valores["etapa"]:
+                continue
+            celdas = {"etapa": valores["etapa"]}
+        else:
+            celdas = celdas_cobro(n)
+            if not facturada:
+                celdas["unidades"] = n
+        cambios.append({"fila": int(fila["FILA"]), "cliente": fila["CLIENTE"], "periodo": periodo, "valores": celdas})
+    con_fila = {f["RUT"] for f in registro["FILAS"]}
+    for rut, n in registro["RUTS"]:
+        if rut in con_fila:
+            continue
+        nombre = registro["CLIENTE"]
+        clave_razon, clave_f = clave_flota(nombre), clave_flota(registro["FLOTA"])
+        if clave_f and clave_f != clave_razon and clave_f not in clave_razon:
+            nombre = f"{nombre} ({registro['FLOTA']})"
+        celdas = {"cliente": nombre, "rut": int(rut) if rut.isdigit() else rut, "unidades": int(n)}
+        if "etapa" in valores:
+            celdas["etapa"] = valores["etapa"]
+            if registro["TIPO"]:
+                celdas["tipo"] = registro["TIPO"]
+        else:
+            celdas.update(celdas_cobro(n))
+            celdas.setdefault("etapa", ETAPA_PENDIENTE)
+        nuevas.append({"periodo": periodo, "valores": celdas})
+    return cambios, nuevas
+
+
+def armar_ajuste_a_rm(registro):
+    """(cambios, nuevas) que dejan las unidades de una razón social ya facturada igual a las
+    de RM_JAVI. El pago con precio por unidad se recalcula con la misma UF con que se facturó;
+    el precio fijo conserva su monto. La primera fila del RUT toma todas las unidades."""
+    periodo = clave_periodo(registro["PERIODO"])
+    restantes = int(registro["UNIDADES_PF"])
+    cambios = []
+    for fila in registro["FILAS"]:
+        n, restantes = restantes, 0
+        anteriores = int(fila["UNIDADES"])
+        if n == anteriores:
+            continue
+        celdas = {"unidades": n}
+        precio, pago = fila["PRECIO"], fila["PAGO"]
+        if isinstance(precio, (int, float)) and not pd.isna(precio) and pago is not None and not pd.isna(pago):
+            uf = uf_de_facturacion(precio, anteriores, pago)
+            nuevo = calcular_totales(precio, n, uf)[1] if uf else None
+            if nuevo is not None:
+                celdas["pago"] = nuevo
+        cambios.append({"fila": int(fila["FILA"]), "cliente": fila["CLIENTE"], "periodo": periodo, "valores": celdas})
+    return cambios, []
+
+
+def periodo_actual(hoy=None):
+    """Clave 'AAAA-MM' del mes en curso."""
+    hoy = hoy or datetime.now()
+    return f"{hoy.year}-{hoy.month:02d}"
 
 
 def periodo_anterior(hoy=None):

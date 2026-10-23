@@ -35,7 +35,7 @@ class TestNormalizacionLogCsvPath(unittest.TestCase):
         self._escribir_config({
             "EXCEL_PATH": "C:\\datos\\PruebasFM.xlsx",
             "LOG_EXCEL_PATH": "C:\\datos\\LogApp.xlsx",
-            "PROVISION_EXCEL_PATH": "C:\\datos\\provisionContratos.xlsx",
+            "PROVISION_EXCEL_PATH": "C:\\datos\\provisionFelipe.xlsx",
         })
 
         cfg = settings_module.load_config()
@@ -44,7 +44,7 @@ class TestNormalizacionLogCsvPath(unittest.TestCase):
                           "Fallo: LOG_CSV_PATH debe derivarse automáticamente desde LOG_EXCEL_PATH.")
         # No debe romper ni alterar las demás rutas ya configuradas
         self.assertEqual(cfg["EXCEL_PATH"], "C:\\datos\\PruebasFM.xlsx")
-        self.assertEqual(cfg["PROVISION_EXCEL_PATH"], "C:\\datos\\provisionContratos.xlsx")
+        self.assertEqual(cfg["PROVISION_EXCEL_PATH"], "C:\\datos\\provisionFelipe.xlsx")
         self.assertEqual(cfg["LOG_EXCEL_PATH"], "C:\\datos\\LogApp.xlsx",
                           "Fallo: LOG_EXCEL_PATH no debe eliminarse (se conserva como referencia del legado).")
 

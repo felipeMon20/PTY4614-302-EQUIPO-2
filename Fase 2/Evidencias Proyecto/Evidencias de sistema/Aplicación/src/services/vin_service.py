@@ -28,7 +28,7 @@ _MODELO_POR_POSICION_4 = {
     'V': 'FE',
 }
 
-# Posicion 4 + posiciones 5-7 == 'B40' (propulsion electrica Empresa Demo/BEV) -> modelo electrico.
+# Posicion 4 + posiciones 5-7 == 'B40' (propulsion electrica Volvo/BEV) -> modelo electrico.
 _MODELO_ELECTRICO_POR_POSICION_4 = {
     'R': 'FHE',
     'X': 'FME',
@@ -40,7 +40,7 @@ _CODIGO_PROPULSION_ELECTRICA = 'B40'
 def obtener_modelo_desde_vin(vin):
     """Deduce unicamente el MODELO del camion a partir del VIN, segun la
     posicion 4 (familia/modelo base) y, si las posiciones 5-7 son 'B40'
-    (propulsion electrica Empresa Demo/BEV), la variante electrica correspondiente.
+    (propulsion electrica Volvo/BEV), la variante electrica correspondiente.
     Normaliza `vin` a mayusculas/sin espacios antes de leer las posiciones.
     Devuelve uno de los valores oficiales del combo MODELO, o None si el VIN
     es demasiado corto o la posicion 4 no coincide con ninguna regla

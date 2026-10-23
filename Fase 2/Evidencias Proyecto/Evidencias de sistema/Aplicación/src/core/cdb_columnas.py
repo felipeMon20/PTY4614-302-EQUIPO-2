@@ -1,4 +1,4 @@
-"""Nombre de la columna de CDB comercial: en el archivo RM_CONTRATOS.csv se llama
+"""Nombre de la columna de CDB comercial: en el archivo RM_JAVI.csv se llama
 "CDB COMERCIAL", pero dentro de la app se sigue usando "CDB" (COL_CDB). La
 conversión ocurre solo al leer y al escribir ese archivo."""
 

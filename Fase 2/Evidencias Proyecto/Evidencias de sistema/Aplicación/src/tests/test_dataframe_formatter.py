@@ -12,7 +12,7 @@ class TestCalcularTerminoContrato(unittest.TestCase):
     (datetime/Timestamp) se convertia a string ISO ANTES de calcular_termino,
     y esta la reparseaba con pd.to_datetime(format='mixed', dayfirst=True),
     lo que intercambiaba dia y mes cuando ambos eran <=12. Confirmado con
-    datos reales de RM_CONTRATOS/PruebasFM (Fase C): ~60% de los registros con
+    datos reales de RM_JAVI/PruebasFM (Fase C): ~60% de los registros con
     duracion numerica quedaban con TÉRMINO CONTRATO incorrecto en cada
     load/reload/sync."""
 
@@ -80,9 +80,9 @@ class TestCalcularTerminoContrato(unittest.TestCase):
         )
 
     def test_duracion_guion_con_termino_guion_no_informado_queda_guion(self):
-        # Caso VIN nuevo en RM_CONTRATOS: DURACIÓN (MESES)='-' y TÉRMINO CONTRATO='-'
+        # Caso VIN nuevo en RM_JAVI: DURACIÓN (MESES)='-' y TÉRMINO CONTRATO='-'
         # significa que el dato todavia NO esta informado/gestionado por
-        # la contraparte comercial, no que el contrato sea mensual. Distinto de
+        # Javiera, no que el contrato sea mensual. Distinto de
         # test_duracion_guion_produce_mensual (termino_previo vacio) y de
         # test_duracion_guion_reemplaza_termino_previo_con_fecha_real (una
         # fecha real si confirma mensual): solo '-' explicito en AMBAS
@@ -130,7 +130,7 @@ class TestCalcularTerminoContrato(unittest.TestCase):
         self.assertEqual(self._clean_termino(datetime(2026, 6, 1), '', termino_previo=''), '')
 
     def test_duracion_vacia_no_se_interpreta_como_mensual_y_queda_vacia(self):
-        # Regla confirmada: un vacio en DURACIÓN (MESES) significa que la contraparte comercial
+        # Regla confirmada: un vacio en DURACIÓN (MESES) significa que Javiera
         # todavia no gestiono el dato -- no debe convertirse en '-' ni en
         # 'MENSUAL'. Distinto de test_duracion_vacia_sin_termino_previo_queda_vacio,
         # que solo revisa TÉRMINO CONTRATO: aqui se confirma tambien que
@@ -166,7 +166,7 @@ class TestCalcularTerminoContrato(unittest.TestCase):
 
 class TestCalcularEtapaGestion(unittest.TestCase):
     """ETAPA GESTIÓN debe calcularse dentro de DataFrameFormatter.clean(), no
-    depender del valor que venga escrito manualmente desde RM_CONTRATOS.
+    depender del valor que venga escrito manualmente desde RM_JAVI.
 
     Orden de prioridades (reordenado 25-09-2026, a pedido explícito del
     usuario -- "la matriz de ESTADO COMERCIAL manda a todas las demás";
@@ -356,7 +356,7 @@ class TestBajaNoLimpiaCamposContractualesAlCargar(unittest.TestCase):
 class TestFormaContratoProvisionMas(unittest.TestCase):
     """Actualizado (30-09-2026, a pedido explícito): la regla que forzaba
     'PROVISION +' a DURACIÓN (MESES)='-' / TÉRMINO CONTRATO='MENSUAL' sin
-    excepción se desactivó (ver dataframe_formatter.py). RM_CONTRATOS siempre trae
+    excepción se desactivó (ver dataframe_formatter.py). RM_JAVI siempre trae
     una fecha real de término para estas filas; la regla la sobrescribía y
     ocultaba contratos ya caducados (391 de 561 filas reales al momento de
     desactivarla). 'PROVISION +' ahora sigue exactamente la misma regla

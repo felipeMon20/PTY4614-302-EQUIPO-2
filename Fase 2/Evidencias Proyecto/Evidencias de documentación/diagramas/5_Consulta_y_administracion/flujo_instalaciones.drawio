@@ -1,0 +1,123 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="flujo-instalaciones" name="Flujo de Instalaciones">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="titulo" value="&lt;b style=&quot;font-size:20px&quot;&gt;Instalaciones: cómo funciona hoy&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;De la provisión del mes a la hoja que recibe Claudia&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-110" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="nota_carpeta" value="&lt;b&gt;Todos los archivos viven en una misma carpeta de datos&lt;/b&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;dashed=1;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontColor=#5D4037;align=center;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="-10" width="300" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Fila 1: provisión -->
+        <mxCell id="christian" value="Christian Reyes" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="5" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prov_sp" value="Provision Contratos-RpySS.xlsx&lt;br&gt;&lt;font style=&quot;font-size:11px;font-weight:normal&quot; color=&quot;#4E6B3A&quot;&gt;SharePoint · hoja 2026&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="110" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_sp" value="Sincronización con SharePoint&lt;br&gt;&lt;font style=&quot;font-size:11px;font-weight:normal&quot; color=&quot;#546E7A&quot;&gt;La app descarga, transforma y previsualiza&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="370" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="prov_felipe" value="provisionFelipe.xlsx&lt;br&gt;&lt;font style=&quot;font-size:11px;font-weight:normal&quot; color=&quot;#3F5F8A&quot;&gt;hoja Prov&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="690" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="felipe" value="Felipe" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="5" width="30" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Fila 2: cruce -->
+        <mxCell id="javiera" value="Javiera" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="270" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="registro" value="Registro Maestro.csv&lt;br&gt;&lt;font style=&quot;font-size:11px;font-weight:normal&quot; color=&quot;#7A6420&quot;&gt;Base comercial de la app&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="240" width="200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="generar" value="&lt;b&gt;Generar mes&lt;/b&gt; (módulo Instalaciones)&lt;br&gt;&lt;font style=&quot;font-size:11px;font-weight:normal&quot; color=&quot;#5E4A73&quot;&gt;Cruza los datos por VIN y deja revisar antes de guardar&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="600" y="240" width="360" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="instalaciones" value="Instalaciones.xlsx&lt;br&gt;&lt;font style=&quot;font-size:11px;font-weight:normal&quot; color=&quot;#5E4A73&quot;&gt;Una hoja por mes&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="265" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="claudia" value="Claudia" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="270" width="30" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Fila 3: enriquecimiento -->
+        <mxCell id="david" value="David" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="480" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bbdd" value="BBDD CLIENTES CM.xlsx" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="475" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="contactos" value="contactos.xlsx" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="790" y="475" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="maxi" value="Maxi" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="480" width="30" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Cuadros de apoyo -->
+        <mxCell id="reglas" value="&lt;b&gt;Reglas del cruce&lt;/b&gt;&lt;br&gt;&lt;br&gt;• &lt;b&gt;VIN:&lt;/b&gt; los de la provisión del último mes, más los del Registro Maestro que se sumen a mano.&lt;br&gt;• &lt;b&gt;RUT y CDB:&lt;/b&gt; del Registro Maestro; si faltan, se busca por el cliente de la provisión (solo si es único).&lt;br&gt;• &lt;b&gt;Razón social:&lt;/b&gt; Registro Maestro, luego BBDD CLIENTES CM, luego el cliente de la provisión.&lt;br&gt;• &lt;b&gt;Administrador:&lt;/b&gt; contactos.xlsx; si no hay, «Director de empresa» de la BBDD.&lt;br&gt;• &lt;b&gt;Inicio:&lt;/b&gt; día 1 del mes actual. &lt;b&gt;Término:&lt;/b&gt; inicio + meses («MENSUAL» si no tiene plazo).&lt;br&gt;• &lt;b&gt;Sin meses&lt;/b&gt; en la provisión: se toman de las observaciones, solo si es plan Volvo Connect.&lt;br&gt;• &lt;b&gt;Al aprobar:&lt;/b&gt; se guarda la hoja y se actualizan Inicio y Término en el Registro Maestro (excepto VIN sin provisión)." style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontFamily=Helvetica;fontSize=12;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="20" y="420" width="400" height="330" as="geometry" />
+        </mxCell>
+
+        <mxCell id="detalle" value="&lt;b&gt;Columnas de la hoja y de dónde sale cada una&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;table cellpadding=&quot;3&quot; style=&quot;font-size:12px;text-align:left;border-collapse:collapse&quot;&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;RUT&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Registro Maestro&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;VIN&lt;/b&gt;&lt;/td&gt;&lt;td&gt;provisionFelipe&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;CHASSIS&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Registro Maestro (si no está, últimos 7 del VIN)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;NOMBRE CONTRATO&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Chasis + razón social&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;RAZON SOCIAL&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Registro Maestro / BBDD CLIENTES CM&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;DIRECCIÓN, COMUNA&lt;/b&gt;&lt;/td&gt;&lt;td&gt;BBDD CLIENTES CM&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;ADMINISTRADOR DE FLOTA&lt;/b&gt;&lt;/td&gt;&lt;td&gt;contactos.xlsx&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;CORREO, TELÉFONO&lt;/b&gt;&lt;/td&gt;&lt;td&gt;contactos.xlsx (o director en la BBDD)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;INICIO&lt;/b&gt;&lt;/td&gt;&lt;td&gt;01 del mes actual&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;MESES&lt;/b&gt;&lt;/td&gt;&lt;td&gt;provisionFelipe&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;TERMINO&lt;/b&gt;&lt;/td&gt;&lt;td&gt;Inicio + Meses&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontFamily=Helvetica;fontSize=13;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="440" width="420" height="310" as="geometry" />
+        </mxCell>
+
+        <!-- Conexiones principales -->
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="christian" target="prov_sp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="Descarga" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="prov_sp" target="sync_sp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="Aprueba e inyecta" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="sync_sp" target="prov_felipe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="VIN del último mes&lt;br&gt;y meses del plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="prov_felipe" target="generar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="RUT, CDB, chasis&lt;br&gt;y razón social" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.25;entryX=0;entryY=0.25;" edge="1" parent="1" source="registro" target="generar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="Guarda Inicio y Término&lt;br&gt;al aprobar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7B1FA2;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.75;entryX=1;entryY=0.75;" edge="1" parent="1" source="generar" target="registro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="Dirección, comuna&lt;br&gt;y director por CDB" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.236;entryY=1;" edge="1" parent="1" source="bbdd" target="generar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="Administrador de&lt;br&gt;flota por CDB" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.764;entryY=1;" edge="1" parent="1" source="contactos" target="generar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="Crea la hoja&lt;br&gt;del mes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="generar" target="instalaciones">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="instalaciones" target="claudia">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=2;dashed=1;endArrow=none;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="detalle" target="instalaciones">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Responsables -->
+        <mxCell id="a1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="felipe" target="prov_felipe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="javiera" target="registro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="david" target="bbdd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="maxi" target="contactos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

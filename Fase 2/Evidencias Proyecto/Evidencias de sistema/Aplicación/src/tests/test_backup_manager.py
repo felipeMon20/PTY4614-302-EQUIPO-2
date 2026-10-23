@@ -31,7 +31,7 @@ class TestBackupManagerSnapshot(unittest.TestCase):
         self.log_xlsx_path = os.path.join(self.origen_dir, "LogApp.xlsx")
         self.log_csv_path = self._crear_archivo("LogApp.csv")
         self.deleted_path = self._crear_archivo("RegistroEliminado.xlsx")
-        self.prov_path = self._crear_archivo("provisionContratos.xlsx")
+        self.prov_path = self._crear_archivo("provisionFelipe.xlsx")
 
         self._patches = [
             patch.object(config.settings, 'EXCEL_PATH', self.excel_path),
@@ -40,7 +40,7 @@ class TestBackupManagerSnapshot(unittest.TestCase):
             patch.object(config.settings, 'DELETED_LOG_EXCEL_PATH', self.deleted_path),
             patch.object(config.settings, 'PROVISION_EXCEL_PATH', self.prov_path),
             patch.object(config.settings, 'INSTALACIONES_PATH', ""),
-            patch.object(config.settings, 'RM_REPORTE_PATH', ""),
+            patch.object(config.settings, 'RM_JAVI_PATH', ""),
             patch.object(config.settings, 'POWERBI_EXCEL_PATH', ""),
             patch.object(config.settings, 'CONTACTOS_EXCEL_PATH', ""),
             patch.object(config.settings, 'CORREOS_EXCEL_PATH', ""),
@@ -68,7 +68,7 @@ class TestBackupManagerSnapshot(unittest.TestCase):
         nombres_copiados = set(os.listdir(resultado["carpeta"]))
         self.assertEqual(
             nombres_copiados,
-            {"PruebasFM.xlsx", "LogApp.csv", "RegistroEliminado.xlsx", "provisionContratos.xlsx"},
+            {"PruebasFM.xlsx", "LogApp.csv", "RegistroEliminado.xlsx", "provisionFelipe.xlsx"},
         )
         self.assertNotIn("LogApp.xlsx", nombres_copiados, "Fallo: no debe copiarse el .xlsx legado, solo LogApp.csv.")
 
@@ -80,22 +80,22 @@ class TestBackupManagerSnapshot(unittest.TestCase):
         os.remove(self.prov_path)
         resultado = self.manager.crear_backup_manual()
 
-        self.assertIn("provisionContratos.xlsx", resultado["omitidos"])
-        self.assertNotIn("provisionContratos.xlsx", resultado["copiados"])
+        self.assertIn("provisionFelipe.xlsx", resultado["omitidos"])
+        self.assertNotIn("provisionFelipe.xlsx", resultado["copiados"])
         self.assertIn("PruebasFM.xlsx", resultado["copiados"])
 
     def test_snapshot_registra_fallidos_sin_detener_los_demas(self):
         real_copy2 = shutil.copy2
 
         def copy2_falla_selectivo(origen, destino):
-            if os.path.basename(origen) == "provisionContratos.xlsx":
+            if os.path.basename(origen) == "provisionFelipe.xlsx":
                 raise PermissionError("bloqueado")
             return real_copy2(origen, destino)
 
         with patch('src.core.backup_manager.shutil.copy2', side_effect=copy2_falla_selectivo):
             resultado = self.manager.crear_backup_manual()
 
-        self.assertIn("provisionContratos.xlsx", resultado["fallidos"])
+        self.assertIn("provisionFelipe.xlsx", resultado["fallidos"])
         self.assertIn("PruebasFM.xlsx", resultado["copiados"])
         self.assertIn("LogApp.csv", resultado["copiados"])
 
@@ -152,7 +152,7 @@ class TestBackupManagerRetencionYProgramacion(unittest.TestCase):
             patch.object(config.settings, 'DELETED_LOG_EXCEL_PATH', ""),
             patch.object(config.settings, 'PROVISION_EXCEL_PATH', ""),
             patch.object(config.settings, 'INSTALACIONES_PATH', ""),
-            patch.object(config.settings, 'RM_REPORTE_PATH', ""),
+            patch.object(config.settings, 'RM_JAVI_PATH', ""),
             patch.object(config.settings, 'POWERBI_EXCEL_PATH', ""),
             patch.object(config.settings, 'CONTACTOS_EXCEL_PATH', ""),
             patch.object(config.settings, 'CORREOS_EXCEL_PATH', ""),

@@ -5,6 +5,7 @@ import shutil
 import pandas as pd
 import openpyxl
 import webbrowser
+from datetime import date
 from openpyxl.formula.translate import Translator
 from PyQt6.QtCore import QThread, pyqtSignal, QStandardPaths
 from config.settings import PROVISION_EXCEL_PATH
@@ -71,8 +72,9 @@ class SharePointSyncWorker(QThread):
             temp_file_path = os.path.join(self.temp_dir, "temp_sharepoint.xlsx")
             shutil.copy(downloaded_file, temp_file_path)
 
-            self.log_signal.emit("[PROCESANDO] Leyendo hoja '2026' y adaptando formato...")
-            df_sp = pd.read_excel(temp_file_path, sheet_name="2026")
+            hoja = self._hoja_del_anio(temp_file_path)
+            self.log_signal.emit(f"[PROCESANDO] Leyendo hoja '{hoja}' y adaptando formato...")
+            df_sp = pd.read_excel(temp_file_path, sheet_name=hoja)
             
             required_cols = ['AÑO', 'MES', 'CHASIS', 'CLIENTE', 'Ejecutivo', 'OBSERVACIONES', 'Dynafleet']
             for col in required_cols:
@@ -137,16 +139,28 @@ class SharePointSyncWorker(QThread):
         except Exception as e:
             self.error_signal.emit(str(e))
 
+    @staticmethod
+    def _hoja_del_anio(ruta):
+        """Hoja del año en curso; si aún no existe, la de año más reciente."""
+        hojas = pd.ExcelFile(ruta).sheet_names
+        anio = str(date.today().year)
+        if anio in hojas:
+            return anio
+        anios = sorted((h for h in hojas if h.strip().isdigit()), key=lambda h: int(h.strip()))
+        if anios:
+            return anios[-1]
+        raise Exception(f"El archivo de SharePoint no tiene una hoja con el año (por ejemplo '{anio}').")
+
     def _fase_2_inyeccion(self):
         try:
             self.log_signal.emit("[SISTEMA] Creando copia de seguridad previa a la inyección...")
             writer_backup = ExcelWriter()
             writer_backup._crear_backup(PROVISION_EXCEL_PATH)
             if not writer_backup.last_backup_ok:
-                self.error_signal.emit("No se pudo crear la copia de seguridad de provisionContratos.xlsx. La operación fue cancelada y no se realizó ningún cambio.")
+                self.error_signal.emit("No se pudo crear la copia de seguridad de provisionFelipe.xlsx. La operación fue cancelada y no se realizó ningún cambio.")
                 return
 
-            self.log_signal.emit("[INYECCION] Abriendo tu Excel provisionContratos...")
+            self.log_signal.emit("[INYECCION] Abriendo tu Excel provisionFelipe...")
             wb = openpyxl.load_workbook(PROVISION_EXCEL_PATH)
             ws = wb["Prov"]
             
@@ -182,7 +196,7 @@ class SharePointSyncWorker(QThread):
 
                 start_inject_row += 1
 
-            self.log_signal.emit("[GUARDANDO] Actualizando provisionContratos.xlsx...")
+            self.log_signal.emit("[GUARDANDO] Actualizando provisionFelipe.xlsx...")
             wb.save(PROVISION_EXCEL_PATH)
             
             self._limpiar_archivos_viejos(self.temp_dir)

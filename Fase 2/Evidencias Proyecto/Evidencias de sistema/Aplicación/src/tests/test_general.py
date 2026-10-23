@@ -162,19 +162,19 @@ class TestConstruirMapaDirectorEmpresaPbi(unittest.TestCase):
         df_pbi = pd.DataFrame({
             'CDB': ['CDB001', 'CDB002'],
             'Nombre': ['Empresa A', 'Empresa B'],
-            'Correo electrónico': ['contacto@empresaa.example', 'contacto@empresab.example'],
+            'Correo electrónico': ['contacto@empresaa.cl', 'contacto@empresab.cl'],
             'Teléfono': ['+56911111111', '+56922222222'],
         })
         mapa = GeneralModule._construir_mapa_director_empresa_pbi(df_pbi)
         self.assertEqual(mapa, {
-            'CDB001': {'correo': 'contacto@empresaa.example', 'telefono': '+56911111111', 'direccion': '', 'comuna': ''},
-            'CDB002': {'correo': 'contacto@empresab.example', 'telefono': '+56922222222', 'direccion': '', 'comuna': ''},
+            'CDB001': {'correo': 'contacto@empresaa.cl', 'telefono': '+56911111111', 'direccion': '', 'comuna': ''},
+            'CDB002': {'correo': 'contacto@empresab.cl', 'telefono': '+56922222222', 'direccion': '', 'comuna': ''},
         })
 
     def test_solo_correo_sin_columna_telefono_no_falla(self):
-        df_pbi = pd.DataFrame({'CDB': ['CDB001'], 'Correo electrónico': ['a@a.example']})
+        df_pbi = pd.DataFrame({'CDB': ['CDB001'], 'Correo electrónico': ['a@a.cl']})
         mapa = GeneralModule._construir_mapa_director_empresa_pbi(df_pbi)
-        self.assertEqual(mapa, {'CDB001': {'correo': 'a@a.example', 'telefono': '', 'direccion': '', 'comuna': ''}})
+        self.assertEqual(mapa, {'CDB001': {'correo': 'a@a.cl', 'telefono': '', 'direccion': '', 'comuna': ''}})
 
     def test_solo_telefono_sin_columna_correo_no_falla(self):
         df_pbi = pd.DataFrame({'CDB': ['CDB001'], 'Teléfono': ['+56911111111']})
@@ -187,7 +187,7 @@ class TestConstruirMapaDirectorEmpresaPbi(unittest.TestCase):
         self.assertEqual(mapa, {'CDB001': {'correo': '', 'telefono': '', 'direccion': '', 'comuna': ''}})
 
     def test_cdb_no_encontrado_no_esta_en_el_mapa(self):
-        df_pbi = pd.DataFrame({'CDB': ['CDB001'], 'Correo electrónico': ['a@a.example'], 'Teléfono': ['+56911111111']})
+        df_pbi = pd.DataFrame({'CDB': ['CDB001'], 'Correo electrónico': ['a@a.cl'], 'Teléfono': ['+56911111111']})
         mapa = GeneralModule._construir_mapa_director_empresa_pbi(df_pbi)
         self.assertNotIn('CDB_NO_EXISTE', mapa)
 
@@ -201,11 +201,11 @@ class TestConstruirMapaDirectorEmpresaPbi(unittest.TestCase):
     def test_cdb_duplicado_conserva_el_primer_valor_no_vacio_de_cada_campo(self):
         df_pbi = pd.DataFrame({
             'CDB': ['CDB001', 'CDB001'],
-            'Correo electrónico': [float('nan'), 'segundo@empresaa.example'],
+            'Correo electrónico': [float('nan'), 'segundo@empresaa.cl'],
             'Teléfono': ['+56911111111', float('nan')],
         })
         mapa = GeneralModule._construir_mapa_director_empresa_pbi(df_pbi)
-        self.assertEqual(mapa['CDB001'], {'correo': 'segundo@empresaa.example', 'telefono': '+56911111111', 'direccion': '', 'comuna': ''})
+        self.assertEqual(mapa['CDB001'], {'correo': 'segundo@empresaa.cl', 'telefono': '+56911111111', 'direccion': '', 'comuna': ''})
 
 
 class TestPowerBiDirectorEmpresaLoaderThread(unittest.TestCase):
@@ -238,7 +238,7 @@ class TestPowerBiDirectorEmpresaLoaderThread(unittest.TestCase):
             pd.DataFrame({
                 'CDB': ['10001', '10002'],
                 'Nombre': ['Empresa A', 'Empresa B'],
-                'Correo electrónico': ['a@empresaa.example', 'b@empresab.example'],
+                'Correo electrónico': ['a@empresaa.cl', 'b@empresab.cl'],
                 'Teléfono': ['56911111111', '56922222222'],
             }).to_excel(powerbi_path, index=False)
 
@@ -250,8 +250,8 @@ class TestPowerBiDirectorEmpresaLoaderThread(unittest.TestCase):
             cargado = self._wait_until(lambda: 'mapa' in resultado, timeout_ms=self.ASYNC_TIMEOUT_MS)
             self.assertTrue(cargado, "Fallo: PowerBiDirectorEmpresaLoaderThread no terminó dentro del timeout.")
             self.assertEqual(resultado['mapa'], {
-                '10001': {'correo': 'a@empresaa.example', 'telefono': '56911111111', 'direccion': '', 'comuna': ''},
-                '10002': {'correo': 'b@empresab.example', 'telefono': '56922222222', 'direccion': '', 'comuna': ''},
+                '10001': {'correo': 'a@empresaa.cl', 'telefono': '56911111111', 'direccion': '', 'comuna': ''},
+                '10002': {'correo': 'b@empresab.cl', 'telefono': '56922222222', 'direccion': '', 'comuna': ''},
             })
 
     def test_archivo_inexistente_emite_mapa_vacio_sin_fallar(self):
@@ -342,7 +342,7 @@ class TestEstadoActivacionColores(unittest.TestCase):
     COLUMNAS_UNIDADES_VISIBLES: CDB y Flota VC quedan fuera de esa tabla a
     pedido explícito (se siguen usando internamente para filtrar por CDB en
     la caja derecha). VIN también queda fuera
-    de la vista desde el 10-09-2026 (a pedido de la contraparte comercial) pero se conserva en
+    de la vista desde el 10-09-2026 (a pedido de Javiera) pero se conserva en
     COLUMNAS_UNIDADES y COLUMNAS_BUSQUEDA_UNIDADES -- ver
     TestAplicarBusquedaUnidades para la búsqueda por VIN oculto."""
 
@@ -366,7 +366,7 @@ class TestEstadoActivacionColores(unittest.TestCase):
 
     def test_vin_no_esta_en_columnas_visibles_pero_si_en_base_y_busqueda(self):
         """VIN se oculta como columna visible en Unidades (10-09-2026, a
-        pedido de la contraparte comercial) pero debe seguir existiendo en el DataFrame base
+        pedido de Javiera) pero debe seguir existiendo en el DataFrame base
         y en las columnas de búsqueda, para que el buscador global de
         MainWindow lo siga encontrando exactamente igual que antes."""
         self.assertNotIn('VIN', COLUMNAS_UNIDADES_VISIBLES)
@@ -442,7 +442,7 @@ class TestPopulateContactCards(unittest.TestCase):
         contactos = pd.DataFrame({
             'Nombre': ['Pedro', 'Ana'],
             'Apellidos': ['Prueba', 'Test'],
-            'Correo electrónico': ['pedro@propio.example', 'ana@propio.example'],
+            'Correo electrónico': ['pedro@propio.cl', 'ana@propio.cl'],
             'Número móvil': ['+56911111111', '+56922222222'],
         })
         self.mod._populate_contact_cards(layout, contactos, None)
@@ -457,26 +457,26 @@ class TestPopulateContactCards(unittest.TestCase):
         contactos = pd.DataFrame({
             'Nombre': ['Pedro'],
             'Apellidos': ['Prueba'],
-            'Correo electrónico': ['pedro@propio.example'],
+            'Correo electrónico': ['pedro@propio.cl'],
             'Número móvil': ['+56911111111'],
         })
-        director_empresa = {'correo': 'correo-empresa@pbi.example', 'telefono': '+56900000000'}
+        director_empresa = {'correo': 'correo-empresa@pbi.cl', 'telefono': '+56900000000'}
         self.mod._populate_contact_cards(layout, contactos, director_empresa)
 
         tarjeta_contacto = layout.itemAt(1).widget()  # índice 0 = tarjeta de Director de empresa
         textos = [lbl.text() for lbl in tarjeta_contacto.findChildren(QLabel)]
-        self.assertTrue(any('pedro@propio.example' in t for t in textos))
-        self.assertFalse(any('correo-empresa@pbi.example' in t for t in textos))
+        self.assertTrue(any('pedro@propio.cl' in t for t in textos))
+        self.assertFalse(any('correo-empresa@pbi.cl' in t for t in textos))
 
     def test_director_empresa_agrega_tarjeta_resaltada(self):
         layout = self._layout_vacio()
-        director_empresa = {'correo': 'correo-empresa@pbi.example', 'telefono': '+56900000000'}
+        director_empresa = {'correo': 'correo-empresa@pbi.cl', 'telefono': '+56900000000'}
         self.mod._populate_contact_cards(layout, pd.DataFrame(), director_empresa)
         # tarjeta Director de empresa + mensaje "sin contactos" + stretch
         self.assertEqual(layout.count(), 3)
         tarjeta_director = layout.itemAt(0).widget()
         textos = [lbl.text() for lbl in tarjeta_director.findChildren(QLabel)]
-        self.assertTrue(any('correo-empresa@pbi.example' in t for t in textos))
+        self.assertTrue(any('correo-empresa@pbi.cl' in t for t in textos))
         self.assertTrue(any('+56900000000' in t for t in textos))
 
     def test_director_empresa_sin_datos_no_agrega_tarjeta(self):
@@ -508,20 +508,20 @@ class TestAplicarBusquedaUnidades(unittest.TestCase):
         return pd.DataFrame({
             'VIN': ['1234567', '7654321', '1111111'],
             'CHASIS': ['CH1', 'CH2', 'CH3'],
-            'Razón Social': ['Empresa Demo Camiones Chile', 'Empresa Demo Servicios Chile', 'Camiones ABC'],
+            'Razón Social': ['Volvo Camiones Chile', 'Volvo Servicios Chile', 'Camiones ABC'],
             'CDB': ['1001', '1002', '1003'],
             'Flota VC': ['FLOTA A', 'FLOTA B', 'FLOTA C'],
             'Estado Activación': ['CONECTADO', 'DESCONECTADO', 'ACTIVANDO'],
         })
 
     def test_busqueda_simple_encuentra_por_razon_social(self):
-        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Empresa Demo')
+        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Volvo')
         self.assertEqual(sorted(resultado['CDB'].tolist()), ['1001', '1002'])
 
     def test_busqueda_por_vin(self):
         resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), '1234567')
         self.assertEqual(len(resultado), 1)
-        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Empresa Demo Camiones Chile')
+        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Volvo Camiones Chile')
 
     def test_busqueda_por_cdb(self):
         resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), '1001')
@@ -529,32 +529,32 @@ class TestAplicarBusquedaUnidades(unittest.TestCase):
         self.assertEqual(resultado.iloc[0]['VIN'], '1234567')
 
     def test_busqueda_and_dos_terminos(self):
-        """"Empresa Demo Camiones" debe interpretarse como Empresa Demo AND Camiones, no
-        como la frase exacta -- solo "Empresa Demo Camiones Chile" tiene ambos
-        términos (Empresa Demo Servicios Chile no tiene "Camiones")."""
-        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Empresa Demo Camiones')
+        """"Volvo Camiones" debe interpretarse como Volvo AND Camiones, no
+        como la frase exacta -- solo "Volvo Camiones Chile" tiene ambos
+        términos (Volvo Servicios Chile no tiene "Camiones")."""
+        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Volvo Camiones')
         self.assertEqual(len(resultado), 1)
-        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Empresa Demo Camiones Chile')
+        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Volvo Camiones Chile')
 
     def test_busqueda_and_multiples_terminos(self):
-        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Empresa Demo Camiones Chile')
+        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Volvo Camiones Chile')
         self.assertEqual(len(resultado), 1)
-        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Empresa Demo Camiones Chile')
+        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Volvo Camiones Chile')
 
     def test_and_entre_columnas_distintas(self):
         """Un término puede matchear en una columna y otro término en una
         columna distinta -- ambos deben cumplirse (AND), no exigirse en la
         misma columna."""
-        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Empresa Demo 1001')
+        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), 'Volvo 1001')
         self.assertEqual(len(resultado), 1)
         self.assertEqual(resultado.iloc[0]['CDB'], '1001')
 
     def test_case_insensitive(self):
         base = self._df_unidades()
         resultados = [
-            GeneralModule._aplicar_busqueda_unidades(base, 'EMPRESA'),
-            GeneralModule._aplicar_busqueda_unidades(base, 'empresa'),
-            GeneralModule._aplicar_busqueda_unidades(base, 'Empresa Demo'),
+            GeneralModule._aplicar_busqueda_unidades(base, 'VOLVO'),
+            GeneralModule._aplicar_busqueda_unidades(base, 'volvo'),
+            GeneralModule._aplicar_busqueda_unidades(base, 'Volvo'),
         ]
         tamanos = [len(r) for r in resultados]
         self.assertEqual(tamanos, [2, 2, 2])
@@ -562,9 +562,9 @@ class TestAplicarBusquedaUnidades(unittest.TestCase):
             self.assertEqual(sorted(r['CDB'].tolist()), sorted(resultados[0]['CDB'].tolist()))
 
     def test_espacios_extra_no_generan_terminos_vacios(self):
-        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), '   Empresa Demo    Camiones   ')
+        resultado = GeneralModule._aplicar_busqueda_unidades(self._df_unidades(), '   Volvo    Camiones   ')
         self.assertEqual(len(resultado), 1)
-        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Empresa Demo Camiones Chile')
+        self.assertEqual(resultado.iloc[0]['Razón Social'], 'Volvo Camiones Chile')
 
     def test_valores_vacios_no_producen_error(self):
         df = pd.DataFrame({
@@ -591,7 +591,7 @@ class TestAplicarBusquedaUnidades(unittest.TestCase):
         self.assertTrue(resultado.empty)
 
     def test_df_vacio_no_falla(self):
-        resultado = GeneralModule._aplicar_busqueda_unidades(pd.DataFrame(columns=COLUMNAS_BUSQUEDA_UNIDADES), 'empresa')
+        resultado = GeneralModule._aplicar_busqueda_unidades(pd.DataFrame(columns=COLUMNAS_BUSQUEDA_UNIDADES), 'volvo')
         self.assertTrue(resultado.empty)
 
     def test_se_combina_con_filtros_existentes(self):
@@ -601,11 +601,11 @@ class TestAplicarBusquedaUnidades(unittest.TestCase):
         condiciones."""
         base = self._df_unidades()
         pre_filtrado = base[base['Estado Activación'] == 'CONECTADO']
-        resultado = GeneralModule._aplicar_busqueda_unidades(pre_filtrado, 'Empresa Demo Camiones')
+        resultado = GeneralModule._aplicar_busqueda_unidades(pre_filtrado, 'Volvo Camiones')
         self.assertEqual(len(resultado), 1)
         self.assertEqual(resultado.iloc[0]['Estado Activación'], 'CONECTADO')
 
-        # "Empresa Demo Servicios Chile" (CDB 1002) tiene Empresa Demo pero no Camiones;
+        # "Volvo Servicios Chile" (CDB 1002) tiene Volvo pero no Camiones;
         # además su Estado Activación es DESCONECTADO -- debe quedar fuera
         # tanto por el buscador como por el filtro previo.
         self.assertNotIn('1002', resultado['CDB'].tolist())
@@ -872,7 +872,7 @@ class TestClientesYUnidadesColumnasVisibles(unittest.TestCase):
         (21-09-2026, matriz de 2 ejes ESTADO COMERCIAL/ESTADO DE ACTIVACIÓN
         ACTUAL): la regla ahora solo produce COMERCIAL u OPERACIONES. Mismo
         patrón que ESTADO_ACTIVACION_COLORES: solo colorea el texto, sin
-        fondo (a pedido de la contraparte comercial, 10-09-2026)."""
+        fondo (a pedido de Javiera, 10-09-2026)."""
         self.assertEqual(ETAPA_GESTION_COLORES['COMERCIAL'], MODULE_COLORS['Comercial'])
         self.assertEqual(ETAPA_GESTION_COLORES['OPERACIONES'], MODULE_COLORS['Operaciones'])
         self.assertNotIn('CLIENTE', ETAPA_GESTION_COLORES)
@@ -1041,7 +1041,7 @@ class TestSeleccionVinUnidades(unittest.TestCase):
         })
         self.module.df_comercial_raw = pd.DataFrame({
             'VIN': ['VINFICHA0001'], 'CHASIS': ['CHFICHA1'], 'RAZÓN SOCIAL': ['EMPRESA FICHA TEST'],
-            'RUT': ['31.423.846-1'], 'CDB': ['CDBFICHA1'], 'INDUSTRIA': ['Minería'],
+            'RUT': ['11.111.111-1'], 'CDB': ['CDBFICHA1'], 'INDUSTRIA': ['Minería'],
             'EJECUTIVO': ['Juan Pérez'], 'MODELO': ['FH'],
         })
         self.module.filter_unidades()
@@ -1282,7 +1282,7 @@ class TestAgregarContactoCliente(unittest.TestCase):
         datos = {
             'CDB': str(self._cdb_esperado), 'Flota': self._razon_social_esperada,
             'Nombre': 'Pedro', 'Apellidos': 'Prueba',
-            'Correo electrónico': 'pedro@empresa.example', 'Número móvil': '+56911111111',
+            'Correo electrónico': 'pedro@empresa.cl', 'Número móvil': '+56911111111',
             'Rol': 'Administrador de flota',
         }
         datos.update(overrides)
@@ -1340,7 +1340,7 @@ class TestAgregarContactoCliente(unittest.TestCase):
         self.dm.df_contactos = pd.DataFrame({
             'ID': [1], 'CDB': ['OTRA_EMPRESA_CDB'], 'Flota': ['Otra Empresa'],
             'Nombre': ['Pedro'], 'Apellidos': ['Prueba'],
-            'Correo electrónico': ['pedro@empresa.example'], 'Número móvil': ['+56911111111'],
+            'Correo electrónico': ['pedro@empresa.cl'], 'Número móvil': ['+56911111111'],
         })
         with patch('src.ui.general.ContactosAddDialog') as mock_dialog, \
              patch('src.ui.general.AddContactoThread', _FakeAddContactoThreadExitoso):
@@ -1349,7 +1349,7 @@ class TestAgregarContactoCliente(unittest.TestCase):
             self.module.btn_agregar_contacto.click()
 
         thread_usado = self.module._add_contacto_thread
-        self.assertEqual(thread_usado.new_data['Correo electrónico'], 'pedro@empresa.example')
+        self.assertEqual(thread_usado.new_data['Correo electrónico'], 'pedro@empresa.cl')
 
     def test_06_guardar_correctamente_recarga_contactos_desde_disco(self):
         """_on_agregar_contacto_finished no repuebla la pestaña a mano: solo

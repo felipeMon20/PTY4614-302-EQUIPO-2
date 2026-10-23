@@ -35,7 +35,7 @@ class TestConfiguracionHistorialCsv(unittest.TestCase):
         # El cambio del campo de historial no debe tocar ninguno de los
         # demás campos de archivos Excel maestros reales.
         for clave in ['EXCEL_PATH', 'PROVISION_EXCEL_PATH', 'INSTALACIONES_PATH',
-                      'RM_REPORTE_PATH', 'CONTACTOS_EXCEL_PATH',
+                      'RM_JAVI_PATH', 'CONTACTOS_EXCEL_PATH',
                       'CORREOS_EXCEL_PATH', 'POWERBI_EXCEL_PATH', 'DELETED_LOG_EXCEL_PATH']:
             self.assertIn(clave, self.module.path_inputs, f"Fallo: el campo '{clave}' no debería haberse eliminado.")
 

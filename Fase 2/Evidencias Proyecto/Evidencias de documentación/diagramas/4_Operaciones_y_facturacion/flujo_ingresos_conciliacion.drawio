@@ -1,0 +1,109 @@
+<mxfile host="65bd71144e">
+    <diagram id="ingresos-conciliacion" name="Ingresos y Conciliación">
+        <mxGraphModel dx="729" dy="1799" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1200" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;whiteSpace=wrap;html=1;fontFamily=Helvetica;align=left;verticalAlign=middle;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Ingresos y Conciliación: qué hace cada pantalla&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;De dónde sale la información de cada pantalla de facturación y qué produce&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="950" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley0" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pantalla" vertex="1">
+                    <mxGeometry height="36" width="150" x="1000" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Acción del usuario" vertex="1">
+                    <mxGeometry height="36" width="150" x="1165" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sistema" vertex="1">
+                    <mxGeometry height="36" width="150" x="1330" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Fuera de la app" vertex="1">
+                    <mxGeometry height="36" width="150" x="1495" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;" value="Decisión" vertex="1">
+                    <mxGeometry height="46" width="110" x="1660" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_ini" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="1790" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_i" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=16;horizontal=0;" value="Ingresos y Conciliación" vertex="1">
+                    <mxGeometry height="830" width="40" x="20" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_i" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#FDF6F5;strokeColor=#b85450;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="830" width="2010" x="70" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="rm" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Registro Maestro (RM_JAVI.csv): un contrato por fila. Las cuatro pantallas trabajan sobre el contrato actual de cada unidad" vertex="1">
+                    <mxGeometry height="90" width="1850" x="110" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="pv" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Provisiones&lt;br&gt;cuánto se provisiona y cuánto se desvía" vertex="1">
+                    <mxGeometry height="120" width="380" x="110" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="cm" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Contratos (CM)&lt;br&gt;importa el reporte y detecta lo que hay que revisar" vertex="1">
+                    <mxGeometry height="120" width="380" x="570" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="fm" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Facturación Manual&lt;br&gt;precio, total y PDF por cliente" vertex="1">
+                    <mxGeometry height="120" width="380" x="1030" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="jt" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="JustTime&lt;br&gt;¿la unidad ya está creada para facturar?" vertex="1">
+                    <mxGeometry height="120" width="380" x="1490" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="pf" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="provisionFelipe.xlsx&lt;br&gt;hoja Prov (SharePoint)" vertex="1">
+                    <mxGeometry height="100" width="380" x="110" y="580" as="geometry"/>
+                </mxCell>
+                <mxCell id="r3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Reporte mensual 3PC&lt;br&gt;(Excel de contratos de mantenimiento)" vertex="1">
+                    <mxGeometry height="100" width="180" x="570" y="580" as="geometry"/>
+                </mxCell>
+                <mxCell id="cb" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="CasosBajaCM.csv&lt;br&gt;casos para revisar" vertex="1">
+                    <mxGeometry height="100" width="180" x="770" y="580" as="geometry"/>
+                </mxCell>
+                <mxCell id="op" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Comercial › Oportunidades CM: avisar a quien administra los CM" vertex="1">
+                    <mxGeometry height="90" width="180" x="770" y="760" as="geometry"/>
+                </mxCell>
+                <mxCell id="fx" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="facturacionManual.xlsx&lt;br&gt;una fila por período y cliente" vertex="1">
+                    <mxGeometry height="100" width="180" x="1030" y="580" as="geometry"/>
+                </mxCell>
+                <mxCell id="pd" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="PDF de detalle de facturación" vertex="1">
+                    <mxGeometry height="100" width="180" x="1230" y="580" as="geometry"/>
+                </mxCell>
+                <mxCell id="jx" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="JustTime (sistema externo): Javiera crea o elimina el contrato a mano" vertex="1">
+                    <mxGeometry height="100" width="380" x="1490" y="580" as="geometry"/>
+                </mxCell>
+                <mxCell id="f1" edge="1" parent="1" source="pv" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.1;entryY=1;startArrow=block;startFill=1;" target="rm" value="actualiza el contrato de Provisión">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f2" edge="1" parent="1" source="cm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.35;entryY=1;" target="rm" value="actualiza los datos de CM">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f3" edge="1" parent="1" source="rm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.62;exitY=1;entryX=0.5;entryY=0;" target="fm" value="lee los contratos por cliente">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f4" edge="1" parent="1" source="jt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.9;entryY=1;startArrow=block;startFill=1;" target="rm" value="estado JustTime">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f5" edge="1" parent="1" source="pf" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="pv" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f6" edge="1" parent="1" source="r3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.25;entryY=1;" target="cm" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f7" edge="1" parent="1" source="cm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" target="cb" value="abre casos">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f8" edge="1" parent="1" source="cb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="op" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f9" edge="1" parent="1" source="fm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.25;exitY=1;entryX=0.5;entryY=0;startArrow=block;startFill=1;" target="fx" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f10" edge="1" parent="1" source="fm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" target="pd" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f11" edge="1" parent="1" source="jt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;startArrow=block;startFill=1;" target="jx" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="notas" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontSize=12;align=left;verticalAlign=top;spacing=12;" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;• Las cuatro trabajan sobre el contrato actual de cada unidad. Un contrato terminado y desconectado deja de aparecer.&lt;br&gt;• Provisiones, Contratos (CM) y JustTime también modifican el Registro Maestro; Facturación Manual solo lo lee y guarda sus propios datos en facturacionManual.xlsx.&lt;br&gt;• JustTime no se conecta al sistema externo: el estado «Si» lo confirma Javiera a mano.&lt;br&gt;• El detalle de cada pantalla está en sus diagramas: Provisiones, Contratos CM, JustTime y Facturación manual." vertex="1">
+                    <mxGeometry height="150" width="1900" x="20" y="920" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

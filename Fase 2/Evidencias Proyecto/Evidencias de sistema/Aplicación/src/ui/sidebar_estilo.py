@@ -1,4 +1,4 @@
-"""Estilo del menú lateral (basado en dashboard-v2.html). Solo
+"""Estilo del menú lateral (basado en volvo-dashboard-v2.html). Solo
 apariencia: la navegación sigue en main_window.py."""
 from PyQt6.QtCore import Qt, QRectF, QPoint
 from PyQt6.QtGui import QColor, QPainter, QLinearGradient, QRadialGradient, QPen

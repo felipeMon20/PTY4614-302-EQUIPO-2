@@ -8,7 +8,7 @@ investigacion, 19-09-2026) y de los campos ya confirmados en df_master
 Sin calculos ni conexion a 'Facturación Manual - BBDD.xlsx': todo campo
 financiero (Valor UF, Precio Total UF, Monto Total CLP, N° OC, HES) queda
 como el texto literal PLACEHOLDER_PENDIENTE hasta que se resuelva con
-la contraparte comercial (reunion 22-09-2026, ver informe de viabilidad). No usa python-docx
+Javiera (reunion 22-09-2026, ver informe de viabilidad). No usa python-docx
 como motor de reemplazo de variables (eso es tarea de la fase siguiente,
 'Preparar generación DOCX/PDF'): aqui solo se arma el documento con
 docx.Document directamente, con tokens {{...}} como marcadores de texto
@@ -17,7 +17,7 @@ para esa fase futura.
 Nota (ver informe de investigacion): en los documentos reales, este tipo de
 carta EDP solo existe hoy para clientes Tipo=OC en la BBDD real; para
 Tipo=FACTURA MANUAL no se encontro ningun documento equivalente. Esta
-plantilla base es unica y generica a proposito -- si la contraparte comercial confirma que
+plantilla base es unica y generica a proposito -- si Javiera confirma que
 ambos tipos de cliente deben recibir el mismo documento, no hace falta
 tocarla; si confirma que deben ser distintos, se decide recien ahi.
 """
@@ -26,22 +26,22 @@ import docx
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-PLACEHOLDER_PENDIENTE = "PENDIENTE CONTRAPARTE COMERCIAL"
+PLACEHOLDER_PENDIENTE = "PENDIENTE JAVIERA"
 
-TITULO = "DETALLE DE FACTURACIÓN – SERVICIOS CONECTADOS"
+TITULO = "DETALLE DE FACTURACIÓN – VOLVO CONNECT"
 
 TEXTO_SALUDO = "Estimado(a) cliente:"
 
 TEXTO_INTRODUCCION = (
     "Junto con saludar, por medio del presente se informa el detalle "
-    "correspondiente a la facturación de los servicios Servicios Conectados."
+    "correspondiente a la facturación de los servicios Volvo Connect."
 )
 
 TEXTO_IVA = "El impuesto al valor agregado (IVA) se aplica conforme a la normativa vigente en Chile."
 TEXTO_CARACTER_INFORMATIVO = "Este documento tiene carácter informativo y respalda el detalle de la facturación emitida."
 
 TEXTO_DESPEDIDA = "Sin otro particular, saluda atentamente,"
-FIRMA_NOMBRE = "Ana Ejemplo Demo"
+FIRMA_NOMBRE = "Javiera González Maldonado"
 FIRMA_CARGO = "Encargada de Servicios Conectados"
 
 # Filas del cuadro "Resumen de Facturación": (etiqueta, valor). Las filas

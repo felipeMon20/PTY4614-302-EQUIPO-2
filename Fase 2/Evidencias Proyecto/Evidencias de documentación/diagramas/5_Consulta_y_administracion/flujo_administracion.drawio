@@ -1,0 +1,255 @@
+<mxfile host="65bd71144e">
+    <diagram id="administracion" name="Administración">
+        <mxGraphModel dx="506" dy="2366" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1950" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;whiteSpace=wrap;html=1;fontFamily=Helvetica;align=left;verticalAlign=middle;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Administración: Historial, Ejecutivos y Clientes&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Las tres pantallas de mantención que se usan para auditar cambios, mantener el directorio de ejecutivos y corregir clientes&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="950" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley0" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pantalla" vertex="1">
+                    <mxGeometry height="36" width="150" x="1000" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Acción del usuario" vertex="1">
+                    <mxGeometry height="36" width="150" x="1165" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sistema" vertex="1">
+                    <mxGeometry height="36" width="150" x="1330" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Fuera de la app" vertex="1">
+                    <mxGeometry height="36" width="150" x="1495" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;" value="Decisión" vertex="1">
+                    <mxGeometry height="46" width="110" x="1660" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_ini" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="1790" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_fin" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="1860" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_his" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=16;horizontal=0;" value="Historial" vertex="1">
+                    <mxGeometry height="480" width="40" x="20" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_his" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#FAF7FC;strokeColor=#9673a6;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="480" width="2010" x="70" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_eje" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;horizontal=0;" value="Ejecutivos" vertex="1">
+                    <mxGeometry height="520" width="40" x="20" y="560" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_eje" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F6FBF5;strokeColor=#82b366;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="520" width="2010" x="70" y="560" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_cli" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=0;" value="Clientes" vertex="1">
+                    <mxGeometry height="520" width="40" x="20" y="1120" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_cli" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F9FE;strokeColor=#6c8ebf;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="520" width="2010" x="70" y="1120" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="148" as="geometry"/>
+                </mxCell>
+                <mxCell id="h1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Administración › Historial: Logs de modificaciones y Papelera" vertex="1">
+                    <mxGeometry height="90" width="240" x="170" y="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="h2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Elige la pestaña y el rango de tiempo (en la Papelera, también el módulo eliminado)" vertex="1">
+                    <mxGeometry height="120" width="290" x="450" y="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="h3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Agrupa por día: cada día es un bloque desplegable con sus cambios (campo, valor anterior y nuevo) o los registros eliminados" vertex="1">
+                    <mxGeometry height="140" width="330" x="780" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="hd" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Qué quiere hacer?" vertex="1">
+                    <mxGeometry height="120" width="240" x="1160" y="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="hx" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Exportar a Excel»: guarda lo que se ve con el filtro actual" vertex="1">
+                    <mxGeometry height="100" width="280" x="100" y="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="hm" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Mostrar N días más»: carga los días anteriores" vertex="1">
+                    <mxGeometry height="100" width="280" x="420" y="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="hv" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Vaciar pestaña actual» y confirma" vertex="1">
+                    <mxGeometry height="100" width="280" x="740" y="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="hs" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Primero hace una copia de seguridad; si falla, no borra nada. Luego deja solo los encabezados de LogApp.csv o de todas las hojas de RegistroEliminado.xlsx" vertex="1">
+                    <mxGeometry height="140" width="350" x="1060" y="310" as="geometry"/>
+                </mxCell>
+                <mxCell id="fh" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="1450" y="353" as="geometry"/>
+                </mxCell>
+                <mxCell id="fhx" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="213" y="455" as="geometry"/>
+                </mxCell>
+                <mxCell id="fhm" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="533" y="455" as="geometry"/>
+                </mxCell>
+                <mxCell id="ie" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="668" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Administración › Ejecutivos: una tarjeta por ejecutivo; pestañas Todos, Sin correo e Inactivos" vertex="1">
+                    <mxGeometry height="100" width="260" x="170" y="635" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Al cargar, agrega sin correo a los ejecutivos de PruebasFM que aún no están en el directorio (Ejecutivos_VC.csv)" vertex="1">
+                    <mxGeometry height="140" width="310" x="470" y="615" as="geometry"/>
+                </mxCell>
+                <mxCell id="ed" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Qué quiere hacer?" vertex="1">
+                    <mxGeometry height="120" width="240" x="830" y="625" as="geometry"/>
+                </mxCell>
+                <mxCell id="ea" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Agregar (+): escribe nombre, correo y alias" vertex="1">
+                    <mxGeometry height="100" width="270" x="1130" y="590" as="geometry"/>
+                </mxCell>
+                <mxCell id="ee" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Editar (doble clic): cambia correo, nombre, alias o estado. Si cambia el nombre, el anterior pasa a alias y PruebasFM no se modifica" vertex="1">
+                    <mxGeometry height="150" width="270" x="1130" y="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="ev" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Desactivar o reactivar al ejecutivo seleccionado" vertex="1">
+                    <mxGeometry height="90" width="270" x="1130" y="900" as="geometry"/>
+                </mxCell>
+                <mxCell id="es" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Valida: nombre obligatorio, correo con formato válido, y nombre o alias que no repitan los de otro ejecutivo" vertex="1">
+                    <mxGeometry height="140" width="320" x="1450" y="650" as="geometry"/>
+                </mxCell>
+                <mxCell id="eg" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Guarda en Ejecutivos_VC.csv. Un ejecutivo inactivo no se usa para contactar" vertex="1">
+                    <mxGeometry height="140" width="230" x="1810" y="650" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="1985" y="880" as="geometry"/>
+                </mxCell>
+                <mxCell id="ic" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="1228" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Administración › Clientes: una fila por cliente con RUT, razón principal, otras razones y unidades. Pestañas Todos, Varias razones y Sin RUT" vertex="1">
+                    <mxGeometry height="130" width="320" x="170" y="1190" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Selecciona un cliente: se abre el panel de la derecha (la ✕ lo cierra)" vertex="1">
+                    <mxGeometry height="120" width="270" x="530" y="1195" as="geometry"/>
+                </mxCell>
+                <mxCell id="cd" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Qué corrige?" vertex="1">
+                    <mxGeometry height="120" width="220" x="850" y="1195" as="geometry"/>
+                </mxCell>
+                <mxCell id="cr" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Razón social: escribe el nombre correcto y presiona «Guardar razón social»" vertex="1">
+                    <mxGeometry height="110" width="300" x="100" y="1420" as="geometry"/>
+                </mxCell>
+                <mxCell id="cu" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="RUT: elige la razón social que está mal, escribe el RUT correcto (sin puntos ni guion) y presiona «Guardar RUT»" vertex="1">
+                    <mxGeometry height="130" width="330" x="440" y="1410" as="geometry"/>
+                </mxCell>
+                <mxCell id="ca1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="El aviso dice cuántas unidades cambian y si otro cliente ya usa ese nombre o ese RUT. Con un RUT ajeno, las unidades pasan a ese cliente (se puede usar también su nombre)" vertex="1">
+                    <mxGeometry height="150" width="360" x="810" y="1400" as="geometry"/>
+                </mxCell>
+                <mxCell id="ca2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Cambia solo esos campos en las unidades (el CDB no se modifica) y guarda con copia de seguridad y registro en el historial" vertex="1">
+                    <mxGeometry height="130" width="330" x="1210" y="1410" as="geometry"/>
+                </mxCell>
+                <mxCell id="ca3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="La pantalla se recarga con los datos nuevos" vertex="1">
+                    <mxGeometry height="100" width="250" x="1580" y="1425" as="geometry"/>
+                </mxCell>
+                <mxCell id="fc" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e51400;strokeColor=#B20000;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="FIN" vertex="1">
+                    <mxGeometry height="54" width="54" x="1870" y="1448" as="geometry"/>
+                </mxCell>
+                <mxCell id="notas" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontSize=12;align=left;verticalAlign=top;spacing=12;" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;• Historial: los cambios se registran solos con cada guardado de la app. «Restaurar fila» en la Papelera está deshabilitado porque no existe un mecanismo de restauración seguro.&lt;br&gt;• Ejecutivos: se corrige el nombre aquí, no en PruebasFM. Contactar a un ejecutivo (desde Operaciones) usa el correo de este directorio.&lt;br&gt;• Clientes: es la única pantalla para corregir nombre o RUT de un cliente. En el formulario de una unidad, la razón social queda bloqueada si el RUT ya existe con un solo nombre.&lt;br&gt;• Contactos e Instalaciones también están en Administración y tienen su propio diagrama." vertex="1">
+                    <mxGeometry height="170" width="1900" x="20" y="1690" as="geometry"/>
+                </mxCell>
+                <mxCell id="f1" edge="1" parent="1" source="ih" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="h1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f2" edge="1" parent="1" source="h1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="h2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f3" edge="1" parent="1" source="h2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="h3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f4" edge="1" parent="1" source="h3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="hd" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f5" edge="1" parent="1" source="hd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="hx" value="Exportar">
+                    <mxGeometry relative="1" x="0.9301" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f6" edge="1" parent="1" source="hd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="hm" value="Ver más">
+                    <mxGeometry relative="1" x="0.903" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f7" edge="1" parent="1" source="hd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="hv" value="Vaciar">
+                    <mxGeometry relative="1" x="0.8416" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f8" edge="1" parent="1" source="hv" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="hs" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f9" edge="1" parent="1" source="hs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="fh" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f10" edge="1" parent="1" source="hx" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="fhx" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f11" edge="1" parent="1" source="hm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="fhm" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f12" edge="1" parent="1" source="ie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="e1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f13" edge="1" parent="1" source="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="e2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f14" edge="1" parent="1" source="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="ed" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f15" edge="1" parent="1" source="ed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="ea" value="Agregar">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f16" edge="1" parent="1" source="ed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="ee" value="Editar">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f17" edge="1" parent="1" source="ed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="ev" value="Estado">
+                    <mxGeometry relative="1" x="0.6563" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f18" edge="1" parent="1" source="ea" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" target="es" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f19" edge="1" parent="1" source="ee" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.75;" target="es" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f20" edge="1" parent="1" source="es" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="eg" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f21" edge="1" parent="1" source="ev" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.3;entryY=1;" target="eg" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f22" edge="1" parent="1" source="eg" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.8;exitY=1;entryX=0.5;entryY=0;" target="fe" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f23" edge="1" parent="1" source="ic" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f24" edge="1" parent="1" source="c1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f25" edge="1" parent="1" source="c2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="cd" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f26" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cr" value="Razón social">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f27" edge="1" parent="1" source="cd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="cu" value="RUT">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f28" edge="1" parent="1" source="cr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=1;" target="ca1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f29" edge="1" parent="1" source="cu" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="ca1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f30" edge="1" parent="1" source="ca1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="ca2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f31" edge="1" parent="1" source="ca2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="ca3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f32" edge="1" parent="1" source="ca3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="fc" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -26,7 +26,7 @@ COLUMNAS = [
 
 FILAS = [
     # CHASIS con prefijo de letra (formato real confirmado en PruebasFM.xlsx,
-    # ej. 'E920364'): un CHASIS puramente numerico ('0900054') dispara un
+    # ej. 'E920364'): un CHASIS puramente numerico ('0000001') dispara un
     # comportamiento de pandas.read_excel ajeno a ExcelWriter (infiere toda
     # la columna como int64 y pierde ceros iniciales SOLO si el 100% de los
     # valores de la columna son puramente numericos, algo que no ocurre en
@@ -171,7 +171,7 @@ class TestUpdateCellsCsv(_BaseCsvBackendTest):
 class TestAddNewRowCsv(_BaseCsvBackendTest):
     @patch('src.core.excel_writer.ExcelWriter._crear_backup')
     def test_agregar_fila_valida(self, mock_backup):
-        nueva = {'VIN': 'YV2DDD0000000004', 'CHASIS': '0900074', 'RAZÓN SOCIAL': 'EMPRESA CUATRO',
+        nueva = {'VIN': 'YV2DDD0000000004', 'CHASIS': '0000004', 'RAZÓN SOCIAL': 'EMPRESA CUATRO',
                   'ESTADO COMERCIAL': 'Vigente'}
         res = self.writer.add_new_row(nueva, module_name="Test", custom_filepath=self.csv_path)
         self.assertTrue(res)
@@ -182,7 +182,7 @@ class TestAddNewRowCsv(_BaseCsvBackendTest):
         self.assertEqual(list(df.columns), COLUMNAS)  # verificar columnas (sin alterar)
 
         fila_nueva = df[df['VIN'] == 'YV2DDD0000000004'].iloc[0]
-        self.assertEqual(fila_nueva['CHASIS'], '0900074')
+        self.assertEqual(fila_nueva['CHASIS'], '0000004')
         self.assertEqual(fila_nueva['RAZÓN SOCIAL'], 'EMPRESA CUATRO')
 
         # Filas existentes no alteradas.
@@ -194,12 +194,12 @@ class TestAddNewRowCsv(_BaseCsvBackendTest):
     def test_columna_faltante_en_dict_queda_en_blanco(self, mock_backup):
         """Mismo comportamiento que la rama .xlsx: una columna existente del
         dataset que NO viene en new_data_dict queda vacia, no falla."""
-        nueva = {'VIN': 'YV2EEE0000000005', 'CHASIS': '0900075'}  # sin RAZÓN SOCIAL ni el resto
+        nueva = {'VIN': 'YV2EEE0000000005', 'CHASIS': '0000005'}  # sin RAZÓN SOCIAL ni el resto
         res = self.writer.add_new_row(nueva, module_name="Test", custom_filepath=self.csv_path)
         self.assertTrue(res)
 
         fila = self._leer().set_index('VIN').loc['YV2EEE0000000005']
-        self.assertEqual(fila['CHASIS'], '0900075')
+        self.assertEqual(fila['CHASIS'], '0000005')
         self.assertEqual(fila['RAZÓN SOCIAL'], '')
         self.assertEqual(fila['ESTADO COMERCIAL'], '')
         self.assertEqual(fila['TÉRMINO CONTRATO'], '')

@@ -11,49 +11,56 @@ from src.ui import mail_dialog
 
 
 NOMBRES_PLANTILLAS = [
-    "Bienvenida", "Crear Cuenta", "Capacitación", "Activación",
-    "Revisión Periódica", "Aviso de Vencimiento", "Cancelación",
+    "Conoce Volvo Connect", "Reactivación", "Continuidad post CM", "Bienvenida",
+    "Activación", "Capacitación", "Seguimiento de Uso", "Revisión Periódica",
+    "Aviso de Vencimiento", "Seguimiento de Renovación", "Renovación Confirmada",
+    "Confirmación de Baja",
+    "Cambio de Nivel",
 ]
 
-# Asuntos que antes vivian hardcodeados en MailDialog._on_plantilla_changed:
-# sirven para verificar que la centralizacion en mail_service no los alteró.
+# Asuntos de las plantillas (textos de Javiera, 21-10-2026; Revisión Periódica
+# se mantiene del diseño anterior).
 ASUNTOS_ORIGINALES = {
-    "Bienvenida": "Bienvenido a la comunidad Servicios Conectados",
-    "Crear Cuenta": "Activación de cuenta Servicios Conectados",
-    "Capacitación": "Capacitación personalizada: Optimiza tu uso de Servicios Conectados",
-    "Activación": "Activación de unidades en Servicios Conectados",
-    "Revisión Periódica": "Revisión periódica de unidades en Servicios Conectados",
-    "Aviso de Vencimiento": "Información sobre la renovación de servicios Servicios Conectados",
-    "Cancelación": "Cancelación de contrato de servicios Servicios Conectados",
+    "Conoce Volvo Connect": "Conoce Volvo Connect | Aprovecha la información de tu flota",
+    "Reactivación": "Reactiva Volvo Connect | Más que información para tu flota",
+    "Continuidad post CM": "Mantén tu flota conectada | Continuidad Volvo Connect",
+    "Bienvenida": "¡Bienvenido a Volvo Connect! Comienza a gestionar tu flota",
+    "Activación": "¡Tu unidad fue incorporada a Volvo Connect!",
+    "Capacitación": "¡Aprende a aprovechar al máximo Volvo Connect!",
+    "Seguimiento de Uso": "¿Cómo ha sido tu experiencia con Volvo Connect?",
+    "Revisión Periódica": "Revisión periódica de unidades en Volvo Connect",
+    "Aviso de Vencimiento": "Tu membresía Volvo Connect está próxima a vencer",
+    "Seguimiento de Renovación": "¡Tu flota puede seguir conectada con Volvo Connect!",
+    "Renovación Confirmada": "¡Tu renovación de Volvo Connect está confirmada!",
+    "Confirmación de Baja": "Confirmación de baja de servicio",
+    "Cambio de Nivel": "¡Tu nivel de servicio Volvo Connect ha sido actualizado!",
 }
 
-# Imagenes CID que antes se adjuntaban a mano en OutlookSenderThread.run():
-# mismas listas, mismo orden.
+# Imagenes CID: logo blanco de la barra en todas; foto principal solo de
+# Conoce Volvo Connect a Revisión Periódica (fotos de Javiera, 21-10-2026).
 # Las plantillas ya no incluyen el ícono de WhatsApp (whatsapp_icon.png).
+_LOGO = ("logo_volvo_blanco.png", "logo_volvo_blanco")
+_CAMION = ("foto_camion_tablet.jpg", "foto_camion_tablet")
+_CELULAR = ("foto_app_celular.jpg", "foto_app_celular")
+_HOMBRE = ("foto_hombre_computador.jpg", "foto_hombre_computador")
+_MUJER = ("foto_mujer_pantallas.jpg", "foto_mujer_pantallas")
+_PUENTE = ("foto_camion_puente.jpg", "foto_camion_puente")
+_EQUIPO = ("foto_equipo_apoyo.jpg", "foto_equipo_apoyo")
 IMAGENES_ORIGINALES = {
-    "Bienvenida": [
-        ("logo_empresa.png", "logo_empresa"), ("camiones-demo.png", "camiones-demo"),
-        ("image002.gif", "image002"),
-    ],
-    "Activación": [
-        ("imagen_Activacion.png", "imagen_activacion"),
-    ],
-    "Cancelación": [],
-    "Aviso de Vencimiento": [
-        ("logo_empresa.png", "logo_empresa"), ("image002.gif", "image002"),
-    ],
-    "Crear Cuenta": [
-        ("logo_empresa.png", "logo_empresa"), ("image002.gif", "image002"),
-    ],
-    "Capacitación": [
-        ("logo_empresa.png", "logo_empresa"), ("camiones-demo.png", "camiones-demo"),
-        ("image002.gif", "image002"),
-    ],
-    "Revisión Periódica": [
-        ("Imagen_revision.jpg", "imagen_revision"),
-    ],
+    "Conoce Volvo Connect": [_CAMION, _LOGO],
+    "Reactivación": [_HOMBRE, _LOGO],
+    "Continuidad post CM": [_MUJER, _LOGO],
+    "Bienvenida": [_PUENTE],
+    "Activación": [_CELULAR, _LOGO],
+    "Capacitación": [_EQUIPO, _LOGO],
+    "Seguimiento de Uso": [_EQUIPO, _LOGO],
+    "Revisión Periódica": [_HOMBRE, _LOGO],
+    "Aviso de Vencimiento": [_LOGO],
+    "Seguimiento de Renovación": [_LOGO],
+    "Renovación Confirmada": [_LOGO],
+    "Confirmación de Baja": [_LOGO],
+    "Cambio de Nivel": [_LOGO],
 }
-
 
 class TestAgruparDestinatarios(unittest.TestCase):
     """Funcion pura movida desde mail_templates.py: agrupa filas simples
@@ -65,9 +72,9 @@ class TestAgruparDestinatarios(unittest.TestCase):
 
     def test_una_empresa_un_correo_un_plan_varios_chasis(self):
         filas = [
-            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.example"),
-            self._fila("9BWZZZ377VT0040022", "TRANSPORTES ACME", "FULL", "acme@test.example"),
-            self._fila("9BWZZZ377VT0040033", "TRANSPORTES ACME", "FULL", "acme@test.example"),
+            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
+            self._fila("9BWZZZ377VT0040022", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
+            self._fila("9BWZZZ377VT0040033", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
         ]
         resultado = agrupar_destinatarios(filas)
 
@@ -75,14 +82,14 @@ class TestAgruparDestinatarios(unittest.TestCase):
         dest = resultado[0]
         self.assertEqual(dest['flota'], "TRANSPORTES ACME")
         self.assertEqual(dest['nombre'], "TRANSPORTES ACME")
-        self.assertEqual(dest['correo'], "acme@test.example")
+        self.assertEqual(dest['correo'], "acme@test.cl")
         self.assertEqual(dest['chasis_list'], ["0040011", "0040022", "0040033"])
         self.assertEqual(dest['grupos_plan'], {"FULL": ["0040011", "0040022", "0040033"]})
 
     def test_una_empresa_un_correo_varios_planes(self):
         filas = [
-            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.example"),
-            self._fila("9BWZZZ377VT0040022", "TRANSPORTES ACME", "BASICO", "acme@test.example"),
+            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
+            self._fila("9BWZZZ377VT0040022", "TRANSPORTES ACME", "BASICO", "acme@test.cl"),
         ]
         resultado = agrupar_destinatarios(filas)
 
@@ -96,29 +103,29 @@ class TestAgruparDestinatarios(unittest.TestCase):
 
     def test_varias_empresas_y_correos(self):
         filas = [
-            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.example"),
-            self._fila("9BWZZZ377VT0040099", "LOGISTICA SUR", "MEDIO", "sur@test.example"),
+            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
+            self._fila("9BWZZZ377VT0040099", "LOGISTICA SUR", "MEDIO", "sur@test.cl"),
         ]
         resultado = agrupar_destinatarios(filas)
 
         self.assertEqual(len(resultado), 2)
         correos = {dest['correo'] for dest in resultado}
-        self.assertEqual(correos, {"acme@test.example", "sur@test.example"})
+        self.assertEqual(correos, {"acme@test.cl", "sur@test.cl"})
 
     def test_destinatarios_repetidos_quedan_agrupados_no_duplicados(self):
         filas = [
-            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.example"),
-            self._fila("9BWZZZ377VT0040022", "TRANSPORTES ACME", "FULL", "acme@test.example"),
-            self._fila("9BWZZZ377VT0040033", "LOGISTICA SUR", "MEDIO", "sur@test.example"),
+            self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
+            self._fila("9BWZZZ377VT0040022", "TRANSPORTES ACME", "FULL", "acme@test.cl"),
+            self._fila("9BWZZZ377VT0040033", "LOGISTICA SUR", "MEDIO", "sur@test.cl"),
         ]
         resultado = agrupar_destinatarios(filas)
 
         self.assertEqual(len(resultado), 2)
-        acme = next(d for d in resultado if d['correo'] == "acme@test.example")
+        acme = next(d for d in resultado if d['correo'] == "acme@test.cl")
         self.assertEqual(len(acme['chasis_list']), 2)
 
     def test_estructura_resultante_es_compatible_con_outlook_sender_thread(self):
-        filas = [self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.example")]
+        filas = [self._fila("9BWZZZ377VT0040011", "TRANSPORTES ACME", "FULL", "acme@test.cl")]
         resultado = agrupar_destinatarios(filas)
 
         self.assertIsInstance(resultado, list)
@@ -136,15 +143,15 @@ class TestValidarDestinatarios(unittest.TestCase):
 
     def test_detecta_correo_faltante_y_devuelve_el_vin(self):
         filas = [
-            {'vin': 'VIN1', 'flota': 'ACME', 'plan': 'FULL', 'correo': 'acme@test.example'},
+            {'vin': 'VIN1', 'flota': 'ACME', 'plan': 'FULL', 'correo': 'acme@test.cl'},
             {'vin': 'VIN2', 'flota': 'ACME', 'plan': 'FULL', 'correo': ''},
         ]
         self.assertEqual(validar_destinatarios(filas), 'VIN2')
 
     def test_todas_con_correo_devuelve_none(self):
         filas = [
-            {'vin': 'VIN1', 'flota': 'ACME', 'plan': 'FULL', 'correo': 'acme@test.example'},
-            {'vin': 'VIN2', 'flota': 'ACME', 'plan': 'FULL', 'correo': 'acme2@test.example'},
+            {'vin': 'VIN1', 'flota': 'ACME', 'plan': 'FULL', 'correo': 'acme@test.cl'},
+            {'vin': 'VIN2', 'flota': 'ACME', 'plan': 'FULL', 'correo': 'acme2@test.cl'},
         ]
         self.assertIsNone(validar_destinatarios(filas))
 
@@ -161,7 +168,7 @@ class TestObtenerConfiguracionPlantilla(unittest.TestCase):
     que reemplaza lo que antes estaba repartido entre el dict "asuntos" de
     MailDialog._on_plantilla_changed y el if/elif de OutlookSenderThread.run()."""
 
-    def test_cubre_las_siete_plantillas_actuales(self):
+    def test_cubre_las_plantillas_actuales(self):
         self.assertEqual(set(PLANTILLAS.keys()), set(NOMBRES_PLANTILLAS))
 
     def test_cada_plantilla_tiene_asunto_constructor_e_imagenes(self):
@@ -185,8 +192,9 @@ class TestObtenerConfiguracionPlantilla(unittest.TestCase):
 
     def test_constructor_produce_html(self):
         dest_ejemplo = {
-            'flota': 'TRANSPORTES ACME', 'nombre': 'TRANSPORTES ACME', 'correo': 'acme@test.example',
+            'flota': 'TRANSPORTES ACME', 'nombre': 'TRANSPORTES ACME', 'correo': 'acme@test.cl',
             'chasis_list': ['0040011'], 'grupos_plan': {'FULL': ['0040011']},
+            'unidades': [{'chasis': '0040011', 'plan': 'FULL', 'vence': '31-12-2026'}],
         }
         for nombre in NOMBRES_PLANTILLAS:
             config = obtener_configuracion_plantilla(nombre)
@@ -207,16 +215,16 @@ class TestSinCorreoPersonalHardcodeado(unittest.TestCase):
 
     def test_mail_dialog_no_contiene_correo_personal_ni_cuenta_antigua(self):
         codigo_fuente = inspect.getsource(mail_dialog)
-        self.assertNotIn("usuario@example.com", codigo_fuente)
-        self.assertNotIn("contacto@example.com", codigo_fuente)
+        self.assertNotIn("fmonsalve716@gmail.com", codigo_fuente)
+        self.assertNotIn("volvoconnect@volvo.com", codigo_fuente)
         self.assertNotIn("CORREO_PRUEBA", codigo_fuente)
-        self.assertNotIn("CUENTA_EMPRESA", codigo_fuente)
+        self.assertNotIn("CUENTA_VOLVO", codigo_fuente)
 
     def test_mail_service_no_contiene_correo_personal_ni_cuenta_antigua(self):
         import src.services.mail_service as mail_service_module
         codigo_fuente = inspect.getsource(mail_service_module)
-        self.assertNotIn("usuario@example.com", codigo_fuente)
-        self.assertNotIn("contacto@example.com", codigo_fuente)
+        self.assertNotIn("fmonsalve716@gmail.com", codigo_fuente)
+        self.assertNotIn("volvoconnect@volvo.com", codigo_fuente)
 
 
 class TestSinReferenciasAlModoPrueba(unittest.TestCase):

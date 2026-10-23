@@ -1,5 +1,5 @@
-"""Estilo visual de la pantalla Comercial (rediseño basado en
-dashboard-v2.html). Solo apariencia: no contiene lógica de negocio."""
+﻿"""Estilo visual de la pantalla Comercial (rediseño basado en
+volvo-dashboard-v2.html). Solo apariencia: no contiene lógica de negocio."""
 import html
 import os
 import sys
@@ -296,6 +296,11 @@ def qss_boton_barra(variante='neutro'):
         )
     if variante == 'alerta':
         return f"QPushButton {{ {_BASE_BOTON_BARRA} color: {ROJO}; background-color: {ROJO_SUAVE}; border: 1px solid {ROJO}; font-weight: bold; }}"
+    if variante == 'rojo':
+        return (
+            f"QPushButton {{ {_BASE_BOTON_BARRA} color: {ROJO}; background: transparent; border: none; }}"
+            "QPushButton:hover { background: rgba(255,255,255,0.16); }"
+        )
     if variante == 'naranja':
         return (
             f"QPushButton {{ {_BASE_BOTON_BARRA} color: {AMBAR}; background: transparent; border: none; }}"
@@ -627,27 +632,68 @@ QSS_ACCION_RAPIDA_TRANSPARENTE = """
 """
 
 
-class GrillaAcciones(QGridLayout):
-    """Acciones de a dos por fila. Se reacomoda sola cuando un botón se
-    muestra u oculta; un botón solo en la última fila ocupa todo el ancho."""
+class PanelAcciones(QWidget):
+    """Panel de acciones de una pestaña. Sus botones se acomodan en la grilla del panel maestro,
+    junto con los comunes, para repartirse en pares; el panel en sí no ocupa lugar."""
 
-    def __init__(self, parent=None):
+    def __init__(self, maestro=False, parent=None):
+        super().__init__(parent)
+        self._maestro = maestro
+        self._pedido = True
+        self.grilla = None
+
+    def setVisible(self, visible):
+        self._pedido = bool(visible)
+        super().setVisible(self._pedido if self._maestro else False)
+        if self.grilla is not None:
+            self.grilla.pedir_reacomodo()
+
+    def esta_activo(self):
+        return self._pedido
+
+    def isVisibleTo(self, ancestor):
+        return super().isVisibleTo(ancestor) if self._maestro else self._pedido
+
+
+class GrillaAcciones(QGridLayout):
+    """Acciones de a dos por fila. Se reacomoda sola cuando un botón se muestra u oculta; con
+    `impar_largo`, el último botón de una cantidad impar ocupa la fila completa. Con `maestra`
+    (otra GrillaAcciones) sus botones se acomodan en esa grilla, en vez de en un panel propio."""
+
+    def __init__(self, parent=None, maestra=None, impar_largo=False):
         super().__init__(parent)
         self.setContentsMargins(0, 0, 0, 0)
         self.setSpacing(6)
-        self._botones = []
+        self.setColumnStretch(0, 1)
+        self.setColumnStretch(1, 1)
+        self._maestra = maestra
+        self._impar_largo = impar_largo
+        self._entradas = []
         self._pendiente = False
+        if isinstance(parent, PanelAcciones):
+            parent.grilla = maestra if maestra is not None else self
 
     def agregar(self, boton):
-        self._botones.append(boton)
-        boton.installEventFilter(self)
-        self._reacomodar()
+        destino = self._maestra if self._maestra is not None else self
+        destino._entradas.append((boton, self.parentWidget()))
+        if isinstance(boton, BotonAccionRapida):
+            # Con padre desde el inicio, un botón nunca se abre como ventana suelta
+            if boton.parentWidget() is None and destino.parentWidget() is not None:
+                boton.setParent(destino.parentWidget())
+            boton._grilla = destino
+        else:
+            boton.installEventFilter(destino)
+        destino._reacomodar()
 
     def eventFilter(self, obj, event):
-        if event.type() in (QEvent.Type.Show, QEvent.Type.Hide) and not self._pendiente:
+        if event.type() in (QEvent.Type.Show, QEvent.Type.Hide):
+            self.pedir_reacomodo()
+        return False
+
+    def pedir_reacomodo(self):
+        if not self._pendiente:
             self._pendiente = True
             QTimer.singleShot(0, self._reacomodar)
-        return False
 
     @staticmethod
     def _oculto_a_proposito(boton):
@@ -657,13 +703,31 @@ class GrillaAcciones(QGridLayout):
 
     def _reacomodar(self):
         self._pendiente = False
-        for b in self._botones:
+        for b, _ in self._entradas:
             self.removeWidget(b)
-        visibles = [b for b in self._botones if not self._oculto_a_proposito(b)]
+        visibles = []
+        for b, panel in self._entradas:
+            panel_activo = not isinstance(panel, PanelAcciones) or panel.esta_activo()
+            if isinstance(b, BotonAccionRapida):
+                b.fijar_panel_activo(panel_activo)
+                se_ve = panel_activo and b.quiere_verse()
+            else:
+                se_ve = panel_activo and not self._oculto_a_proposito(b)
+            if se_ve:
+                visibles.append(b)
+        n = len(visibles)
+        botones = [b for b, _ in self._entradas if isinstance(b, BotonAccionRapida)]
+        for b in botones:
+            b._reubicando = True
         for i, b in enumerate(visibles):
-            solo = i == len(visibles) - 1 and len(visibles) % 2 == 1
-            self.addWidget(b, i // 2, i % 2, 1, 2 if solo else 1)
-
+            if self._impar_largo and n % 2 == 1 and i == n - 1:
+                self.addWidget(b, i // 2, 0, 1, 2)
+            else:
+                self.addWidget(b, i // 2, i % 2)
+        # Al cambiar de panel Qt oculta el botón: se vuelve a fijar su visibilidad real
+        for b in botones:
+            b.refrescar_visibilidad()
+            b._reubicando = False
 
 class BotonAccionRapida(_Levantamiento, QPushButton):
     """Acción rápida con fondo/borde animados al pasar el mouse y un
@@ -671,12 +735,49 @@ class BotonAccionRapida(_Levantamiento, QPushButton):
     QSS con fondo propio (ej. estado de "Agregar contacto"), ese QSS se
     pinta encima y manda."""
 
-    def __init__(self, color, parent=None):
+    def __init__(self, color, parent=None, ocultar_si_bloqueado=False):
         super().__init__(parent)
         self._color = QColor(color)
+        self._ocultar_si_bloqueado = ocultar_si_bloqueado
+        self._visible_pedido = True
+        self._panel_activo = True
+        self._reubicando = False
         self.setStyleSheet(QSS_ACCION_RAPIDA_TRANSPARENTE)
         self._iniciar_levantamiento(3, 0)
         self._hover = AnimacionHover(self, self._on_hover)
+
+    def quiere_verse(self):
+        """Se pidió mostrarlo y, con `ocultar_si_bloqueado`, está habilitado."""
+        return self._visible_pedido and (self.isEnabled() or not self._ocultar_si_bloqueado)
+
+    def _mostrable(self):
+        # Sin padre un botón se abriría como ventana propia
+        sin_padre = self._ocultar_si_bloqueado and self.parentWidget() is None
+        return self.quiere_verse() and self._panel_activo and not sin_padre
+
+    def _aplicar_visibilidad(self):
+        super().setVisible(self._mostrable())
+        grilla = getattr(self, '_grilla', None)
+        if grilla is not None:
+            grilla.pedir_reacomodo()
+
+    def fijar_panel_activo(self, activo):
+        self._panel_activo = activo
+
+    def refrescar_visibilidad(self):
+        super().setVisible(self._mostrable())
+
+    def setVisible(self, visible):
+        if self._reubicando:
+            super().setVisible(visible)
+            return
+        self._visible_pedido = bool(visible)
+        self._aplicar_visibilidad()
+
+    def setEnabled(self, habilitado):
+        super().setEnabled(habilitado)
+        if self._ocultar_si_bloqueado:
+            self._aplicar_visibilidad()
 
     def _on_hover(self, progreso):
         self._aplicar_levantamiento(progreso if self.isEnabled() else 0.0)
@@ -802,14 +903,14 @@ def kpi_ocultos_guardado():
     """Preferencia global (misma para todas las pantallas) de ocultar las
     tarjetas KPI; vive en el mismo QSettings que el sidebar."""
     try:
-        return QSettings("GestorApp", "Dashboard").value("kpi_ocultos", False, type=bool)
+        return QSettings("VolvoApp", "Dashboard").value("kpi_ocultos", False, type=bool)
     except Exception:
         return False
 
 
 def guardar_kpi_ocultos(ocultos):
     try:
-        QSettings("GestorApp", "Dashboard").setValue("kpi_ocultos", bool(ocultos))
+        QSettings("VolvoApp", "Dashboard").setValue("kpi_ocultos", bool(ocultos))
     except Exception:
         pass
 
@@ -1005,6 +1106,45 @@ class TarjetaKpiResumen(TarjetaKpiComercial):
         self._lbl_pie.setText(pie)
 
 
+class BotonAccionCompacta(BotonAccionRapida):
+    """Acción rápida compacta, igual a las de Comercial y Operaciones: ícono y
+    título; el detalle aparece al pasar el mouse."""
+
+    def __init__(self, icono, titulo, detalle, color, parent=None):
+        super().__init__(color, parent)
+        from src.theme.theme_manager import ThemeManager
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._qss_por_defecto = QSS_ACCION_RAPIDA_TRANSPARENTE
+        self.setMinimumHeight(36)
+        self.setToolTip(detalle)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(6, 4, 10, 4)
+        layout.setSpacing(8)
+        marco = QFrame()
+        marco.setFixedSize(26, 26)
+        marco.setStyleSheet(qss_icono_accion(color))
+        marco_layout = QVBoxLayout(marco)
+        marco_layout.setContentsMargins(0, 0, 0, 0)
+        lbl_icono = QLabel()
+        lbl_icono.setPixmap(ThemeManager.icon_pixmap(icono, color=color, size=12))
+        lbl_icono.setStyleSheet("background: transparent; border: none;")
+        marco_layout.addWidget(lbl_icono, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(marco)
+        self._lbl_titulo = QLabel(titulo.strip())
+        self._lbl_titulo.setToolTip(detalle)
+        layout.addWidget(self._lbl_titulo, stretch=1)
+        self._pintar_titulo()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.EnabledChange:
+            self._pintar_titulo()
+
+    def _pintar_titulo(self):
+        color = TINTA if self.isEnabled() else APAGADO
+        self._lbl_titulo.setStyleSheet(f"color: {color}; font-weight: bold; font-size: 12px; background: transparent; border: none;")
+
+
 class BotonAccionPanel(BotonAccionRapida):
     """Acción del panel flotante (mismo look que las de Comercial y
     Operaciones): ícono, título y una línea de ayuda."""
@@ -1134,6 +1274,23 @@ def ubicar_popup_selector(popup, ancla):
     popup.move(x, max(limite.top(), y))
 
 
+def encadenar_filtros(orden, cambiado):
+    """Los filtros dependen del orden en que se eligieron: al cambiar o quitar
+    uno, se limpian los que se eligieron después."""
+    if cambiado in orden:
+        posicion = orden.index(cambiado)
+        posteriores = orden[posicion + 1:]
+        del orden[posicion + 1:]
+        for selector in posteriores:
+            selector.blockSignals(True)
+            selector.limpiar()
+            selector.blockSignals(False)
+        if cambiado.valor() is None:
+            orden.remove(cambiado)
+    elif cambiado.valor() is not None:
+        orden.append(cambiado)
+
+
 class SelectorFiltroPopup(QPushButton):
     """Botón de filtro para la barra oscura: muestra la opción elegida y abre
     una tarjeta con las opciones agrupadas. `valor()` es None cuando está en
@@ -1153,12 +1310,24 @@ class SelectorFiltroPopup(QPushButton):
         self.setMinimumWidth(190)
         self.setIcon(qta.icon(icono, color='white'))
         self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        self._icono = icono
         self.setStyleSheet(
             "QPushButton { background-color: rgba(255,255,255,0.10); color: white; "
             "border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; min-height: 34px; "
             "padding: 0 14px; font-weight: 700; text-align: left; }"
             "QPushButton:hover { background-color: rgba(255,255,255,0.20); }")
         self._actualizar_texto()
+
+    def limpiar(self):
+        self._elegir(None)
+
+    def _estilo_capsula(self):
+        """Mismo estilo que los demás botones de la barra: blanco en la cápsula
+        y azul cuando hay un valor elegido."""
+        if not self.property('en_capsula'):
+            preparar_boton_capsula(self)
+        aplicar_estilo_boton_barra(self, 'activo' if self._valor is not None else 'neutro')
+        self.setIcon(qta.icon(self._icono, color=PRIMARIO if self._valor is not None else 'white'))
 
     def valor(self):
         return self._valor
@@ -1186,6 +1355,7 @@ class SelectorFiltroPopup(QPushButton):
         self._compacto = compacto
         if compacto:
             self.setFixedWidth(44)
+            self._estilo_capsula()
         else:
             self.setMinimumWidth(190)
             self.setMaximumWidth(16777215)
@@ -1196,19 +1366,10 @@ class SelectorFiltroPopup(QPushButton):
         if self._compacto:
             self.setText("")
             self.setToolTip(f"{self._titulo}: {self._etiqueta_actual()}")
+            self._estilo_capsula()
             return
         self.setToolTip(f"Filtrar por {self._titulo.lower()}")
         self.setText("  " + self._etiqueta_actual() + "   ▾")
-
-    def paintEvent(self, e):
-        super().paintEvent(e)
-        if self._compacto and self._valor is not None:
-            p = QPainter(self)
-            p.setRenderHint(QPainter.RenderHint.Antialiasing)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor("#FBBF24"))
-            p.drawEllipse(QRectF(self.width() - 13, 5, 8, 8))
-            p.end()
 
     def _elegir(self, valor):
         if valor == self._valor:

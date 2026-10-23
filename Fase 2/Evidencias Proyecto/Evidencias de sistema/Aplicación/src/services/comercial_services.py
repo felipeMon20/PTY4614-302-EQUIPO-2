@@ -219,6 +219,14 @@ def excluir_contratos_finalizados_inactivos(df):
     return df[~(cerrado & inactivo)]
 
 
+def excluir_contratos_cerrados(df):
+    """Quita todos los contratos en Baja o Baja Solicitada, estén o no
+    conectados todavía."""
+    if df is None or df.empty or COL_ESTADO_COMERCIAL not in df.columns:
+        return df
+    return df[~df[COL_ESTADO_COMERCIAL].map(es_contrato_cerrado)]
+
+
 def vins_con_contrato_abierto(df):
     """VIN (mayúsculas) cuyo contrato actual no permite crear otro (ver
     puede_crear_contrato)."""
@@ -234,12 +242,67 @@ def vins_con_contrato_abierto(df):
     return set(vins) - {''}
 
 
-def calcular_renovacion(fila, meses_extra):
-    """Cambios de una renovación: solo suma `meses_extra` a DURACIÓN (MESES) y
-    recalcula TÉRMINO CONTRATO desde el inicio; el contrato conserva su ID y su
-    inicio. Un contrato Vencido vuelve a Vigente. Devuelve None si la fila no
-    es renovable (estado distinto de Vigente/Vencido, duración no numérica
-    como MENSUAL o '-', o sin fecha de inicio válida)."""
+def puede_renovar_con_nuevo_contrato(estado_comercial, estado_activacion=''):
+    """Un contrato Vigente o Vencido se puede reemplazar por uno nuevo; también una unidad
+    en Revisar que ya está Conectada (todavía sin contrato)."""
+    estado = str(estado_comercial).strip().upper()
+    if estado == VALOR_ESTADO_COMERCIAL_REVISAR:
+        return str(estado_activacion).strip().upper() == ESTADO_CONECTADO
+    return estado in {VALOR_ESTADO_COMERCIAL_VIGENTE, VALOR_ESTADO_COMERCIAL_VENCIDO}
+
+
+def cambios_contrato_renovado(fila):
+    """Cambios del contrato anterior cuando lo reemplaza uno nuevo: queda en
+    estado Renovado (historial) y, si estaba en JustTime como Si o Pendiente,
+    pasa a Eliminar porque el contrato nuevo ocupa su lugar."""
+    cambios = {COL_ESTADO_COMERCIAL: 'Renovado'}
+    estado_jt = str(fila.get('CONTRATO CREADO EN JUSTTIME', '')).strip().upper()
+    if estado_jt in {'SI', 'PENDIENTE'}:
+        cambios['CONTRATO CREADO EN JUSTTIME'] = 'Eliminar'
+    return cambios
+
+
+_CAMPOS_PROPIOS_RENOVACION = (
+    'RUT', 'RAZÓN SOCIAL', 'INDUSTRIA', 'VIN', 'CHASIS', 'MODELO', 'CDB', 'EJECUTIVO', 'FLOTA VC', 'FLOTA VC 2',
+    'CDB FLOTA', 'ESTADO DE ACTIVACIÓN ACTUAL', 'ESTADO DE ENTREGA', 'PERIODO INTERNO')
+
+
+def armar_renovaciones_multiples(data, datos_por_vin, prototipo, id_inicial):
+    """Contratos nuevos de una renovación de varias unidades. `data` es lo que devolvió el
+    formulario (cargado con la primera unidad, `prototipo`); `datos_por_vin` es {vin: datos
+    del contrato actual}. Cada contrato nuevo toma de su unidad lo propio (cliente, VIN, flota,
+    activación, periodo) y del formulario las condiciones comerciales, JustTime y CM; el tipo de
+    servicio solo se aplica a todas si se cambió respecto de la primera unidad. Devuelve una
+    lista de {'vin', 'id_anterior', 'cambios_anterior', 'nuevo'} con IDs consecutivos."""
+    resultado = []
+    siguiente = int(id_inicial) if str(id_inicial).strip().isdigit() else None
+    for vin, datos in datos_por_vin.items():
+        nuevo = dict(data)
+        for campo in _CAMPOS_PROPIOS_RENOVACION:
+            valor = datos.get(campo)
+            if valor is not None and str(valor).strip() not in ('', 'nan', 'NaN', 'None'):
+                nuevo[campo] = str(valor).strip()
+        if str(data.get('TIPO DE SERVICIO', '')).strip() == str(prototipo.get('TIPO DE SERVICIO', '')).strip():
+            propio = str(datos.get('TIPO DE SERVICIO', '')).strip()
+            if propio and propio.lower() != 'nan':
+                nuevo['TIPO DE SERVICIO'] = propio
+        nuevo[COL_ETAPA_GESTION] = DataFrameFormatter.calcular_etapa_gestion_esperada(pd.Series(nuevo))
+        if siguiente is not None:
+            nuevo['ID'] = str(siguiente)
+            siguiente += 1
+        resultado.append({
+            'vin': vin, 'id_anterior': str(datos.get('ID', '')).strip(),
+            'cambios_anterior': cambios_contrato_renovado(datos), 'nuevo': nuevo})
+    return resultado
+
+
+def calcular_renovacion(fila, meses_extra, nuevo_inicio=None):
+    """Cambios de una renovación: suma `meses_extra` a DURACIÓN (MESES) y
+    recalcula TÉRMINO CONTRATO desde el inicio; el contrato conserva su ID. Con
+    `nuevo_inicio` (fecha) el inicio también cambia a ese día. Un contrato
+    Vencido vuelve a Vigente. Devuelve None si la fila no es renovable (estado
+    distinto de Vigente/Vencido, duración no numérica como MENSUAL o '-', o sin
+    fecha de inicio válida cuando no se da `nuevo_inicio`)."""
     estado = str(fila.get(COL_ESTADO_COMERCIAL, '')).strip().upper()
     if estado not in {VALOR_ESTADO_COMERCIAL_VIGENTE, VALOR_ESTADO_COMERCIAL_VENCIDO} or meses_extra < 1:
         return None
@@ -247,7 +310,7 @@ def calcular_renovacion(fila, meses_extra):
         duracion = int(float(str(fila.get('DURACIÓN (MESES)', '')).strip().replace(',', '.')))
     except ValueError:
         return None
-    inicio = DataFrameFormatter.parsear_fecha_segura(fila.get('INICIO CONTRATO'))
+    inicio = pd.Timestamp(nuevo_inicio) if nuevo_inicio is not None else DataFrameFormatter.parsear_fecha_segura(fila.get('INICIO CONTRATO'))
     if pd.isna(inicio):
         return None
     nueva_duracion = duracion + int(meses_extra)
@@ -255,6 +318,8 @@ def calcular_renovacion(fila, meses_extra):
         'DURACIÓN (MESES)': str(nueva_duracion),
         'TÉRMINO CONTRATO': (inicio + pd.DateOffset(months=nueva_duracion)).strftime("%d-%m-%Y"),
     }
+    if nuevo_inicio is not None:
+        cambios['INICIO CONTRATO'] = inicio.strftime("%d-%m-%Y")
     if estado == VALOR_ESTADO_COMERCIAL_VENCIDO:
         cambios[COL_ESTADO_COMERCIAL] = VALOR_ESTADO_COMERCIAL_VIGENTE
     return cambios
@@ -270,7 +335,7 @@ def clasificar_vigencia_contrato(df, dias_alerta=30, hoy=None):
     de vigencia: reemplaza los calculos duplicados que antes vivian por
     separado en calcular_kpis_vigencia() y en ComercialModule.filter_table().
 
-    IMPORTANTE (regla de negocio confirmada con la contraparte comercial): esta funcion usa
+    IMPORTANTE (regla de negocio confirmada con Javiera): esta funcion usa
     exclusivamente TÉRMINO CONTRATO (termino del contrato pagado por el
     cliente) y dias CALENDARIO. Nunca debe usarse FECHA TERMINO CM (termino
     del contrato CM) para esta clasificacion -- son conceptos de fecha
@@ -394,7 +459,7 @@ _PATRON_DIAS_RESTANTES_FUTURO = re.compile(r'^(\d+) d[ií]as? restantes?$', re.I
 def parsear_dias_restantes(texto):
     """Inverso de formatear_dias_restantes(): recupera el numero de dias con
     signo a partir del texto ya formateado (usado por
-    AppTableWidget._parse_number_like en custom_table.py para poder
+    VolvoTableWidget._parse_number_like en custom_table.py para poder
     ordenar la columna 'DÍAS RESTANTES' por magnitud numerica en vez de
     alfabeticamente). Unica fuente de verdad sobre el patron de texto:
     custom_table.py no debe reimplementar estas expresiones regulares.
@@ -730,7 +795,10 @@ def _mask_revisar_hacia_comercial(df):
     -- un cambio futuro en la matriz se refleja acá automáticamente, sin
     tocar este código.
     Usada por filtrar_vencidos (para excluirlas) y filtrar_por_gestionar
-    (para incluirlas)."""
+    (para incluirlas).
+
+    Excepción (22-10-2026, pedido de Javiera): Revisar + Conectado ya no va a
+    Nuevas oportunidades sino a Renovar contratos (ver mascara_revisar_conectado)."""
     if df.empty or COL_ESTADO_COMERCIAL not in df.columns or COL_ESTADO_ACTIVACION not in df.columns:
         return pd.Series(False, index=df.index)
     estado_com_norm = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
@@ -738,7 +806,21 @@ def _mask_revisar_hacia_comercial(df):
     es_revisar = estado_com_norm == VALOR_ESTADO_COMERCIAL_REVISAR
     clave_matriz = estado_com_norm + "||" + estado_act_norm
     etapa = clave_matriz.map(ESTADO_COMERCIAL_ACTIVACION_ETAPA_FLAT)
-    return es_revisar & (etapa == 'COMERCIAL')
+    return es_revisar & (etapa == 'COMERCIAL') & (estado_act_norm != ESTADO_CONECTADO)
+
+
+def mascara_revisar_conectado(df):
+    """Unidades con ESTADO COMERCIAL = Revisar que ya están Conectadas: se gestionan
+    en Renovar contratos, donde se les crea el contrato."""
+    if df.empty or COL_ESTADO_COMERCIAL not in df.columns or COL_ESTADO_ACTIVACION not in df.columns:
+        return pd.Series(False, index=df.index)
+    estado_com = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
+    estado_act = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
+    return (estado_com == VALOR_ESTADO_COMERCIAL_REVISAR) & (estado_act == ESTADO_CONECTADO)
+
+
+def filtrar_revisar_conectados(df):
+    return df[mascara_revisar_conectado(df)]
 
 
 def filtrar_vencidos(df):
@@ -851,7 +933,11 @@ def cdbs_por_razon_social(df):
     datos = datos[(datos['razon'] != '') & (datos['cdb'] != '')]
     conteo = datos.groupby(['razon', 'cdb'], sort=False).size().reset_index(name='n')
     conteo = conteo.sort_values('n', ascending=False, kind='stable')
-    return {razon: grupo['cdb'].tolist() for razon, grupo in conteo.groupby('razon', sort=False)}
+    # Una pasada en vez de un groupby por razón social (~5 veces más rápido con miles de clientes)
+    resultado = {}
+    for razon, cdb in zip(conteo['razon'], conteo['cdb']):
+        resultado.setdefault(razon, []).append(cdb)
+    return resultado
 
 
 def cdb_discrepante(cdb, razon_social, referencia):
@@ -862,7 +948,7 @@ def cdb_discrepante(cdb, razon_social, referencia):
 
 
 def filtrar_por_gestionar(df):
-    """Panel Comercial -> Por gestionar (regla confirmada con la contraparte comercial):
+    """Panel Comercial -> Por gestionar (regla confirmada con Javiera):
     ESTADO DE ACTIVACIÓN ACTUAL == 'NO APLICA', igualdad EXACTA (no
     'contains'), para no confundir con 'ACTIVACION PENDIENTE', 'SIN FLOTA',
     'NO ENTREGADO', 'ACTIVANDO', 'CONECTADO' ni 'DESCONECTADO'.
@@ -881,6 +967,9 @@ def filtrar_por_gestionar(df):
         no_aplica = no_aplica & ~estado_com.isin({VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA,
                                                   VALOR_ESTADO_COMERCIAL_VENCIDO})
     return df[no_aplica | _mask_revisar_hacia_comercial(df)]
+
+
+OBSERVACION_VIENE_DE_PROVISIONES = 'Viene de Provisiones'
 
 
 def filtrar_vigentes(df):
@@ -907,14 +996,75 @@ def filtrar_vigentes(df):
     return df[mask]
 
 
+def pendientes_marcar_vigente(df):
+    """Unidades que "Marcar como Vigente" corrige, ya Conectadas: las que quedaron en
+    Activación Pendiente y los contratos MENSUAL en Vencido (un mensual no vence por fecha)."""
+    if df.empty or COL_ESTADO_COMERCIAL not in df.columns or COL_ESTADO_ACTIVACION not in df.columns:
+        return df.iloc[0:0]
+    estado_com = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
+    estado_act = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
+    pendiente = estado_com.isin((VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE, 'ACTIVACION PENDIENTE'))
+    mensual_vencido = pd.Series(False, index=df.index)
+    if 'TÉRMINO CONTRATO' in df.columns:
+        mensual_vencido = (estado_com == VALOR_ESTADO_COMERCIAL_VENCIDO) & \
+                          (df['TÉRMINO CONTRATO'].astype(str).str.strip().str.upper() == 'MENSUAL')
+    return df[(pendiente | mensual_vencido) & (estado_act == ESTADO_CONECTADO)]
+
+
+def es_forma_provision(fila):
+    """True si FORMA DE CONTRATO de la unidad (dict o fila) es exactamente Provisión."""
+    return str(fila.get('FORMA DE CONTRATO', '')).strip().upper() in ('PROVISION', 'PROVISIÓN')
+
+
+def cambios_provision_a_conversion(filas, df_base, hoy=None):
+    """Cambios {vin: {'VIN', 'cambios', 'ID'}} que pasan unidades de Provisión a Conversión con
+    facturación manual: Vigente y Conectada (la matriz las deja en Comercial, sin pasar por
+    Operaciones), inicio el día 1 del mes, duración "-" (mensual) y sin fecha de baja.
+    `filas` es {vin: fila}. JustTime sigue la regla del formulario: FACTURACIÓN MANUAL no va a
+    JustTime, así que un contrato Si o Revisar pago queda en Eliminar y uno Pendiente en "-"."""
+    from src.core.constants import (
+        COL_FORMA_CONTRATO, COL_TIPO_FACTURACION, COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_INICIO_CONTRATO,
+        COL_DURACION_MESES, COL_TERMINO_CONTRATO, COL_FECHA_BAJA, COL_ETAPA_GESTION, COL_CONTRATO_JUSTTIME,
+        COL_FECHA_INICIO_FACT, COL_FECHA_TERMINO_FACT, VALOR_TIPO_FACT_FACTURACION_MANUAL,
+        VALOR_ESTADO_COMERCIAL_VIGENTE, ESTADO_CONECTADO, JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_REVISAR_PAGO,
+        JUSTTIME_ESTADO_ELIMINAR, JUSTTIME_ESTADO_PENDIENTE, JUSTTIME_ESTADO_NO_APLICA,
+        ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ)
+
+    hoy = hoy or datetime.now()
+    etapa = ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ[VALOR_ESTADO_COMERCIAL_VIGENTE][ESTADO_CONECTADO]
+    base = {
+        COL_FORMA_CONTRATO: 'Conversion',
+        COL_TIPO_FACTURACION: VALOR_TIPO_FACT_FACTURACION_MANUAL,
+        COL_ESTADO_COMERCIAL: VALOR_ESTADO_COMERCIAL_VIGENTE.capitalize(),
+        COL_ESTADO_ACTIVACION: ESTADO_CONECTADO.capitalize(),
+        COL_INICIO_CONTRATO: hoy.replace(day=1).strftime("%d-%m-%Y"),
+        COL_DURACION_MESES: '-',
+        COL_TERMINO_CONTRATO: 'MENSUAL',
+        COL_FECHA_BAJA: '',
+        COL_ETAPA_GESTION: etapa,
+    }
+    cambios = {}
+    for vin, fila in filas.items():
+        celdas = dict(base)
+        estado_jt = str(fila.get(COL_CONTRATO_JUSTTIME, '')).strip()
+        if estado_jt in (JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_REVISAR_PAGO):
+            celdas[COL_CONTRATO_JUSTTIME] = JUSTTIME_ESTADO_ELIMINAR
+        elif estado_jt == JUSTTIME_ESTADO_PENDIENTE:
+            celdas[COL_CONTRATO_JUSTTIME] = JUSTTIME_ESTADO_NO_APLICA
+            celdas[COL_FECHA_INICIO_FACT] = ''
+            celdas[COL_FECHA_TERMINO_FACT] = ''
+        cambios[vin] = {'VIN': vin, 'cambios': celdas}
+    return agregar_id_a_cambios(cambios, df_base)
+
+
 def filtrar_renovar_clientes(df):
     """Panel Comercial -> Renovar clientes: unión de las antiguas
-    sub-pestañas Renovaciones, Gestionar Bajas (vencidos) y Vigentes. Cada
-    regla sigue siendo la de su función original."""
+    sub-pestañas Renovaciones, Gestionar Bajas (vencidos) y Vigentes, más las
+    unidades Revisar ya Conectadas. Cada regla sigue siendo la de su función original."""
     if df.empty:
         return df.iloc[0:0]
     indices = set()
-    for filtro in (filtrar_renovaciones, filtrar_vencidos, filtrar_vigentes):
+    for filtro in (filtrar_renovaciones, filtrar_vencidos, filtrar_vigentes, filtrar_revisar_conectados):
         indices.update(filtro(df).index)
     return df[df.index.isin(indices)]
 
@@ -924,15 +1074,18 @@ def obtener_masks_kpi_renovar_clientes(df):
     solaparse: vencidas, por vencer en 30 días y vigentes (el resto)."""
     vencidas = pd.Series(df.index.isin(filtrar_vencidos(df).index), index=df.index)
     por_vencer = pd.Series(df.index.isin(filtrar_renovaciones(df).index), index=df.index) & ~vencidas
-    vigentes = pd.Series(df.index.isin(filtrar_vigentes(df).index), index=df.index) & ~vencidas & ~por_vencer
+    al_dia = pd.Series(df.index.isin(filtrar_vigentes(df).index), index=df.index) | mascara_revisar_conectado(df)
+    vigentes = al_dia & ~vencidas & ~por_vencer
     return {"vencidas": vencidas, "por_vencer": por_vencer, "vigentes": vigentes}
 
 
-def calcular_kpis_renovar_clientes(df):
-    """KPI de "Renovar clientes" sobre la bandeja ya filtrada."""
+def calcular_kpis_renovar_clientes(df, masks=None):
+    """KPI de "Renovar clientes" sobre la bandeja ya filtrada. `masks`: las de
+    obtener_masks_kpi_renovar_clientes(df) si ya están calculadas."""
     if df.empty:
         return {"total": 0, "vencidas": 0, "por_vencer": 0, "vigentes": 0}
-    masks = obtener_masks_kpi_renovar_clientes(df)
+    if masks is None:
+        masks = obtener_masks_kpi_renovar_clientes(df)
     return {
         "total": len(df),
         "vencidas": int(masks["vencidas"].sum()),
@@ -1041,6 +1194,11 @@ def validar_valor_pegado(col_name, texto_portapapeles, dropdown_options):
     return "valido", opciones_upper[clipboard_upper]
 
 
+# Tope de DURACIÓN (MESES) (20-10-2026, a pedido del usuario): una duración
+# absurda llevaba el término fuera del calendario y hacía fallar la carga
+DURACION_MAXIMA_MESES = 99
+
+
 def validar_duracion(valor):
     """Extraccion literal de la validacion de DURACION (MESES) en
     ComercialModule.on_item_edited() (rama `col_name == 'DURACIÓN (MESES)'`).
@@ -1061,9 +1219,9 @@ def validar_duracion(valor):
         return "vacio", ""
     if val_limpio == '-' or val_limpio.upper() == 'MENSUAL':
         return "mensual", "-"
-    if val_limpio.replace('.', '', 1).isdigit() and float(val_limpio) > 0:
+    if val_limpio.replace('.', '', 1).isdigit() and 0 < float(val_limpio) < DURACION_MAXIMA_MESES + 1:
         return "numerico", str(int(float(val_limpio)))
-    return "invalido", "La duración debe ser un número mayor a 0, o un guion '-'."
+    return "invalido", f"La duración debe ser un número mayor a 0 y de hasta {DURACION_MAXIMA_MESES} meses, o un guion '-'."
 
 
 def validar_fecha_ddmmyyyy(valor):
@@ -1167,7 +1325,7 @@ def detectar_contradicciones_etapa_gestion(df):
 def detectar_inconsistencias_forma_contrato_tipo_facturacion(df):
     """Filas cuya combinación (FORMA DE CONTRATO, TIPO DE FACTURACION) actual
     NO cumple FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ (constants.py, matriz de
-    negocio entregada por la contraparte comercial, 24-09-2026) -- la misma matriz que ya
+    negocio entregada por Javiera, 24-09-2026) -- la misma matriz que ya
     aplica en vivo ComercialAgregarDialog
     (_sincronizar_tipo_facturacion_con_forma_contrato), reutilizada tal cual
     (no se duplica). Es una herramienta de solo DETECCIÓN para datos
@@ -1175,7 +1333,7 @@ def detectar_inconsistencias_forma_contrato_tipo_facturacion(df):
     correcto, eso lo decide el usuario/negocio (ver botón "Revisar
     inconsistencias" en Vista Completa, comercial.py).
 
-    Reglas de normalización/exclusión (confirmadas contra RM_CONTRATOS.csv real,
+    Reglas de normalización/exclusión (confirmadas contra RM_JAVI.csv real,
     24-09-2026, antes de implementar -- ver conversación con el usuario):
     - FORMA DE CONTRATO se normaliza con `.strip().upper()`, igual que en
       ComercialAgregarDialog. Un valor que no esté en la matriz (legado/no
@@ -1215,7 +1373,7 @@ def contar_forma_contrato_sin_tipo_facturacion_asignado(df):
     detectar_inconsistencias_forma_contrato_tipo_facturacion, que por eso
     mismo NO las cuenta como inconsistencia). Puramente informativo: se usa
     junto al conteo de inconsistencias reales para diferenciar ambos casos
-    en el mensaje de sincronización (RMReporteSyncWorker, comercial.py), sin
+    en el mensaje de sincronización (RMJaviSyncWorker, comercial.py), sin
     reimplementar la consulta a la matriz -- solo referencia el mismo dict."""
     cols_necesarias = {'FORMA DE CONTRATO', COL_TIPO_FACTURACION}
     if df.empty or not cols_necesarias.issubset(df.columns):
@@ -1228,17 +1386,110 @@ def contar_forma_contrato_sin_tipo_facturacion_asignado(df):
     return int(mask.sum())
 
 
+def _clave_contrato(vin, id_contrato):
+    return (str(vin).strip().upper(), _normalizar_id_contrato(id_contrato))
+
+
+def detectar_termino_distinto_de_duracion(df_crudo):
+    """Contratos cuyo TÉRMINO CONTRATO original del archivo no coincide con
+    INICIO CONTRATO + DURACIÓN (MESES). Debe recibir el df ANTES de
+    DataFrameFormatter.clean(), que recalcula el término y taparía la
+    diferencia. Devuelve {(VIN, ID): término original}.
+
+    Solo compara filas con inicio y término que sean fechas reales y duración
+    numérica; las Bajas se excluyen porque su término es la fecha de baja."""
+    columnas = {'VIN', 'INICIO CONTRATO', 'DURACIÓN (MESES)', 'TÉRMINO CONTRATO'}
+    if df_crudo is None or df_crudo.empty or not columnas.issubset(df_crudo.columns):
+        return {}
+    estados = (df_crudo['ESTADO COMERCIAL'].astype(str).str.strip().str.upper().tolist()
+               if 'ESTADO COMERCIAL' in df_crudo.columns else [''] * len(df_crudo))
+    ids = df_crudo['ID'].tolist() if 'ID' in df_crudo.columns else [''] * len(df_crudo)
+    cache = {}
+    resultado = {}
+    # Cada fecha distinta se interpreta una sola vez (las filas casi nunca
+    # repiten la terna inicio, duración y término, pero sí cada fecha)
+    fechas = {}
+
+    def parsear(valor):
+        if valor not in fechas:
+            fechas[valor] = DataFrameFormatter.parsear_fecha_segura(valor)
+        return fechas[valor]
+
+    for vin, id_contrato, estado, inicio, duracion, termino in zip(
+            df_crudo['VIN'].tolist(), ids, estados, df_crudo['INICIO CONTRATO'].tolist(),
+            df_crudo['DURACIÓN (MESES)'].tolist(), df_crudo['TÉRMINO CONTRATO'].tolist()):
+        if estado in (VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA):
+            continue
+        clave = (inicio, duracion, termino)
+        if clave not in cache:
+            cache[clave] = _termino_original_si_difiere(inicio, duracion, termino, parsear)
+        if cache[clave]:
+            resultado[_clave_contrato(vin, id_contrato)] = cache[clave]
+    return resultado
+
+
+def _termino_original_si_difiere(inicio, duracion, termino, parsear=DataFrameFormatter.parsear_fecha_segura):
+    try:
+        meses = int(float(str(duracion).strip().replace(',', '.')))
+    except (ValueError, OverflowError):
+        return ''
+    if not 0 < meses <= DURACION_MAXIMA_MESES:
+        return ''
+    inicio_dt = parsear(inicio) if str(inicio).strip() not in ('', '-') else pd.NaT
+    texto_termino = str(termino).strip()
+    if pd.isna(inicio_dt) or texto_termino.upper() in ('', '-', 'MENSUAL', 'NAN'):
+        return ''
+    termino_dt = parsear(termino)
+    if pd.isna(termino_dt):
+        return ''
+    if termino_dt.normalize() == (inicio_dt + pd.DateOffset(months=meses)).normalize():
+        return ''
+    return termino_dt.strftime('%d-%m-%Y')
+
+
+def construir_correcciones_termino(df_fechas, df_base, vins=None):
+    """Cambios para dejar en el archivo el TÉRMINO CONTRATO calculado (inicio +
+    duración) de los contratos de `df_fechas`; `vins` limita a la selección.
+    Marca 'escribir_termino' porque el escritor ignora esa columna por defecto."""
+    if df_fechas is None or df_fechas.empty or 'TÉRMINO CONTRATO' not in df_fechas.columns:
+        return {}
+    permitidos = {str(v).strip().upper() for v in vins} if vins is not None else None
+    cambios = {}
+    for vin, termino in zip(df_fechas['VIN'].tolist(), df_fechas['TÉRMINO CONTRATO'].tolist()):
+        vin = str(vin).strip().upper()
+        if permitidos is not None and vin not in permitidos:
+            continue
+        if pd.isna(DataFrameFormatter.parsear_fecha_segura(termino)) or str(termino).strip().upper() in ('', '-', 'MENSUAL'):
+            continue
+        cambios[vin] = {'VIN': vin, 'cambios': {'TÉRMINO CONTRATO': str(termino).strip()}, 'escribir_termino': True}
+    return agregar_id_a_cambios(cambios, df_base)
+
+
+def filtrar_termino_distinto_de_duracion(df, discrepancias):
+    """Filas de `df` (df_base) cuyo contrato está en `discrepancias`, con la
+    columna 'TÉRMINO EN ARCHIVO' (el valor original) al final."""
+    if df is None or df.empty or not discrepancias or 'VIN' not in df.columns:
+        return df.iloc[0:0] if df is not None else pd.DataFrame()
+    ids = df['ID'].tolist() if 'ID' in df.columns else [''] * len(df)
+    originales = [discrepancias.get(_clave_contrato(v, i), '') for v, i in zip(df['VIN'].tolist(), ids)]
+    serie = pd.Series(originales, index=df.index)
+    mascara = serie != ''
+    resultado = df[mascara].copy()
+    resultado['TÉRMINO EN ARCHIVO'] = serie[mascara]
+    return resultado
+
+
 def normalizar_tipo_facturacion_por_forma_contrato(df):
     """Completa TIPO DE FACTURACION cuando está "sin asignar" (vacío/'-') y
     FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ tiene EXACTAMENTE una opción
     válida para el FORMA DE CONTRATO de esa fila -- es el único caso sin
     ambigüedad de negocio real (no existe otra opción posible entre la cual
-    "adivinar"). Usada por RMReporteSyncWorker (comercial.py), 24-09-2026, a
+    "adivinar"). Usada por RMJaviSyncWorker (comercial.py), 24-09-2026, a
     pedido explícito, justo después de _normalizar_vacios_a_guion (donde
     "sin asignar" ya suele ser '' o '-'). Trata NaN igual que vacío/'-' de
     forma robusta por cuenta propia (con pd.isna(), sin reimplementar
     _normalizar_vacios_a_guion): esta función también se prueba/usa de forma
-    independiente contra datos crudos de RM_CONTRATOS (lectura de Excel, donde
+    independiente contra datos crudos de RM_JAVI (lectura de Excel, donde
     una celda vacía SÍ llega como NaN real, no como texto).
 
     Reglas (misma matriz, sin duplicarla):
@@ -1372,7 +1623,7 @@ COLUMNAS_LIMPIEZA_SIN_CONTRATO = [
 
 
 def aplica_regla_sin_contrato(col_name, new_value):
-    """Regla de negocio confirmada (ver conversación con la contraparte comercial): cuando el
+    """Regla de negocio confirmada (ver conversación con Javiera): cuando el
     usuario edita manualmente FORMA DE CONTRATO en Vista Completa y el nuevo
     valor es 'Sin Contrato', se deben limpiar a '-' TIPO DE SERVICIO,
     INICIO CONTRATO, DURACIÓN (MESES) y TÉRMINO CONTRATO de esa misma fila.
@@ -1391,39 +1642,6 @@ def aplica_regla_sin_contrato(col_name, new_value):
     if str(new_value).strip().upper() != 'SIN CONTRATO':
         return {}
     return {col: '-' for col in COLUMNAS_LIMPIEZA_SIN_CONTRATO}
-
-
-COLUMNAS_LIMPIEZA_TERMINATED_CM = [
-    'N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM',
-]
-
-
-def aplica_regla_terminated_cm(col_name, new_value):
-    """Regla de negocio confirmada: cuando el usuario edita manualmente
-    ESTADO DEL CM (en Comercial -> Vista Completa o en Contratos CM) y el
-    nuevo valor es 'Terminated', se deben limpiar a '-' N CONTRATO 3PC,
-    FECHA INICIO CM, FECHA TERMINO CM, TIPO DE CM y PAGO CM de esa misma
-    fila. ESTADO DEL CM en si NO se limpia (queda 'Terminated': es la razon
-    por la que los demas campos quedaron vacios).
-
-    Mismo contrato que aplica_regla_sin_contrato: se dispara SOLO ante la
-    edicion explicita de ESTADO DEL CM (columna y valor ya resueltos por
-    on_item_edited de cada pantalla), nunca al cargar/recalcular el
-    DataFrame completo, y no hay regla inversa (pasar de 'Terminated' a
-    otro valor no reconstruye estos campos).
-
-    No debe confundirse con cm_bajas_service.py: esa deteccion es automatica
-    (desaparicion del VIN en el Excel mensual de 3PC) y no toca ningun campo
-    de PruebasFM. Esta regla es manual (el usuario elige 'Terminated' a
-    mano) y si limpia los campos, de inmediato.
-
-    Devuelve un dict {columna: '-'} a fusionar en pending_changes; {} si la
-    edicion no corresponde a este caso."""
-    if col_name != 'ESTADO DEL CM':
-        return {}
-    if str(new_value).strip().upper() != 'TERMINATED':
-        return {}
-    return {col: '-' for col in COLUMNAS_LIMPIEZA_TERMINATED_CM}
 
 
 def aplicar_cambios_pendientes(df, pending_changes):
@@ -1524,7 +1742,7 @@ def detectar_grupos_razon_social_duplicada(df):
     _elegir_razon_social_ganadora para el criterio de desempate cuando hay
     empate en unidades. No modifica `df`. Usado tanto por el botón manual
     "Unificar Razón Social" (Vista General -> pestaña Duplicados) como por
-    RMReporteSyncWorker (aplicado automáticamente en cada sincronización,
+    RMJaviSyncWorker (aplicado automáticamente en cada sincronización,
     23-09-2026, a pedido explícito) -- misma detección que
     GeneralModule._calcular_claves_duplicadas_rut_cdb, pero a nivel de fila
     (VIN) en vez de a nivel de cliente ya agrupado."""
@@ -1564,7 +1782,7 @@ def detectar_grupos_razon_social_duplicada(df):
 
     # Filas sin CDB (05-10-2026): si su RUT tiene un único CDB en el resto de la
     # base y su razón social no aparece con CDB en ningún lado, es el mismo
-    # cliente con otra grafía (ej. "CLIENTE EJEMPLO S.A." / "CLIENTE EJEMPLO SA") y se
+    # cliente con otra grafía (ej. "MAXAM CHILE S.A." / "MAXAM CHILE SA") y se
     # unifica con la razón social ganadora de ese RUT. No se rellena el CDB.
     base = df[[COL_RUT, COL_CDB, COL_RAZON_SOCIAL]].copy()
     for col in base.columns:
@@ -1624,12 +1842,22 @@ def resumen_clientes(df):
         'rut': df['RUT'].astype(str).str.strip(),
         'razon': razon,
     })
-    aux = aux[~aux['razon'].str.lower().isin(['', 'nan', 'none', '-'])]
+    aux = aux[~aux['razon'].str.lower().isin(['', 'nan', 'none', '-']) & aux['clave'].notna()]
+    # Una pasada sobre listas: value_counts por cliente tardaba ~0,3 ms por cliente
+    conteos, ruts, unidades = {}, {}, {}
+    for clave, rut, razon_txt in zip(aux['clave'].tolist(), aux['rut'].tolist(), aux['razon'].tolist()):
+        conteo = conteos.setdefault(clave, {})
+        if isinstance(razon_txt, str):
+            conteo[razon_txt] = conteo.get(razon_txt, 0) + 1
+        unidades[clave] = unidades.get(clave, 0) + 1
+        if clave not in ruts and rut_llave(rut):
+            ruts[clave] = rut
     filas = []
-    for clave, grupo in aux.groupby('clave', sort=False):
-        conteo = grupo['razon'].value_counts()
-        rut_txt = next((r for r in grupo['rut'] if rut_llave(r)), 'Sin RUT')
-        filas.append((clave, rut_txt, conteo.index[0], ', '.join(conteo.index[1:]) or '-', len(grupo)))
+    for clave, conteo in conteos.items():
+        if not conteo:
+            continue
+        razones = sorted(conteo, key=conteo.get, reverse=True)
+        filas.append((clave, ruts.get(clave, 'Sin RUT'), razones[0], ', '.join(razones[1:]) or '-', unidades[clave]))
     return pd.DataFrame(filas, columns=COLUMNAS_RESUMEN_CLIENTES) if filas else vacio
 
 
@@ -1678,6 +1906,48 @@ def cambios_rut_razon_cliente(df, clave, razon, nuevo_rut, nueva_razon=None):
         if nueva_razon:
             cambios['RAZÓN SOCIAL'] = str(nueva_razon).strip()
         lote[vin_limpio] = {'VIN': vin_limpio, 'cambios': cambios}
+    return lote
+
+
+def _cdb_serie(df):
+    """CDB como texto; '-' donde falta (vacío, nan o none)."""
+    texto = df['CDB'].fillna('').astype(str).str.strip()
+    return texto.where(~texto.str.lower().isin(['', 'nan', 'none']), '-')
+
+
+def cdbs_por_cliente(df):
+    """{clave de cliente: [(CDB, unidades)]}, de mayor a menor y con '-' (unidades
+    sin CDB) al final. Pensado para recibir los contratos actuales."""
+    if df is None or df.empty or not all(c in df.columns for c in ('RUT', 'RAZÓN SOCIAL', 'CDB')):
+        return {}
+    razon = df['RAZÓN SOCIAL'].astype(str).str.strip()
+    claves = clave_cliente_serie(df['RUT'], razon)
+    con_nombre = ~razon.str.lower().isin(['', 'nan', 'none', '-'])
+    conteos = {}
+    for clave, cdb in zip(claves[con_nombre].tolist(), _cdb_serie(df)[con_nombre].tolist()):
+        conteo = conteos.setdefault(clave, {})
+        conteo[cdb] = conteo.get(cdb, 0) + 1
+    return {clave: sorted(conteo.items(), key=lambda kv: (kv[0] == '-', -kv[1])) for clave, conteo in conteos.items()}
+
+
+def cambios_cdb_cliente(df, clave, cdb_origen, nuevo_cdb):
+    """Lote {VIN: {'VIN', 'cambios'}} que deja `nuevo_cdb` (1 a 10 dígitos) en
+    las unidades del cliente `clave` que tengan otro CDB. Con `cdb_origen`
+    ('-' para las que no tienen), solo las que hoy tienen ese CDB."""
+    if df is None or df.empty or not all(c in df.columns for c in ('RUT', 'RAZÓN SOCIAL', 'CDB', 'VIN')):
+        return {}
+    nuevo = str(nuevo_cdb).strip()
+    if not re.fullmatch(r'\d{1,10}', nuevo):
+        return {}
+    razon = df['RAZÓN SOCIAL'].astype(str).str.strip()
+    cdb = _cdb_serie(df)
+    mascara = (clave_cliente_serie(df['RUT'], razon) == clave) & (cdb != nuevo)
+    if cdb_origen is not None:
+        mascara &= cdb == cdb_origen
+    lote = {}
+    for vin in df.loc[mascara, 'VIN'].astype(str):
+        vin_limpio = vin.strip().upper()
+        lote[vin_limpio] = {'VIN': vin_limpio, 'cambios': {'CDB': nuevo}}
     return lote
 
 

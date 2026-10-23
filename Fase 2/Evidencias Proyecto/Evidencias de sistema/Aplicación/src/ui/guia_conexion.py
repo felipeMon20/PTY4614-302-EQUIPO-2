@@ -9,8 +9,8 @@ from src.ui import comercial_estilo as estilo_com
 
 _PASOS = (
     ("fa5s.cloud-download-alt", estilo_com.AZUL, "Trae la carpeta compartida a tu equipo",
-     "En Teams o SharePoint abre la carpeta de datos del equipo (la que contiene <b>RM_CONTRATOS.csv</b>) y pulsa "
-     "<b>Sincronizar</b>. Cuando termine, aparecerá en el Explorador de archivos bajo <b>Empresa Demo Group</b>."),
+     "En Teams o SharePoint abre la carpeta de datos del equipo (la que contiene <b>RM_JAVI.csv</b>) y pulsa "
+     "<b>Sincronizar</b>. Cuando termine, aparecerá en el Explorador de archivos bajo <b>Volvo Group</b>."),
     ("fa5s.check-circle", estilo_com.VERDE, "Déjala disponible sin internet",
      "En el Explorador, clic derecho sobre la carpeta y elige <b>Mantener siempre en este dispositivo</b>. "
      "Espera a que los archivos muestren la palomita verde."),

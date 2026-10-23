@@ -22,10 +22,10 @@ def _df_correos():
         "VIN": ["VIN_CON_CORREO", "VIN_SIN_CORREO"],
         "CHASIS": ["CHA1", "CHA2"],
         "RAZÓN SOCIAL": ["EMPRESA CON CORREO", "EMPRESA SIN CORREO"],
-        "RUT": ["31.423.846-1", "31.439.684-0"],
+        "RUT": ["11.111.111-1", "22.222.222-2"],
         "TIPO DE SERVICIO": ["FULL", "FULL"],
         "FECHA TERMINO": ["01-01-2027", "01-01-2027"],
-        "CORREO ELECTRÓNICO": ["contacto@empresa.example", ""],
+        "CORREO ELECTRÓNICO": ["contacto@empresa.cl", ""],
     })
 
 
@@ -137,10 +137,10 @@ class TestMailDialogPreseleccionDesdeGestionarCM(unittest.TestCase):
             "VIN": ["VIN_UNO", "VIN_DOS", "VIN_TRES"],
             "CHASIS": ["CHA1", "CHA2", "CHA3"],
             "RAZÓN SOCIAL": ["EMPRESA UNO", "EMPRESA DOS", "EMPRESA TRES"],
-            "RUT": ["31.423.846-1", "31.439.684-0", "31.447.603-9"],
+            "RUT": ["11.111.111-1", "22.222.222-2", "33.333.333-3"],
             "TIPO DE SERVICIO": ["FULL", "FULL", "FULL"],
             "FECHA TERMINO": ["01-01-2027", "01-01-2027", "01-01-2027"],
-            "CORREO ELECTRÓNICO": ["uno@empresa.example", "dos@empresa.example", "tres@empresa.example"],
+            "CORREO ELECTRÓNICO": ["uno@empresa.cl", "dos@empresa.cl", "tres@empresa.cl"],
         })
 
     def test_un_vin_preseleccionado_queda_marcado(self):

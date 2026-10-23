@@ -9,9 +9,9 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame,
                              QAbstractItemView, QTabBar, QMessageBox, QDialog,
                              QListWidget, QListWidgetItem, QDialogButtonBox, QApplication,
                              QMenu, QWidgetAction, QFileDialog, QComboBox, QCompleter,
-                             QGraphicsDropShadowEffect, QGridLayout, QScrollArea)
+                             QGraphicsDropShadowEffect, QGridLayout, QScrollArea, QTableWidget, QTableWidgetItem)
 from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QStandardPaths, QEvent, QPoint, QRect,
-                          QTimer, QPropertyAnimation, QEasingCurve, QUrl)
+                          QTimer, QPropertyAnimation, QEasingCurve, QUrl, QDate)
 from PyQt6.QtGui import QKeySequence, QFontMetrics, QColor, QFont, QDesktopServices
 from config.settings import REPORTE_NOTAS_VENTAS_URL
 from src.core.data_manager import DataManager
@@ -21,11 +21,13 @@ from src.core.constants import (COL_VIN, COL_ESTADO_COMERCIAL, VALOR_ESTADO_COME
                                 COL_RAZON_SOCIAL, COL_CDB_FLOTA, COL_RUT, COL_FLOTA_VC, COL_ID, COL_ESTADO_ACTIVACION,
                                 COL_CDB)
 from src.services import comercial_services, operaciones_services, contactos_service, ejecutivos_service
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui.contactos import AddContactoThread
 from src.ui.contactos_agregar import ContactosAddDialog
 from src.ui.guardado_overlay import mostrar_guardando, guardado_listo, terminar_guardando
 from src.ui.dialogo_accion import DialogoAccion
+from src.ui.selector_fecha import SelectorFecha
+from src.ui.ingresos_base import PantallaIngresosBase
 from src.ui import comercial_estilo as estilo_com
 from src.ui.transiciones import TransicionFundidoSubida
 from src.theme.theme_manager import ThemeManager
@@ -62,7 +64,7 @@ def _texto_cantidad(cantidad, participio):
 # reutilizan comercial_services.calcular_kpis_vigencia en vez de duplicar el
 # cálculo de vigencia de contrato.
 #
-# La tabla usa AppTableWidget + PandasTableModel -- el mismo componente
+# La tabla usa VolvoTableWidget + PandasTableModel -- el mismo componente
 # que "Vista Completa" de Comercial y Clientes y Flota -- para que todas
 # las tablas de la app compartan un único diseño.
 # =========================================================
@@ -70,8 +72,8 @@ def _texto_cantidad(cantidad, participio):
 # Activaciones y Sin Flota muestran las mismas 4 columnas (con ESTADO
 # COMERCIAL visible, a pedido explícito); Bajas conserva exactamente las
 # columnas que ya tenía (INICIO/TÉRMINO CONTRATO), sin tocarla.
-COLUMNAS_TABLA_ACTIVACIONES = ['VIN', 'FLOTA VC', 'CDB FLOTA', 'ESTADO COMERCIAL']
-COLUMNAS_TABLA_BAJAS = ['VIN', 'FLOTA VC', 'CDB FLOTA', 'INICIO CONTRATO', 'TÉRMINO CONTRATO']
+COLUMNAS_TABLA_ACTIVACIONES = ['VIN', 'FLOTA VC', 'CDB FLOTA', 'TIPO DE SERVICIO', 'FORMA DE CONTRATO', 'ESTADO COMERCIAL']
+COLUMNAS_TABLA_BAJAS = ['VIN', 'FLOTA VC', 'CDB FLOTA', 'TIPO DE SERVICIO', 'FORMA DE CONTRATO', 'INICIO CONTRATO', 'TÉRMINO CONTRATO']
 _COLUMNAS_POR_TAB = {
     0: COLUMNAS_TABLA_ACTIVACIONES,
     1: COLUMNAS_TABLA_ACTIVACIONES,
@@ -80,7 +82,8 @@ _COLUMNAS_POR_TAB = {
     4: COLUMNAS_TABLA_ACTIVACIONES,
 }
 ANCHOS_COLUMNAS_ACTIVACIONES = {
-    'VIN': 175, 'FLOTA VC': 220, 'CDB FLOTA': 110, 'CDB': 110, 'ESTADO COMERCIAL': 140,
+    'VIN': 175, 'FLOTA VC': 450, 'CDB FLOTA': 110, 'CDB': 110, 'ESTADO COMERCIAL': 140,
+    'TIPO DE SERVICIO': 150, 'FORMA DE CONTRATO': 140,
     'INICIO CONTRATO': 120, 'TÉRMINO CONTRATO': 120,
     'RUT': 130, 'UNIDADES': 110, 'VIGENTES': 110,
 }
@@ -98,6 +101,10 @@ def _es_latin1(texto):
         return True
     except UnicodeEncodeError:
         return False
+
+
+_FILTROS_EXTRA = (('FORMA DE CONTRATO', "Forma de contrato", 'fa5s.file-signature'),
+                  ('TIPO DE SERVICIO', "Tipo de servicio", 'fa5s.concierge-bell'))
 
 
 class BotonAccionOperaciones(estilo_com.BotonAccionRapida):
@@ -180,7 +187,7 @@ CAMPOS_DETALLE_ACTIVACIONES = [
 # Sub-pestañas con los campos CDB flota / Flota VC en el panel derecho
 SUBTABS_CON_DATOS_FLOTA = (0, 1, 4)
 
-# Índice de la sub-pestaña "Sin Flota" -- único lugar donde el consultor de operaciones debe
+# Índice de la sub-pestaña "Sin Flota" -- único lugar donde Luis debe
 # completar CDB/FLOTA VC antes de poder conectar una unidad (ver
 # _on_marcar_conectado_clicked/_actualizar_campos_sin_flota_visibles).
 IDX_SIN_FLOTA = 1
@@ -219,7 +226,7 @@ class OperacionesTableModel(PandasTableModel):
     siguen de solo lectura -- ese último solo cambia vía los botones
     "Marcar como...", nunca a mano, para no romper el alineamiento con
     ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ. En "Bajas" la edición queda
-    bloqueada igual (AppTableWidget.setEditTriggers(NoEditTriggers) en
+    bloqueada igual (VolvoTableWidget.setEditTriggers(NoEditTriggers) en
     esa sub-pestaña, ver _actualizar_seleccion_y_campos_sin_flota), así
     que estos flags nunca llegan a activarse ahí en la práctica."""
     _COLUMNAS_EDITABLES = {'FLOTA VC', 'CDB FLOTA'}
@@ -267,9 +274,7 @@ class OperacionesModule(QWidget):
         self._cola_full = {i: pd.DataFrame() for i in range(len(SUBTABS))}
         # Filtro adicional por cliente (botón "Filtrar"), por sub-pestaña.
         # None = sin filtro (se ven todos los clientes de esa cola).
-        self._filtro_cliente_seleccionado = {}
         # Solo para marcar el botón "Filtrar" mientras excluye clientes
-        self._filtro_activo = {}
         self._data_dirty = False
         self._vins_en_guardado = []
         self._vins_en_guardado_baja = []
@@ -349,7 +354,6 @@ class OperacionesModule(QWidget):
         # Detalle y acciones: panel flotante fuera del layout (la tabla usa
         # todo el ancho); aparece solo con alguna fila seleccionada
         self._panel_detalle = self._build_detalle_card()
-        self._panel_detalle.setParent(self)
         estilo_com.crear_sombra_panel(self._panel_detalle)
         self._panel_detalle.hide()
         self._panel_abierto = False
@@ -532,7 +536,7 @@ class OperacionesModule(QWidget):
         ("no_entregado", "Pendientes por no entrega", WARNING,
          "ESTADO DE ACTIVACIÓN ACTUAL = No entregado.", "falta la entrega"),
         ("sin_flota", "Pendientes por asignación de flota", DANGER,
-         "Unidades en la cola de Sin Flota (todavía no aparecen en Servicios Conectados).", "sin flota en VC"),
+         "Unidades en la cola de Sin Flota (todavía no aparecen en Volvo Connect).", "sin flota en VC"),
     ]
 
     _KPI_SPECS = {
@@ -542,7 +546,7 @@ class OperacionesModule(QWidget):
              "Unidades de la cola de Bajas: siguen Conectadas a la espera de la desconexión física.",
              "bajas por cerrar")],
         3: [("cdb_sin_contacto", "CDB sin contacto", DANGER,
-             "CDB de RM_CONTRATOS que no tienen ningún contacto en contactos.xlsx.",
+             "CDB de RM_JAVI que no tienen ningún contacto en contactos.xlsx.",
              "sin contacto registrado")],
         IDX_DATOS_FLOTA: [("conectados_vigentes", "Conectados y vigentes", PRIMARY,
                            "Contratos Vigentes cuya unidad está Conectada. FLOTA VC y CDB FLOTA se editan en el panel.",
@@ -635,7 +639,7 @@ class OperacionesModule(QWidget):
         layout_externo.addWidget(barra)
         layout_externo.addWidget(frame, stretch=1)
         top_row = QHBoxLayout(barra)
-        top_row.setContentsMargins(15, 12, 15, 12)
+        top_row.setContentsMargins(15, 7, 15, 7)
         top_row.setSpacing(8)
         self._barra_bandeja = barra
 
@@ -656,7 +660,7 @@ class OperacionesModule(QWidget):
         self.btn_exportar_vin_cdb.setIcon(ThemeManager.icon('fa5s.file-excel', color='white'))
         self.btn_exportar_vin_cdb.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_exportar_vin_cdb.setToolTip(
-            "Guarda en el Escritorio un Excel con VIN y CDB de la tabla visible\n"
+            "Guarda en el Escritorio un Excel con VIN, CDB y plan de la tabla visible\n"
             "(solo las filas seleccionadas, si hay alguna)."
         )
         self.btn_exportar_vin_cdb.clicked.connect(self._on_exportar_vin_cdb_clicked)
@@ -671,12 +675,40 @@ class OperacionesModule(QWidget):
         )
         self.btn_exportar_contactos.clicked.connect(self._on_exportar_contactos_clicked)
 
-        self.btn_filtrar = QPushButton()
-        self.btn_filtrar.setToolTip("Filtrar por cliente")
-        self.btn_filtrar.setIcon(ThemeManager.icon('fa5s.filter', color=TEXT_SECONDARY))
-        self.btn_filtrar.setCursor(Qt.CursorShape.PointingHandCursor)
-        estilo_com.aplicar_estilo_boton_barra(self.btn_filtrar, 'neutro')
-        self.btn_filtrar.clicked.connect(self._on_filtrar_clicked)
+        # Filtros por columna: mismo selector que Comercial, solo icono
+        self._selectores_filtro = {'cliente': estilo_com.SelectorFiltroPopup("Cliente", "Todos los clientes", 'fa5s.user-tie')}
+        for col, titulo, icono in _FILTROS_EXTRA:
+            self._selectores_filtro[col] = estilo_com.SelectorFiltroPopup(titulo, f"Todas ({titulo.lower()})", icono)
+        for selector in self._selectores_filtro.values():
+            selector.set_compacto(True)
+            selector.cambiado.connect(lambda _v, s=selector: self._on_filtro_cambiado(s))
+        self._orden_filtros = []
+        self.btn_limpiar_filtros = QPushButton()
+        self.btn_limpiar_filtros.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_limpiar_filtros.setIcon(ThemeManager.icon('fa5s.trash-alt', color=TEXT_SECONDARY))
+        self.btn_limpiar_filtros.setToolTip("Quitar los filtros")
+        self.btn_limpiar_filtros.clicked.connect(self._limpiar_filtros)
+
+        # Solo en Conectados: muestra las unidades sin Flota VC o CDB flota
+        self.btn_faltantes = QPushButton()
+        self.btn_faltantes.setCheckable(True)
+        self.btn_faltantes.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_faltantes.setIcon(ThemeManager.icon('fa5s.exclamation-triangle', color=TEXT_SECONDARY))
+        estilo_com.aplicar_estilo_boton_barra(self.btn_faltantes, 'neutro')
+        self.btn_faltantes.toggled.connect(self._on_faltantes_toggled)
+        self._solo_faltantes = False
+        self.btn_faltantes.hide()
+
+        # Solo en Conectados: rojo si un CDB flota tiene varias Flota VC; al pulsarlo filtra esas unidades
+        self.btn_cdb_varias = QPushButton()
+        self.btn_cdb_varias.setCheckable(True)
+        self.btn_cdb_varias.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cdb_varias.setIcon(ThemeManager.icon('fa5s.code-branch', color=TEXT_SECONDARY))
+        estilo_com.aplicar_estilo_boton_barra(self.btn_cdb_varias, 'neutro')
+        self.btn_cdb_varias.toggled.connect(self._on_cdb_varias_toggled)
+        self._solo_cdb_varias = False
+        self._cdb_varias_cantidad = 0
+        self.btn_cdb_varias.hide()
 
         # "Ampliar": oculta las tarjetas KPI para darle más alto a la tabla
         self.btn_ampliar = QPushButton()
@@ -713,20 +745,22 @@ class OperacionesModule(QWidget):
         top_row.addWidget(separador)
         top_row.addWidget(lbl_seccion)
         top_row.addStretch()
-        capsula = QFrame()
-        capsula.setStyleSheet("QFrame { background: rgba(255,255,255,0.08); border-radius: 14px; }")
-        lay_capsula = QHBoxLayout(capsula)
-        lay_capsula.setContentsMargins(5, 5, 5, 5)
-        lay_capsula.setSpacing(4)
-        for btn in (self.btn_exportar_vin_cdb, self.btn_exportar_contactos, self.btn_filtrar, self.btn_ampliar,
-                    self.btn_recargar):
-            btn.setFixedWidth(44)
-            lay_capsula.addWidget(btn)
-            estilo_com.preparar_boton_capsula(btn)
-        top_row.addWidget(capsula)
+        # Tres grupos con encabezado: filtros, acciones y generales
+        for titulo_grupo, botones in (
+                ("Filtros", (self.btn_limpiar_filtros, *self._selectores_filtro.values(), self.btn_faltantes, self.btn_cdb_varias)),
+                ("Acciones", (self.btn_exportar_vin_cdb, self.btn_exportar_contactos)),
+                ("Generales", (self.btn_ampliar, self.btn_recargar))):
+            grupo, lay_grupo = PantallaIngresosBase._crear_grupo_barra(titulo_grupo)
+            for btn in botones:
+                btn.setFixedWidth(44)
+                lay_grupo.addWidget(btn)
+                estilo_com.preparar_boton_capsula(btn)
+            top_row.addWidget(grupo)
+            grupo.show()
+        self.btn_limpiar_filtros.hide()
 
         # Mismo componente y estilo de tabla que la bandeja de Comercial
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         qss_tabla = estilo_com.QSS_TABLA + (
             "QHeaderView::section { background: #F7F8FC; color: #6B7A90; border-bottom: 1px solid #E3E8F0; }"
             "QTableView { alternate-background-color: #FFFFFF; }"
@@ -859,7 +893,7 @@ class OperacionesModule(QWidget):
         sola en la última fila, ocupa el ancho completo."""
         grilla = self._grilla_acciones
         botones = [self.btn_marcar_conectado, self.btn_marcar_sin_flota,
-                   self.btn_marcar_desconectado, self.btn_guardar_flota,
+                   self.btn_marcar_desconectado, self.btn_guardar_flota, self.btn_limpiar_flota,
                    self.btn_contactar_ejecutivo]
         for b in botones:
             grilla.removeWidget(b)
@@ -878,9 +912,12 @@ class OperacionesModule(QWidget):
         self.btn_marcar_sin_flota.setVisible(idx == 0)
         self.btn_marcar_desconectado.setVisible(idx == 2)
         self.btn_guardar_flota.setVisible(idx in SUBTABS_CON_DATOS_FLOTA)
+        self.btn_limpiar_flota.setVisible(idx == IDX_SIN_FLOTA)
         self._reubicar_acciones()
         self._bloque_datos_flota.setVisible(idx in SUBTABS_CON_DATOS_FLOTA)
         self.btn_exportar_vin_cdb.setVisible(idx != IDX_CONTACTOS)
+        self.btn_faltantes.setVisible(idx == IDX_DATOS_FLOTA)
+        self.btn_cdb_varias.setVisible(idx == IDX_DATOS_FLOTA)
         self._bloque_unidad.setVisible(idx != IDX_CONTACTOS)
         self._bloque_contacto.setVisible(idx == IDX_CONTACTOS)
         if idx != IDX_CONTACTOS:
@@ -901,6 +938,51 @@ class OperacionesModule(QWidget):
         self.model.solo_lectura = True
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
+    def _actualizar_boton_faltantes(self, cantidad):
+        self.btn_faltantes.setToolTip(
+            f"Muestra solo las {cantidad} unidad(es) sin Flota VC o CDB flota (\"SIN FLOTA\" y \"NO EXISTE EN VC\" cuentan como faltantes)."
+            if cantidad else "No hay unidades sin Flota VC ni CDB flota.")
+
+    def _on_faltantes_toggled(self, activo):
+        self._solo_faltantes = activo
+        if activo:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_faltantes, 'activo')
+            self.btn_faltantes.setIcon(ThemeManager.icon('fa5s.exclamation-triangle', color=estilo_com.PRIMARIO))
+        else:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_faltantes, 'neutro')
+            self.btn_faltantes.setIcon(ThemeManager.icon('fa5s.exclamation-triangle', color=TEXT_SECONDARY))
+        self._refrescar_tabla_actual()
+        if activo and self.model.get_df().empty:
+            self.btn_faltantes.setChecked(False)
+            QMessageBox.information(self, "Unidades sin flota", "Todas las unidades Conectadas tienen Flota VC y CDB flota.")
+
+    def _actualizar_boton_cdb_varias(self, cantidad):
+        self._cdb_varias_cantidad = cantidad
+        if self.btn_cdb_varias.isChecked():
+            return
+        if cantidad:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_cdb_varias, 'alerta')
+            self.btn_cdb_varias.setIcon(ThemeManager.icon('fa5s.code-branch', color=estilo_com.ROJO))
+            self.btn_cdb_varias.setToolTip(
+                f"{cantidad} unidad(es) tienen un CDB flota con más de una Flota VC. Click para mostrarlas.")
+        else:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_cdb_varias, 'neutro')
+            self.btn_cdb_varias.setIcon(ThemeManager.icon('fa5s.code-branch', color=TEXT_SECONDARY))
+            self.btn_cdb_varias.setToolTip("Ningún CDB flota tiene varias Flota VC.")
+
+    def _on_cdb_varias_toggled(self, activo):
+        self._solo_cdb_varias = activo
+        if activo:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_cdb_varias, 'activo')
+            self.btn_cdb_varias.setIcon(ThemeManager.icon('fa5s.code-branch', color=estilo_com.PRIMARIO))
+            self.btn_cdb_varias.setToolTip("Mostrando solo los CDB flota con varias Flota VC. Click para volver a todas.")
+        self._refrescar_tabla_actual()
+        if activo and self.model.get_df().empty:
+            self.btn_cdb_varias.setChecked(False)
+            QMessageBox.information(self, "CDB con varias flotas", "Ningún CDB flota tiene varias Flota VC en esta lista.")
+        elif not activo:
+            self._actualizar_boton_cdb_varias(self._cdb_varias_cantidad)
+
     def _refrescar_cola(self, idx):
         columnas_tab = _COLUMNAS_POR_TAB[idx]
         df = self.df_master
@@ -912,14 +994,7 @@ class OperacionesModule(QWidget):
             full = _FILTROS_POR_TAB[idx](df)
 
         cola_sin_filtrar = full
-        self._filtro_activo[idx] = False
-        col_filtro = self._columna_filtro(idx)
-        if not full.empty and col_filtro in full.columns:
-            seleccionados = self._filtro_cliente_seleccionado.get(idx)
-            if seleccionados is not None:
-                razones = full[col_filtro].astype(str).str.strip()
-                self._filtro_activo[idx] = not set(razones).issubset(seleccionados)
-                full = full[razones.isin(seleccionados)]
+        full = self._aplicar_filtros_columna(idx, full)
 
         # Búsqueda global (25-09-2026, pedido explícito): reutiliza
         # construir_mascara_busqueda, mismo mecanismo que comercial.py, sobre
@@ -934,7 +1009,7 @@ class OperacionesModule(QWidget):
         # primero las unidades con ESTADO COMERCIAL=Vigente (el caso que
         # antes vivía en "Conectividad"), el resto sin un criterio adicional
         # (queda en el orden que ya trae df_master). Solo se aplica cuando
-        # el consultor de operaciones no eligió ordenar manualmente una columna -- self.table.
+        # Luis no eligió ordenar manualmente una columna -- self.table.
         # apply_sort() más abajo respeta y sobreescribe este orden si hay uno
         # manual activo, igual que hace con cualquier otro orden previo.
         if idx == 0 and not full.empty and COL_ESTADO_COMERCIAL in full.columns:
@@ -942,9 +1017,20 @@ class OperacionesModule(QWidget):
             full = pd.concat([full[es_vigente], full[~es_vigente]]).reset_index(drop=True)
 
         # Conectados: primero las filas con Flota VC o CDB Flota faltante (arreglos urgentes)
-        if idx == IDX_DATOS_FLOTA and not full.empty:
-            pendiente = operaciones_services.mascara_flota_pendiente(full)
-            full = pd.concat([full[pendiente], full[~pendiente]]).reset_index(drop=True)
+        if idx == IDX_DATOS_FLOTA:
+            pendiente = operaciones_services.mascara_flota_pendiente(full) if not full.empty else None
+            self._actualizar_boton_faltantes(0 if pendiente is None else int(pendiente.sum()))
+            if pendiente is not None:
+                if self._solo_faltantes:
+                    full = full[pendiente].reset_index(drop=True)
+                else:
+                    full = pd.concat([full[pendiente], full[~pendiente]]).reset_index(drop=True)
+            varias = operaciones_services.mascara_cdb_con_varias_flotas(full) if not full.empty else None
+            self._actualizar_boton_cdb_varias(0 if varias is None else int(varias.sum()))
+            if varias is not None and self._solo_cdb_varias:
+                full = full[varias].reset_index(drop=True)
+                if COL_CDB_FLOTA in full.columns:
+                    full = full.sort_values([COL_CDB_FLOTA, COL_FLOTA_VC], kind="mergesort").reset_index(drop=True)
 
         self._cola_full[idx] = full
         self._actualizar_titulo_barra(idx, full)
@@ -958,7 +1044,7 @@ class OperacionesModule(QWidget):
         # sola vez con resizeRowsToContents() en vez de dejar el header en
         # modo ResizeToContents "vivo": ese modo recalcula el alto de TODAS
         # las filas en cada cambio (scroll, resize de columna, set_data),
-        # lo que con la sombra de AppTableWidget (QGraphicsDropShadowEffect)
+        # lo que con la sombra de VolvoTableWidget (QGraphicsDropShadowEffect)
         # se vuelve visiblemente lento. Fixed conserva la altura ya calculada
         # sin seguir recalculando.
         self.table.setWordWrap(True)
@@ -1056,13 +1142,12 @@ class OperacionesModule(QWidget):
     def _actualizar_estado_botones(self):
         idx = self.subtabs.currentIndex()
         cola_activa = self._cola_full.get(idx, pd.DataFrame())
-        self.btn_filtrar.setEnabled(not cola_activa.empty)
         self.btn_exportar_contactos.setEnabled(idx == 0 and not cola_activa.empty)
         self.btn_exportar_vin_cdb.setEnabled(not self.model.get_df().empty)
         # "Marcar como CONECTADO" tiene sentido en Activaciones y Sin Flota
         # (resolver la unidad hacia CONECTADO); "Marcar como SIN FLOTA" solo
         # en Activaciones (sacar de ahí una unidad que todavía no aparece en
-        # Servicios Conectados); "Marcar como DESCONECTADO" es exclusiva de Bajas.
+        # Volvo Connect); "Marcar como DESCONECTADO" es exclusiva de Bajas.
         # No depende solo de la señal selectionChanged: al cambiar de
         # sub-pestaña el modelo se reemplaza y la selección previa queda
         # obsoleta, así que se recalcula explícitamente para no dejar el
@@ -1071,11 +1156,8 @@ class OperacionesModule(QWidget):
         self.btn_marcar_sin_flota.setEnabled(idx == 0 and bool(self._get_selected_vins()))
         self.btn_marcar_desconectado.setEnabled(idx == 2 and bool(self._obtener_vins_baja_seleccionados()))
         self.btn_guardar_flota.setEnabled(self._flota_editable(self._get_selected_vins(), idx))
+        self.btn_limpiar_flota.setEnabled(idx == IDX_SIN_FLOTA and bool(self._get_selected_vins()))
         self.btn_contactar_ejecutivo.setEnabled(idx != IDX_CONTACTOS and bool(self._get_selected_vins()))
-        # "Filtrar" se marca mientras haya clientes excluidos en esta sub-pestaña
-        variante = 'activo' if self._filtro_activo.get(idx) else 'neutro'
-        if self.btn_filtrar.property('variante_barra') != variante:
-            estilo_com.aplicar_estilo_boton_barra(self.btn_filtrar, variante)
 
     # ---------------------------------------------------------------
     # ACCIÓN: "Contactar ejecutivo" -- borrador de Outlook (sin enviar) para
@@ -1097,11 +1179,9 @@ class OperacionesModule(QWidget):
             '<tr>' + ''.join(f'<td style="{estilo_td}">{celda(f.get(c, ""))}</td>' for _, c in columnas) + '</tr>'
             for f in filas
         )
-        plural = len(filas) > 1
         primer_nombre = str(nombre).split()[0] if str(nombre).strip() else ''
         return (
             f"<p>Hola {html_escape(primer_nombre)},</p>"
-            f"<p>Te escribo desde Operaciones por {'las siguientes unidades asociadas' if plural else 'la siguiente unidad asociada'} a tu cartera:</p>"
             f'<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:12px;">'
             f"<tr>{encabezado}</tr>{cuerpo}</table>"
             "<p>Quedo atento a tus comentarios.</p><p>Saludos</p>"
@@ -1269,6 +1349,7 @@ class OperacionesModule(QWidget):
         self.btn_marcar_sin_flota.setEnabled(idx == 0 and bool(vins))
         self.btn_marcar_desconectado.setEnabled(idx == 2 and bool(self._obtener_vins_baja_seleccionados()))
         self.btn_guardar_flota.setEnabled(self._flota_editable(vins, idx))
+        self.btn_limpiar_flota.setEnabled(idx == IDX_SIN_FLOTA and bool(vins))
         self.btn_contactar_ejecutivo.setEnabled(bool(vins))
 
         self._mostrar_panel(bool(vins))
@@ -1303,109 +1384,45 @@ class OperacionesModule(QWidget):
     def _columna_filtro(idx):
         return COL_FLOTA_VC if idx == IDX_CONTACTOS else 'RAZÓN SOCIAL'
 
-    def _on_filtrar_clicked(self):
-        idx = self.subtabs.currentIndex()
-        df_full = self._cola_full.get(idx, pd.DataFrame())
-        col_filtro = self._columna_filtro(idx)
-        if df_full.empty or col_filtro not in df_full.columns:
-            QMessageBox.information(self, "Filtrar", "No hay clientes para filtrar en esta pestaña.")
-            return
+    def _aplicar_filtros_columna(self, idx, full):
+        """Cada filtro ofrece solo los valores que existen con lo elegido en los
+        demás; luego deja las filas que cumplen todos."""
+        columnas = {'cliente': self._columna_filtro(idx), **{c: c for c, _t, _i in _FILTROS_EXTRA}}
+        series = {k: (full[c].astype(str).str.strip() if not full.empty and c in full.columns else None)
+                  for k, c in columnas.items()}
+        for clave, selector in self._selectores_filtro.items():
+            if series[clave] is None:
+                selector.set_opciones([])
+                continue
+            mascara = pd.Series(True, index=full.index)
+            for otra, otro in self._selectores_filtro.items():
+                if otra != clave and series[otra] is not None and otro.valor() is not None:
+                    mascara &= series[otra] == otro.valor()
+            conteo = series[clave][mascara].value_counts()
+            items = [(v, f"{v} ({n})") for v, n in sorted(conteo.items()) if v and v.lower() not in ('-', 'nan', 'none')]
+            selector.set_opciones([(None, items)])
+        self._orden_filtros[:] = [s for s in self._orden_filtros if s.valor() is not None]
+        mascara = pd.Series(True, index=full.index)
+        for clave, selector in self._selectores_filtro.items():
+            if series[clave] is not None and selector.valor() is not None:
+                mascara &= series[clave] == selector.valor()
+        self.btn_limpiar_filtros.setVisible(any(s.valor() is not None for s in self._selectores_filtro.values()))
+        return full[mascara]
 
-        opciones = sorted({
-            str(v).strip() for v in df_full[col_filtro]
-            if str(v).strip() and str(v).strip().lower() not in ('nan', 'none')
-        })
-        seleccionados = self._filtro_cliente_seleccionado.get(idx, set(opciones))
-        self._mostrar_menu_filtro_cliente(idx, opciones, seleccionados)
+    def _on_filtro_cambiado(self, selector):
+        estilo_com.encadenar_filtros(self._orden_filtros, selector)
+        self._refrescar_tabla_actual()
 
-    def _mostrar_menu_filtro_cliente(self, idx, opciones, seleccionados):
-        menu = QMenu(self)
-        menu.setStyleSheet(f"QMenu {{ background-color: {SURFACE}; border: 1px solid {BORDER}; border-radius: 8px; padding: 3px; }}")
-
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
-
-        lbl_title = QLabel("Filtrar por cliente")
-        lbl_title.setStyleSheet(f"font-size: 10px; font-weight: bold; color: {TEXT_SECONDARY};")
-        layout.addWidget(lbl_title)
-
-        search_edit = QLineEdit()
-        search_edit.setPlaceholderText("Buscar...")
-        search_edit.setFixedHeight(24)
-        ThemeManager.apply_search_bar(search_edit)
-        layout.addWidget(search_edit)
-
-        list_widget = QListWidget()
-        list_widget.setFixedWidth(230)
-        list_widget.setMaximumHeight(220)
-
-        item_todos = QListWidgetItem("Todos")
-        item_todos.setFlags(item_todos.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-        item_todos.setCheckState(Qt.CheckState.Checked if opciones and len(seleccionados) == len(opciones) else Qt.CheckState.Unchecked)
-        list_widget.addItem(item_todos)
-
-        valor_items = []
-        for valor in opciones:
-            item = QListWidgetItem(valor)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Checked if valor in seleccionados else Qt.CheckState.Unchecked)
-            list_widget.addItem(item)
-            valor_items.append(item)
-
-        def _on_item_changed(changed_item):
-            list_widget.blockSignals(True)
-            if changed_item is item_todos:
-                state = item_todos.checkState()
-                for it in valor_items:
-                    it.setCheckState(state)
-            else:
-                todo_marcado = all(it.checkState() == Qt.CheckState.Checked for it in valor_items)
-                item_todos.setCheckState(Qt.CheckState.Checked if todo_marcado else Qt.CheckState.Unchecked)
-            list_widget.blockSignals(False)
-
-        list_widget.itemChanged.connect(_on_item_changed)
-
-        def _on_search_text(text):
-            texto = text.strip().lower()
-            for it in valor_items:
-                it.setHidden(texto not in it.text().lower())
-
-        search_edit.textChanged.connect(_on_search_text)
-        layout.addWidget(list_widget)
-
-        btn_row = QHBoxLayout()
-        btn_limpiar = QPushButton("Limpiar")
-        ThemeManager.apply_danger_button(btn_limpiar)
-        btn_aplicar = QPushButton("Aplicar")
-        ThemeManager.apply_primary_button(btn_aplicar)
-        btn_row.addWidget(btn_limpiar)
-        btn_row.addWidget(btn_aplicar)
-        layout.addLayout(btn_row)
-
-        def _limpiar():
-            self._filtro_cliente_seleccionado[idx] = set(opciones)
-            self._refrescar_tabla_actual()
-            menu.close()
-
-        def _aplicar():
-            seleccion_actual = {it.text() for it in valor_items if it.checkState() == Qt.CheckState.Checked}
-            self._filtro_cliente_seleccionado[idx] = seleccion_actual
-            self._refrescar_tabla_actual()
-            menu.close()
-
-        btn_limpiar.clicked.connect(_limpiar)
-        btn_aplicar.clicked.connect(_aplicar)
-
-        action_widget = QWidgetAction(menu)
-        action_widget.setDefaultWidget(container)
-        menu.addAction(action_widget)
-
-        menu.exec(self.btn_filtrar.mapToGlobal(self.btn_filtrar.rect().bottomLeft()))
+    def _limpiar_filtros(self):
+        for selector in self._selectores_filtro.values():
+            selector.blockSignals(True)
+            selector.limpiar()
+            selector.blockSignals(False)
+        self._orden_filtros.clear()
+        self._refrescar_tabla_actual()
 
     # ---------------------------------------------------------------
-    # BOTÓN "Exportar contactos" -- pedido de la contraparte comercial: darle al ejecutivo
+    # BOTÓN "Exportar contactos" -- pedido de Javiera: darle al ejecutivo
     # los datos de contacto de los clientes de Activaciones. Se resuelve
     # como un Excel descargable (no hay definición de a quién/cómo
     # entregarlo automáticamente), cruzando por CDB contra Contactos.xlsx
@@ -1456,14 +1473,15 @@ class OperacionesModule(QWidget):
     # ---------------------------------------------------------------
     def _on_exportar_vin_cdb_clicked(self):
         df_visible = self.model.get_df()
-        columnas = [c for c in ('VIN', 'CDB FLOTA') if c in df_visible.columns]
+        columnas = [c for c in ('VIN', 'CDB FLOTA', 'TIPO DE SERVICIO') if c in df_visible.columns]
         if df_visible.empty or not columnas:
             QMessageBox.information(self, "Exportar VIN & CDB", "No hay unidades para exportar.")
             return
 
         filas = sorted({i.row() for i in self.table.selectionModel().selectedRows()})
         df_export = df_visible.iloc[filas] if filas else df_visible
-        df_export = df_export[columnas]
+        df_export = df_export[columnas].rename(columns={'TIPO DE SERVICIO': 'PLAN'})
+        columnas = list(df_export.columns)
 
         pestana = self.subtabs.tabText(self.subtabs.currentIndex()).strip().replace(" ", "_")
         carpeta = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
@@ -1489,7 +1507,9 @@ class OperacionesModule(QWidget):
     # acciones rápidas de Comercial)
     # ---------------------------------------------------------------
     def _build_detalle_card(self):
-        frame = QFrame()
+        # Nace colgado del módulo: armarlo suelto y moverlo después le
+        # reaplicaba los estilos a todo el panel
+        frame = QFrame(self)
         frame.setObjectName("accionesRapidasComercial")
         frame.setStyleSheet(estilo_com.QSS_PANEL_FLOTANTE)
         marco = QVBoxLayout(frame)
@@ -1553,19 +1573,21 @@ class OperacionesModule(QWidget):
 
         self.btn_marcar_conectado = BotonAccionOperaciones(
             'fa5s.check-circle', 'Conectado',
-            "La unidad queda CONECTADA y su estado comercial pasa a Vigente.", estilo_com.AZUL, self._bloque_unidad)
+            "La unidad queda CONECTADA y su estado comercial pasa a Vigente. Si estaba en Activación Pendiente, "
+            "se pide la fecha de activación en Volvo Connect como inicio del contrato; la duración se completa en Comercial.",
+            estilo_com.AZUL, self._bloque_unidad)
         self.btn_marcar_conectado.setEnabled(False)
         self.btn_marcar_conectado.clicked.connect(self._on_marcar_conectado_clicked)
 
         # "Marcar como SIN FLOTA" (24-09-2026, a pedido explícito): saca de
-        # Activaciones una unidad que todavía no aparece en Servicios Conectados;
+        # Activaciones una unidad que todavía no aparece en Volvo Connect;
         # solo tiene sentido en Activaciones (idx 0, ver
         # _actualizar_estado_botones/_on_seleccion_cambiada) -- una unidad
         # en Sin Flota ya está SIN FLOTA, no tiene caso volver a marcarla.
         # Mismo color que "Marcar como DESCONECTADO" (29-09-2026, a pedido explícito).
         self.btn_marcar_sin_flota = BotonAccionOperaciones(
             'fa5s.truck-loading', 'Sin flota',
-            "Todavía no aparece en Servicios Conectados: sale de Activaciones.", estilo_com.ROJO, self._bloque_unidad)
+            "Todavía no aparece en Volvo Connect: sale de Activaciones.", estilo_com.ROJO, self._bloque_unidad)
         self.btn_marcar_sin_flota.setEnabled(False)
         self.btn_marcar_sin_flota.clicked.connect(self._on_marcar_sin_flota_clicked)
 
@@ -1585,6 +1607,13 @@ class OperacionesModule(QWidget):
             "Guarda la Flota VC y el CDB flota escritos arriba; el contrato no cambia de estado.", estilo_com.AZUL, self._bloque_unidad)
         self.btn_guardar_flota.setEnabled(False)
         self.btn_guardar_flota.clicked.connect(self._on_guardar_flota_clicked)
+
+        self.btn_limpiar_flota = BotonAccionOperaciones(
+            'fa5s.eraser', 'Limpiar flota',
+            "Deja Flota VC y CDB flota en \"-\" en todas las unidades seleccionadas, sean o no de la misma empresa.",
+            estilo_com.ROJO, self._bloque_unidad)
+        self.btn_limpiar_flota.setEnabled(False)
+        self.btn_limpiar_flota.clicked.connect(self._on_limpiar_flota_clicked)
 
         self.btn_contactar_ejecutivo = BotonAccionOperaciones(
             'fa5s.envelope', 'Contactar ejecutivo',
@@ -1702,15 +1731,29 @@ class OperacionesModule(QWidget):
         self._completer_flota.model().setStringList(sorted({f for lista in por_cdb.values() for f in lista}))
         cdb = flota = ''
         placeholder = "Sin cambios"
+        mezcladas = len(vins) > 1 and not self._vins_misma_empresa(vins, self.subtabs.currentIndex())
+        cola = self._cola_full.get(self.subtabs.currentIndex(), pd.DataFrame())
         if len(vins) == 1:
-            cola = self._cola_full.get(self.subtabs.currentIndex(), pd.DataFrame())
             if not cola.empty:
                 fila = cola[cola['VIN'].astype(str).str.strip().str.upper() == vins[0].strip().upper()]
                 if not fila.empty:
                     cdb = self._texto_flota_limpio(fila.iloc[0].get(COL_CDB_FLOTA))
                     flota = self._texto_flota_limpio(fila.iloc[0].get(COL_FLOTA_VC))
             placeholder = "Sin dato"
-        mezcladas = len(vins) > 1 and not self._vins_misma_empresa(vins, self.subtabs.currentIndex())
+        elif not mezcladas and not cola.empty:
+            # Varias unidades de una misma empresa: si todas traen el mismo
+            # valor, el panel lo muestra en vez de quedar en blanco.
+            claves = {v.strip().upper() for v in vins}
+            filas = cola[cola['VIN'].astype(str).str.strip().str.upper().isin(claves)]
+            if len(filas) == len(claves):
+                cdbs = {self._texto_flota_limpio(v) for v in filas[COL_CDB_FLOTA]}
+                flotas = {self._texto_flota_limpio(v) for v in filas[COL_FLOTA_VC]}
+                if len(cdbs) == 1:
+                    cdb = next(iter(cdbs))
+                if len(flotas) == 1:
+                    flota = next(iter(flotas))
+                if len(cdbs) > 1 or len(flotas) > 1:
+                    placeholder = "Varios valores"
         if mezcladas:
             placeholder = "Una sola empresa"
         self.txt_cdb_flota.setPlaceholderText(placeholder)
@@ -1929,6 +1972,98 @@ class OperacionesModule(QWidget):
             ).exec()
         return abiertos
 
+    def _confirmar_conexion(self, filas, vins, idx, pendientes):
+        """Panel de confirmación de "Conectado": tabla con el CDB flota y la
+        Flota VC que quedarán en cada unidad y, si hay unidades en Activación
+        Pendiente, la fecha de activación en Volvo Connect (será su inicio de
+        contrato). Devuelve la fecha DD-MM-YYYY ('' si no se pidió fecha) o
+        None si se cancela."""
+        n = len(vins)
+        sin_duracion = [v for v in pendientes if operaciones_services.duracion_sin_dato(filas[v])]
+        con_fecha = [v for v in pendientes if str(filas[v].get('INICIO CONTRATO', '')).strip().upper() not in ('', '-', 'NAN', 'NAT')]
+
+        if pendientes:
+            descripcion = (f"{'La unidad estaba' if len(pendientes) == 1 else f'{len(pendientes)} unidades estaban'} en Activación Pendiente. "
+                           "Indica la fecha en que se activó en Volvo Connect: será el inicio del contrato.")
+            if con_fecha:
+                descripcion += f" Reemplaza el inicio que ya tienen {len(con_fecha)} de ellas."
+        else:
+            descripcion = "Revisa el CDB flota y la Flota VC que quedarán en cada unidad antes de conectar."
+
+        cuerpo = QWidget()
+        cuerpo.setStyleSheet("background: transparent; border: none;")
+        lay = QVBoxLayout(cuerpo)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+
+        selector = None
+        if pendientes:
+            etiqueta = QLabel("Fecha de activación en Volvo Connect")
+            etiqueta.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 12px; font-weight: bold;")
+            lay.addWidget(etiqueta)
+            selector = SelectorFecha(QDate.currentDate(), QDate.currentDate())
+            lay.addWidget(selector, alignment=Qt.AlignmentFlag.AlignLeft)
+            if sin_duracion:
+                aviso = QLabel(
+                    f"{'1 unidad no tiene' if len(sin_duracion) == 1 else f'{len(sin_duracion)} unidades no tienen'} duración: "
+                    "el término del contrato no se calculará hasta que Comercial la complete.")
+                aviso.setWordWrap(True)
+                aviso.setStyleSheet(f"color: {WARNING}; font-size: 12px; font-weight: bold;")
+                lay.addWidget(aviso)
+            lay.addSpacing(4)
+
+        titulo_tabla = QLabel(f"Unidades a conectar ({n})")
+        titulo_tabla.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 12px; font-weight: bold;")
+        lay.addWidget(titulo_tabla)
+
+        tabla = QTableWidget(n, 3)
+        tabla.setHorizontalHeaderLabels(["VIN", "CDB flota", "Flota VC"])
+        tabla.verticalHeader().hide()
+        tabla.verticalHeader().setDefaultSectionSize(32)
+        tabla.setShowGrid(False)
+        tabla.setAlternatingRowColors(True)
+        tabla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        tabla.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        tabla.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        tabla.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tabla.setTextElideMode(Qt.TextElideMode.ElideRight)
+        tabla.setWordWrap(False)
+        cab = tabla.horizontalHeader()
+        cab.setHighlightSections(False)
+        cab.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        cab.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        cab.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        cab.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        tabla.setColumnWidth(0, 175)
+        tabla.setColumnWidth(1, 110)
+        tabla.setStyleSheet(f"""
+            QTableWidget {{ background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: 1px solid #E3E8F0;
+                            border-radius: 10px; color: {TEXT_PRIMARY}; font-size: 12px; outline: none; }}
+            QTableWidget::item {{ padding: 0 10px; border: none; }}
+            QHeaderView::section {{ background-color: #F3F5F9; color: {TEXT_SECONDARY}; font-size: 11px; font-weight: bold;
+                                    border: none; border-bottom: 1px solid #E3E8F0; padding: 6px 10px; text-align: left; }}
+        """)
+        for fila_i, v in enumerate(vins):
+            cdb_v, flota_v = self._flota_efectiva(v, idx)
+            for col, texto in enumerate((v.strip().upper(), cdb_v, flota_v)):
+                celda = QTableWidgetItem(texto)
+                celda.setToolTip(texto)
+                celda.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                tabla.setItem(fila_i, col, celda)
+        tabla.setFixedHeight(min(262, 44 + 32 * n))
+        lay.addWidget(tabla)
+
+        dialogo = DialogoAccion(
+            self, " Confirmar conexión",
+            icon_name="fa5s.calendar-check" if pendientes else "fa5s.check-circle", icon_color=PRIMARY, icon_bg_color="#DBEAFE",
+            titulo="Fecha de inicio del contrato" if pendientes else "Confirmar conexión", subtitulo=None, descripcion=descripcion,
+            botones=[{'texto': 'Cancelar', 'clase': 'secondary', 'rol': 'reject'},
+                     {'texto': 'Conectar', 'clase': 'primary', 'rol': 'accept'}],
+            widget_extra=cuerpo, ancho=640)
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return selector.date().toString("dd-MM-yyyy") if selector is not None else ''
+
     def _on_marcar_conectado_clicked(self):
         idx = self.subtabs.currentIndex()
         vins = self._solo_contratos_abiertos(self._get_selected_vins(), idx)
@@ -1953,7 +2088,6 @@ class OperacionesModule(QWidget):
             ).exec()
             return
 
-        self._vins_en_guardado = vins
         # Cada VIN recalcula su propia ETAPA GESTIÓN con la matriz de
         # negocio (ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ, ver
         # operaciones_services.calcular_cambios_marcar_conectado) en vez de
@@ -1961,13 +2095,27 @@ class OperacionesModule(QWidget):
         # el riesgo detectado 24-09-2026 (ETAPA GESTIÓN transitoria e
         # inconsistente con la matriz si no se recalcula aquí).
         cola = self._cola_full.get(idx, pd.DataFrame())
+        filas = {}
+        for v in vins:
+            fila = cola[cola['VIN'].astype(str).str.strip().str.upper() == v.strip().upper()]
+            filas[v.strip().upper()] = fila.iloc[0].to_dict() if not fila.empty else {}
+
+        # Unidades en Activación Pendiente: su inicio de contrato es la fecha
+        # en que se activan en Volvo Connect, que elige quien conecta.
+        pendientes = [v for v, f in filas.items() if operaciones_services.es_activacion_pendiente(f)]
+        fecha_inicio = self._confirmar_conexion(filas, vins, idx, pendientes)
+        if fecha_inicio is None:
+            return
+        fecha_inicio = fecha_inicio or None
+
+        self._vins_en_guardado = vins
         changes = {}
         for v in vins:
             v_upper = v.strip().upper()
-            fila = cola[cola['VIN'].astype(str).str.strip().str.upper() == v_upper]
-            fila_dict = fila.iloc[0].to_dict() if not fila.empty else {}
+            fila_dict = filas[v_upper]
             cdb_v, flota_vc_v = self._flota_efectiva(v, idx)
-            cambios = operaciones_services.calcular_cambios_marcar_conectado(fila_dict, cdb=cdb_v, flota_vc=flota_vc_v)
+            cambios = operaciones_services.calcular_cambios_marcar_conectado(
+                fila_dict, cdb=cdb_v, flota_vc=flota_vc_v, fecha_inicio=fecha_inicio)
             changes[v_upper] = {'VIN': v.strip(), 'cambios': cambios}
         comercial_services.agregar_id_a_cambios(changes, self.df_master)
 
@@ -2008,7 +2156,7 @@ class OperacionesModule(QWidget):
 
     # ---------------------------------------------------------------
     # ACCIÓN: "Marcar como SIN FLOTA" (24-09-2026, a pedido explícito) --
-    # para camiones que todavía no aparecen en Servicios Conectados. Solo tiene
+    # para camiones que todavía no aparecen en Volvo Connect. Solo tiene
     # sentido en Activaciones (idx 0, ver _actualizar_estado_botones); saca
     # la unidad de Activaciones (ya no cumple ESTADO DE ACTIVACIÓN ACTUAL en
     # {Activando, No entregado}) y, según ESTADO_COMERCIAL_ACTIVACION_
@@ -2162,6 +2310,45 @@ class OperacionesModule(QWidget):
             terminar_guardando(self)
         else:
             self.btn_guardar_flota.setEnabled(bool(self._get_selected_vins()))
+            terminar_guardando(self, exito=False)
+            DialogoAccion.error(self, MENSAJE_ERROR_GUARDADO).exec()
+
+    def _on_limpiar_flota_clicked(self):
+        """"Limpiar flota" (Sin Flota): Flota VC y CDB flota quedan en "-" en
+        todas las unidades seleccionadas, sin exigir que sean de la misma empresa."""
+        vins = self._get_selected_vins()
+        if not vins:
+            return
+        if QMessageBox.question(
+                self, "Limpiar flota",
+                f"Flota VC y CDB flota quedarán en \"-\" en {len(vins)} unidad(es). ¿Continuar?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        changes = {v.strip().upper(): {'VIN': v.strip(), 'cambios': {COL_FLOTA_VC: '-', COL_CDB_FLOTA: '-'}} for v in vins}
+        comercial_services.agregar_id_a_cambios(changes, self.df_master)
+        self._cambios_en_guardado_flota = changes
+
+        self.btn_limpiar_flota.setEnabled(False)
+        self.btn_limpiar_flota.setText("  Guardando...")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        mostrar_guardando(self, "Limpiando datos de flota…")
+        self.save_thread_flota = SaveExcelThread(self.writer, changes, module_name="Operaciones")
+        self.save_thread_flota.finished_signal.connect(self._on_limpiar_flota_finished)
+        self.save_thread_flota.start()
+
+    def _on_limpiar_flota_finished(self, success):
+        QApplication.restoreOverrideCursor()
+        self.btn_limpiar_flota.setText('Limpiar flota')
+        if success:
+            guardado_listo(self)
+            dm = self.data_manager
+            if not dm.df_master.empty:
+                dm.df_master = comercial_services.aplicar_cambios_pendientes(dm.df_master, self._cambios_en_guardado_flota)
+            self.load_data()
+            dm.data_ready.emit()
+            terminar_guardando(self)
+        else:
+            self.btn_limpiar_flota.setEnabled(bool(self._get_selected_vins()))
             terminar_guardando(self, exito=False)
             DialogoAccion.error(self, MENSAJE_ERROR_GUARDADO).exec()
 

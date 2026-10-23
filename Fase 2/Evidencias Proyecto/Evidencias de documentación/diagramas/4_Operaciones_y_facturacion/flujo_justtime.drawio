@@ -1,0 +1,194 @@
+<mxfile host="65bd71144e">
+    <diagram id="justtime" name="JustTime">
+        <mxGraphModel dx="608" dy="1749" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1250" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;whiteSpace=wrap;html=1;fontFamily=Helvetica;align=left;verticalAlign=middle;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;JustTime: ciclo del estado y pantalla de revisión&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Cómo cambia el estado JustTime de una unidad y cómo se corrigen las inconsistencias&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="950" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley0" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pantalla" vertex="1">
+                    <mxGeometry height="36" width="150" x="1000" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Acción del usuario" vertex="1">
+                    <mxGeometry height="36" width="150" x="1165" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Sistema" vertex="1">
+                    <mxGeometry height="36" width="150" x="1330" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Fuera de la app" vertex="1">
+                    <mxGeometry height="36" width="150" x="1495" y="-125" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;" value="Decisión" vertex="1">
+                    <mxGeometry height="46" width="110" x="1660" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ley_ini" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="1790" y="-134" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_ciclo" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;horizontal=0;" value="Ciclo del estado" vertex="1">
+                    <mxGeometry height="400" width="40" x="20" y="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_ciclo" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F6FBF5;strokeColor=#82b366;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="400" width="2010" x="60" y="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="carril_pant" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=16;horizontal=0;" value="Pantalla JustTime" vertex="1">
+                    <mxGeometry height="480" width="40" x="20" y="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="fondo_pant" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#FAF7FC;strokeColor=#9673a6;dashed=1;" value="" vertex="1">
+                    <mxGeometry height="480" width="2010" x="70" y="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="i1" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="148" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_nace" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Nace la unidad (alta, Provisiones o contrato nuevo) con tipo de facturación Cliente o Interno" vertex="1">
+                    <mxGeometry height="110" width="260" x="170" y="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_fechas" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Con estado Pendiente, Si o Revisar pago las fechas se calculan solas: inicio = día 1 del mes de inicio de contrato; término = inicio + duración. No se editan a mano" vertex="1">
+                    <mxGeometry height="130" width="290" x="170" y="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="st_pend" parent="1" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#FEF3C7;strokeColor=#92400E;fontColor=#92400E;strokeWidth=3;shadow=1;fontSize=14;fontStyle=1;" value="Pendiente" vertex="1">
+                    <mxGeometry height="70" width="170" x="510" y="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="f_jt" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Javiera crea el contrato en JustTime (sistema externo) y lo confirma a mano" vertex="1">
+                    <mxGeometry height="110" width="260" x="730" y="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="st_si" parent="1" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#D1FAE5;strokeColor=#065F46;fontColor=#065F46;strokeWidth=3;shadow=1;fontSize=14;fontStyle=1;" value="Si (En JustTime)" vertex="1">
+                    <mxGeometry height="70" width="210" x="1050" y="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="st_rev" parent="1" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#EDE9FE;strokeColor=#5B21B6;fontColor=#5B21B6;strokeWidth=3;shadow=1;fontSize=14;fontStyle=1;" value="Revisar pago" vertex="1">
+                    <mxGeometry height="70" width="190" x="1370" y="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="st_elim" parent="1" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#FEE2E2;strokeColor=#991B1B;fontColor=#991B1B;strokeWidth=3;shadow=1;fontSize=14;fontStyle=1;" value="Eliminar" vertex="1">
+                    <mxGeometry height="70" width="210" x="1050" y="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="st_no" parent="1" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#EEF1F6;strokeColor=#52607A;fontColor=#52607A;strokeWidth=3;shadow=1;fontSize=14;fontStyle=1;" value="-" vertex="1">
+                    <mxGeometry height="70" width="170" x="510" y="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_rev" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Se pone a mano para revisar el pago antes de sacar la unidad de JustTime (ej. una Provisión que pasa a cobrarse por CM)" vertex="1">
+                    <mxGeometry height="120" width="300" x="1600" y="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_elim" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ECEFF1;strokeColor=#607D8B;dashed=1;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Javiera elimina el contrato en JustTime" vertex="1">
+                    <mxGeometry height="90" width="230" x="760" y="320" as="geometry"/>
+                </mxCell>
+                <mxCell id="i2" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#60a917;strokeColor=#2D7600;fontColor=#FFFFFF;fontStyle=1;fontSize=11;strokeWidth=2;" value="INICIO" vertex="1">
+                    <mxGeometry height="54" width="54" x="100" y="518" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Ingresos y Conciliación › JustTime: empresas con unidades" vertex="1">
+                    <mxGeometry height="90" width="230" x="170" y="500" as="geometry"/>
+                </mxCell>
+                <mxCell id="s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Arma el universo: unidades (contrato actual) cuyo tipo de facturación va a JustTime, o con algún estado distinto de «-». Deja fuera los contratos finalizados sin estado" vertex="1">
+                    <mxGeometry height="120" width="300" x="440" y="485" as="geometry"/>
+                </mxCell>
+                <mxCell id="s2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Detecta inconsistencias: formato antiguo; tipo que va a JustTime sin estado; tipo que no va a JustTime en Si o Pendiente; contrato finalizado que falta eliminar" vertex="1">
+                    <mxGeometry height="130" width="330" x="780" y="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="a1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Filtra por estado, por tarjeta (Total, Interno, Cliente, Inconsistencias) o busca; abre una empresa" vertex="1">
+                    <mxGeometry height="100" width="240" x="1150" y="495" as="geometry"/>
+                </mxCell>
+                <mxCell id="d1" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontSize=12;fontStyle=1;" value="¿Qué quiere hacer?" vertex="1">
+                    <mxGeometry height="120" width="220" x="1430" y="485" as="geometry"/>
+                </mxCell>
+                <mxCell id="b1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Selecciona unidades y presiona «Corregir según matriz», «Aplicar sugerencia» o «Limpiar datos»" vertex="1">
+                    <mxGeometry height="110" width="300" x="170" y="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="b2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Arreglar fechas»: muestra la fecha actual y la nueva de cada unidad que sigue en JustTime" vertex="1">
+                    <mxGeometry height="110" width="300" x="520" y="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="b3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="«Cambiar estado» (dentro de una empresa): pone un mismo estado a todas las unidades mostradas" vertex="1">
+                    <mxGeometry height="110" width="300" x="870" y="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="b4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Doble clic o «Editar unidad»: abre el formulario en la pestaña «JustTime &amp;amp; CM»" vertex="1">
+                    <mxGeometry height="110" width="300" x="1220" y="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="s3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontSize=12;spacing=6;" value="Pide confirmar y guarda en el Registro Maestro, con copia de seguridad y registro en el historial" vertex="1">
+                    <mxGeometry height="60" width="1350" x="170" y="860" as="geometry"/>
+                </mxCell>
+                <mxCell id="notas" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fontFamily=Helvetica;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontSize=12;align=left;verticalAlign=top;spacing=12;" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;• Solo Cliente e Interno van a JustTime (confirmado por Javiera el 05-10-2026). Facturación manual y Provisión + no.&lt;br&gt;• JustTime es un sistema externo: la app no se conecta a él. Que una unidad esté en «Si» lo confirma Javiera a mano.&lt;br&gt;• «Corregir según matriz»: sin estado y con tipo que va a JustTime pasa a Pendiente; Si o Revisar pago en un tipo que no va pasa a Eliminar; Pendiente en un tipo que no va pasa a «-»; con formato antiguo toma el estado sugerido.&lt;br&gt;• «Limpiar datos» deja estado, inicio y término en «-» solo en unidades que no van a JustTime y ya salieron (Eliminar) o conservan fechas sueltas.&lt;br&gt;• Al renovar un contrato, el anterior queda Renovado y, si estaba en Si o Pendiente, pasa a Eliminar.&lt;br&gt;• En el formulario, «-» solo se ofrece si el contrato está en Baja, Baja solicitada o Vencido, y al elegirlo se limpian las fechas.&lt;br&gt;• Las unidades dadas de baja o desconectadas no se marcan como inconsistentes, salvo un contrato finalizado que sigue en Si o Pendiente." vertex="1">
+                    <mxGeometry height="210" width="1750" x="20" y="990" as="geometry"/>
+                </mxCell>
+                <mxCell id="f1" edge="1" parent="1" source="i1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s_nace" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f2" edge="1" parent="1" source="s_nace" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="st_pend" value="Pendiente">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f3" edge="1" parent="1" source="s_nace" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="s_fechas" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f4" edge="1" parent="1" source="st_pend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="f_jt" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f5" edge="1" parent="1" source="f_jt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="st_si" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f6" edge="1" parent="1" source="st_pend" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="st_no" value="Tipo no va a JustTime y nunca se creó">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f7" edge="1" parent="1" source="st_si" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="st_rev" value="a mano">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f8" edge="1" parent="1" source="st_si" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="st_elim" value="Tipo ya no va a JustTime, contrato renovado o finalizado">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f9" edge="1" parent="1" source="st_rev" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=1;entryY=0.5;" target="st_elim" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f10" edge="1" parent="1" source="st_elim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="n_elim" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f11" edge="1" parent="1" source="n_elim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="st_no" value="Limpiar datos&lt;div&gt;: estado, inicio&amp;nbsp;&lt;div&gt;y término quedan en «-»&lt;/div&gt;&lt;/div&gt;">
+                    <mxGeometry relative="1" y="45" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f12" edge="1" parent="1" source="i2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="p1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f13" edge="1" parent="1" source="p1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f14" edge="1" parent="1" source="s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f15" edge="1" parent="1" source="s2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="a1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f16" edge="1" parent="1" source="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="d1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f17" edge="1" parent="1" source="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="b1" value="Corregir">
+                    <mxGeometry relative="1" x="0.9544" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f18" edge="1" parent="1" source="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="b2" value="Fechas">
+                    <mxGeometry relative="1" x="0.9378" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f19" edge="1" parent="1" source="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="b3" value="Estado">
+                    <mxGeometry relative="1" x="0.9024" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f20" edge="1" parent="1" source="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="b4" value="Editar">
+                    <mxGeometry relative="1" x="0.6981" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="f21" edge="1" parent="1" source="b1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.11;entryY=0;" target="s3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f22" edge="1" parent="1" source="b2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.37;entryY=0;" target="s3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f23" edge="1" parent="1" source="b3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.63;entryY=0;" target="s3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f24" edge="1" parent="1" source="b4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.89;entryY=0;" target="s3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

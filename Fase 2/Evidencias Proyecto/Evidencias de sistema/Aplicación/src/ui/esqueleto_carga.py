@@ -1,6 +1,7 @@
 from PyQt6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QTimer, QEvent
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen
 from PyQt6.QtWidgets import QWidget
+from PyQt6 import sip
 
 from src.theme.colors import SURFACE, BORDER
 from src.theme import tema
@@ -13,6 +14,18 @@ COLOR_BLOQUE_OSCURO = QColor("#1C2740")
 COLOR_BRILLO_OSCURO = QColor("#2A3756")
 
 
+def animar_sobre_tabla(tabla, ms=650):
+    """Esqueleto corto sobre el viewport de una tabla (búsquedas y filtros)."""
+    viewport = tabla.viewport()
+    if viewport.height() < 80 or not tabla.isVisible():
+        return
+    esqueleto = tabla.__dict__.get('_esqueleto_busqueda')
+    if esqueleto is None:
+        esqueleto = tabla._esqueleto_busqueda = EsqueletoCarga(viewport, 'tarjetas')
+    esqueleto.iniciar_ya()
+    QTimer.singleShot(ms, lambda: esqueleto.terminar() if sip.isdeleted(esqueleto) is False else None)
+
+
 class EsqueletoCarga(QWidget):
     """Capa sobre el contenido de una caja mientras corre una carga en
     segundo plano: tarjetas o filas grises con un brillo que las recorre.
@@ -23,15 +36,18 @@ class EsqueletoCarga(QWidget):
     RETRASO_MS = 150        # cargas más rápidas no muestran el esqueleto
     FUNDIDO_MS = 220
     CICLO_BRILLO_MS = 1100
+    CICLO_BRILLO_RAPIDO_MS = 500
+    FUNDIDO_RAPIDO_MS = 120
     MAXIMO_MS = 15000       # por si la carga nunca avisa que terminó
 
     ALTO_TARJETA = 78
     SEPARACION = 10
 
-    def __init__(self, caja, forma='tarjetas'):
+    def __init__(self, caja, forma='tarjetas', fondo=None):
         super().__init__(caja)
         self._caja = caja
         self._forma = forma
+        self._fondo = fondo
         self._mostrando = False
         self._fase = 0.0
         self._foto = None
@@ -63,7 +79,12 @@ class EsqueletoCarga(QWidget):
         self._fundido.valueChanged.connect(self._on_fundido)
         self._fundido.finished.connect(self._ocultar)
 
-    def iniciar(self):
+    def _fijar_velocidad(self, rapido):
+        self._brillo.setDuration(self.CICLO_BRILLO_RAPIDO_MS if rapido else self.CICLO_BRILLO_MS)
+        self._fundido.setDuration(self.FUNDIDO_RAPIDO_MS if rapido else self.FUNDIDO_MS)
+
+    def iniciar(self, rapido=False):
+        self._fijar_velocidad(rapido)
         if self._mostrando:
             # Otra carga llegó durante el fundido: vuelve al esqueleto
             self._fundido.stop()
@@ -73,6 +94,15 @@ class EsqueletoCarga(QWidget):
             self.update()
             return
         self._retraso.start(self.RETRASO_MS)
+
+    def iniciar_ya(self, rapido=False):
+        """Muestra el esqueleto sin el retraso inicial (cambios de tema al
+        desplazarse). Con `rapido` el brillo y el fundido corren más deprisa."""
+        if self._mostrando:
+            self.iniciar(rapido)
+            return
+        self._fijar_velocidad(rapido)
+        self._mostrar()
 
     def terminar(self):
         self._retraso.stop()
@@ -133,9 +163,11 @@ class EsqueletoCarga(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(self.rect(), tema.fondo(SURFACE))
+        painter.fillRect(self.rect(), tema.fondo(self._fondo) if self._fondo else tema.fondo(SURFACE))
         if self._opacidad_foto < 1.0 or self._foto is None:
-            if self._forma == 'ficha':
+            if self._forma == 'dashboard':
+                self._pintar_dashboard(painter)
+            elif self._forma == 'ficha':
                 self._pintar_ficha(painter)
             else:
                 self._pintar_tarjetas(painter)
@@ -150,7 +182,8 @@ class EsqueletoCarga(QWidget):
         banda = max(120.0, ancho * 0.35)
         x0 = -banda + self._fase * (ancho + banda)
         gradiente = QLinearGradient(x0, 0, x0 + banda, 0)
-        bloque, brillo = (COLOR_BLOQUE_OSCURO, COLOR_BRILLO_OSCURO) if tema.es_oscuro() else (COLOR_BLOQUE, COLOR_BRILLO)
+        oscuro = tema.es_oscuro()
+        bloque, brillo = (COLOR_BLOQUE_OSCURO, COLOR_BRILLO_OSCURO) if oscuro else (COLOR_BLOQUE, COLOR_BRILLO)
         gradiente.setColorAt(0.0, bloque)
         gradiente.setColorAt(0.5, brillo)
         gradiente.setColorAt(1.0, bloque)
@@ -193,3 +226,47 @@ class EsqueletoCarga(QWidget):
             self._barra(painter, ancho - 4 - ancho * 0.22, y, ancho * 0.22, 9)
             y += 24
             fila += 1
+
+    def _tarjeta_dashboard(self, painter, pincel, x, y, ancho, alto):
+        painter.setPen(QPen(tema.fondo("#E3E8F0"), 1))
+        painter.setBrush(tema.fondo("#FFFFFF"))
+        painter.drawRoundedRect(QRectF(x + 0.5, y + 0.5, ancho - 1, alto - 1), 16, 16)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(pincel)
+        self._barra(painter, x + 18, y + 20, ancho * 0.4, 12)
+        self._barra(painter, x + 18, y + 42, ancho * 0.6, 9)
+
+    def _pintar_dashboard(self, painter):
+        """Silueta del Dashboard: tarjetas de cifras, dos gráficos anchos y la fila final."""
+        ancho, hueco = self.width(), 14
+        pincel = self._pincel_brillo()
+        ancho_kpi = (ancho - 3 * hueco) / 4
+        for i in range(4):
+            x = i * (ancho_kpi + hueco)
+            self._tarjeta_dashboard(painter, pincel, x, 0, ancho_kpi, 172)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(pincel)
+            self._barra(painter, x + 18, 80, ancho_kpi * 0.35, 26)
+            self._barra(painter, x + 18, 128, ancho_kpi - 36, 8)
+        y = 172 + hueco
+        alto_mes = min(330, max(120, self.height() - y))
+        self._tarjeta_dashboard(painter, pincel, 0, y, ancho, alto_mes)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(pincel)
+        for fila in range(min(10, int((alto_mes - 90) // 28))):
+            yf = y + 74 + fila * 28
+            largo = ancho * (0.14 + 0.11 * ((fila * 5) % 4))
+            self._barra(painter, ancho / 2 - largo, yf, largo, 14)
+            self._barra(painter, ancho / 2 + 4, yf, ancho * (0.06 + 0.07 * ((fila * 3) % 4)), 14)
+        y += alto_mes + hueco
+        alto_metas = min(260, max(0, self.height() - y))
+        if alto_metas < 100:
+            return
+        self._tarjeta_dashboard(painter, pincel, 0, y, ancho, alto_metas)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(pincel)
+        columnas = 6
+        paso = (ancho - 80) / columnas
+        for c in range(columnas):
+            alto_col = (alto_metas - 120) * (0.35 + 0.13 * ((c * 3) % 5))
+            self._barra(painter, 40 + c * paso + paso * 0.2, y + alto_metas - 36 - alto_col, paso * 0.6, alto_col)

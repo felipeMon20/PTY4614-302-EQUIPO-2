@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel, 
 
 from src.ui import comercial_estilo as estilo_com
 from src.ui.transiciones import TransicionFundidoSubida
-from src.ui.ingresos_base import aplicar_estilo_tabla_lectura, estilo_combo_barra
+from src.ui.ingresos_base import PantallaIngresosBase, aplicar_estilo_tabla_lectura, estilo_combo_barra
 from src.theme.theme_manager import ThemeManager
 
 _QSS_BARRA = "QFrame#barraAdmin { background-color: #1B2B4E; border: none; border-radius: 14px; }"
@@ -48,7 +48,7 @@ def fila_kpis(cantidad):
     return contenedor, tarjetas
 
 
-def barra_opciones(icono, titulo, subtitulo="", mostrar_titulo=True):
+def barra_opciones(icono, titulo, subtitulo="", mostrar_titulo=True, con_grupos=True):
     """Barra azul con ícono, título y subtítulo a la izquierda, una zona para
     filtros y la cápsula de botones a la derecha. Con `mostrar_titulo=False`
     la zona de filtros ocupa el lugar del ícono y el título."""
@@ -56,7 +56,7 @@ def barra_opciones(icono, titulo, subtitulo="", mostrar_titulo=True):
     marco.setObjectName("barraAdmin")
     marco.setStyleSheet(_QSS_BARRA)
     fila = QHBoxLayout(marco)
-    fila.setContentsMargins(15, 12, 15, 12)
+    fila.setContentsMargins(15, 7, 15, 7)
     fila.setSpacing(8)
 
     lbl_titulo = QLabel(titulo)
@@ -72,11 +72,22 @@ def barra_opciones(icono, titulo, subtitulo="", mostrar_titulo=True):
 
     zona_filtros = QHBoxLayout()
     zona_filtros.setSpacing(8)
-    capsula = QFrame()
-    capsula.setStyleSheet(_QSS_CAPSULA)
-    lay_capsula = QHBoxLayout(capsula)
-    lay_capsula.setContentsMargins(5, 5, 5, 5)
-    lay_capsula.setSpacing(4)
+    if con_grupos:
+        # Tres grupos con encabezado; cada uno aparece al recibir su primer botón
+        grupo_filtros, lay_filtros = PantallaIngresosBase._crear_grupo_barra("Filtros")
+        grupo_acciones, lay_capsula = PantallaIngresosBase._crear_grupo_barra("Acciones")
+        grupo_generales, lay_generales = PantallaIngresosBase._crear_grupo_barra("Generales")
+        grupos = {'filtros': (grupo_filtros, lay_filtros), 'acciones': (grupo_acciones, lay_capsula),
+                  'generales': (grupo_generales, lay_generales)}
+        widgets_derecha = (grupo_filtros, grupo_acciones, grupo_generales)
+    else:
+        capsula = QFrame()
+        capsula.setStyleSheet(_QSS_CAPSULA)
+        lay_capsula = QHBoxLayout(capsula)
+        lay_capsula.setContentsMargins(5, 5, 5, 5)
+        lay_capsula.setSpacing(4)
+        grupos = {}
+        widgets_derecha = (capsula,)
 
     if mostrar_titulo:
         fila.addWidget(bloque)
@@ -86,20 +97,27 @@ def barra_opciones(icono, titulo, subtitulo="", mostrar_titulo=True):
         bloque.setParent(marco)
         bloque.hide()
         fila.addLayout(zona_filtros, 1)
-    fila.addWidget(capsula)
+    for widget in widgets_derecha:
+        fila.addWidget(widget)
     return SimpleNamespace(marco=marco, lbl_titulo=lbl_titulo, lbl_subtitulo=lbl_subtitulo,
-                           zona_filtros=zona_filtros, capsula=capsula, lay_capsula=lay_capsula)
+                           zona_filtros=zona_filtros, lay_capsula=lay_capsula, grupos=grupos)
 
 
-def boton_capsula(barra, icono, tooltip, boton=None):
-    """Convierte `boton` (o crea uno) en un botón de solo ícono dentro de la cápsula."""
+def boton_capsula(barra, icono, tooltip, boton=None, grupo='acciones'):
+    """Convierte `boton` (o crea uno) en un botón de solo ícono dentro de la cápsula
+    del grupo `grupo` ('filtros', 'acciones' o 'generales')."""
     boton = boton or QPushButton()
     boton.setText("")
     boton.setIcon(ThemeManager.icon(icono, color='white'))
     boton.setToolTip(tooltip)
     boton.setCursor(Qt.CursorShape.PointingHandCursor)
     boton.setFixedWidth(44)
-    barra.lay_capsula.addWidget(boton)
+    if barra.grupos:
+        contenedor, lay = barra.grupos[grupo]
+        lay.addWidget(boton)
+        contenedor.show()
+    else:
+        barra.lay_capsula.addWidget(boton)
     estilo_com.preparar_boton_capsula(boton)
     return boton
 

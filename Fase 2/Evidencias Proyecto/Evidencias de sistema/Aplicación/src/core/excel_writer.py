@@ -173,7 +173,7 @@ class ExcelWriter:
         (SaveExcelThread, etc.) lean el CSV ya actualizado en su propio hilo
         de fondo justo despues de escribir, y devuelvan el resultado a
         DataManager.set_logs_df() en el hilo principal -- mismo patron que
-        ya usa RMReporteSyncWorker/SyncRMReporteDialog.handle_success. Devuelve
+        ya usa RMJaviSyncWorker/SyncRMJaviDialog.handle_success. Devuelve
         DataFrame vacio si el archivo todavia no existe, o None si la
         lectura falla (para que el llamador no pise datos buenos con un
         error)."""

@@ -35,7 +35,7 @@ _ROLES_CON_VALOR = frozenset([Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditR
                               Qt.ItemDataRole.BackgroundRole, Qt.ItemDataRole.ForegroundRole])
 _ALINEACION_CELDA = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 _QCOLORES = {}
-# Padding izquierdo+derecho de QTableView::item (ver AppTableWidget._setup_style).
+# Padding izquierdo+derecho de QTableView::item (ver VolvoTableWidget._setup_style).
 _PADDING_H_CELDA = 12
 # Margen extra al decidir, sin medir con el delegate, que un texto cabe en una línea.
 _HOLGURA_UNA_LINEA = 16
@@ -175,7 +175,7 @@ class PandasTableModel(QAbstractTableModel):
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         # section puede venir fuera de rango si el header restauró un estado
-        # guardado (AppTableWidget.set_table_id -> QHeaderView.restoreState)
+        # guardado (VolvoTableWidget.set_table_id -> QHeaderView.restoreState)
         # con más columnas de las que trae el DataFrame actual (p.ej. el
         # Excel real perdió una columna desde la última vez que se guardó
         # ese estado): sin este guard, Qt sigue pidiendo secciones viejas y
@@ -248,7 +248,7 @@ class FilterHeaderView(QHeaderView):
     contextual de clic derecho, saveState/restoreState) -- solo agrega el
     dibujo del botón y la detección de su clic izquierdo. Qué columnas son
     filtrables y cuáles tienen un filtro activo lo decide quien use la tabla
-    (ver AppTableWidget.set_header_filterable_columns/set_header_active_columns),
+    (ver VolvoTableWidget.set_header_filterable_columns/set_header_active_columns),
     esta clase no conoce reglas de negocio."""
 
     filter_button_clicked = pyqtSignal(str, QPoint)
@@ -265,7 +265,7 @@ class FilterHeaderView(QHeaderView):
     ICON_SIZE = 10
 
     # Padding horizontal del texto del encabezado (mismo valor que "padding:
-    # 6px 8px" de QHeaderView::section en AppTableWidget._setup_style) y
+    # 6px 8px" de QHeaderView::section en VolvoTableWidget._setup_style) y
     # margen vertical extra sumado al alto necesario cuando hay varias líneas.
     _WORD_WRAP_PADDING_H = 8
     _WORD_WRAP_PADDING_V = 10
@@ -314,7 +314,7 @@ class FilterHeaderView(QHeaderView):
         con set_word_wrap_habilitado(True)): degradado vertical de fondo,
         línea inferior de acento, separador opcional entre columnas y, si
         `iconos_orden`, el ícono de orden de cada columna (lee el estado de
-        orden de la tabla dueña, ver AppTableWidget._set_sort). Lo usa solo
+        orden de la tabla dueña, ver VolvoTableWidget._set_sort). Lo usa solo
         la bandeja de Comercial; el resto de las tablas no lo llama."""
         self._estilo_encabezado = {
             'fondo_superior': QColor(fondo_superior), 'fondo_inferior': QColor(fondo_inferior),
@@ -395,7 +395,7 @@ class FilterHeaderView(QHeaderView):
     def _paint_section_wrapped(self, painter, rect, logical_index):
         # Reemplaza el texto de una sola línea con elipsis que dibuja el
         # QStyle nativo: mismo fondo/borde que QHeaderView::section (ver
-        # AppTableWidget._setup_style), pero el texto se centra y se parte
+        # VolvoTableWidget._setup_style), pero el texto se centra y se parte
         # en varias líneas con Qt.TextFlag.TextWordWrap.
         painter.save()
         estilo = self._estilo_encabezado
@@ -518,7 +518,7 @@ class FilterHeaderView(QHeaderView):
 # reportado en producción: "Vista Completa" de Comercial con ~12.000 filas
 # dejaba la app sin responder varios segundos al armar los datos y podía
 # colgarse indefinidamente al escribir el .xlsx, sin ningún aviso visual ni
-# forma de seguir usando la app mientras tanto). AppTableWidget.
+# forma de seguir usando la app mientras tanto). VolvoTableWidget.
 # export_to_excel() es compartido por Comercial, Contactos, Contratos,
 # Historial, Instalaciones y Provisiones -- este hilo corrige el problema
 # para los seis de una sola vez, sin duplicar la lógica en cada módulo.
@@ -653,7 +653,7 @@ class ExportExcelThread(QThread):
             self.finished_signal.emit(False, self.filepath, str(e))
 
 
-class AppTableWidget(QTableView):
+class VolvoTableWidget(QTableView):
     action_eliminar = pyqtSignal(int, str)
     action_restaurar = pyqtSignal(int, str)
     action_editar_unidad = pyqtSignal(int, str)
@@ -938,7 +938,7 @@ class AppTableWidget(QTableView):
 
     def set_table_id(self, table_id):
         self.table_id = table_id
-        self.settings = QSettings("GestorApp", "Dashboard")
+        self.settings = QSettings("VolvoApp", "Dashboard")
         state = self.settings.value(f"table_state_{self.table_id}")
         if not state:
             return

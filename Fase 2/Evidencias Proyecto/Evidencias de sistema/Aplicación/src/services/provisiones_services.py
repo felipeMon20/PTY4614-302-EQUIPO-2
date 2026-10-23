@@ -198,6 +198,25 @@ def parsear_numero_uf(texto):
     return float(texto.replace(',', '.'))
 
 
+def escribir_uf_en_variables(ruta, uf):
+    """Escribe el valor de UF en la hoja Variables del Excel de provisiones.
+    False si el archivo no tiene esa hoja o la fila UF."""
+    import openpyxl
+    wb = openpyxl.load_workbook(ruta)
+    try:
+        if "Variables" not in wb.sheetnames:
+            return False
+        hoja = wb["Variables"]
+        for fila in range(1, 10):
+            if str(hoja.cell(row=fila, column=1).value).strip().upper() == "UF":
+                hoja.cell(row=fila, column=2).value = float(uf)
+                wb.save(ruta)
+                return True
+        return False
+    finally:
+        wb.close()
+
+
 def mapear_industria(industria_raw):
     """Normaliza a mayusculas, colapsa los valores vacios/nulos conocidos a
     'NO DEFINIDA' y traduce via INDUSTRIA_MAP cuando corresponde. Reutilizada
@@ -297,22 +316,22 @@ def mapear_tipo_servicio_desde_plan(plan):
 
 
 _PLANES_OBSERVACION = {'BASICO': 'Basico', 'MEDIO': 'Medio', 'FULL': 'Full'}
-_TRAMO_SERVICIOS_CONECTADOS = re.compile(
-    r'SERVICIOS CONECTADOS\s+(BASICO|MEDIO|FULL)\s*(\+\s*CIV)?\s*(\d{1,3})\s*(MESES|MES|M|AÑOS|AÑO|ANOS|ANO)\b')
+_TRAMO_VOLVO_CONNECT = re.compile(
+    r'VOLVO CONNECT\s+(BASICO|MEDIO|FULL)\s*(\+\s*CIV)?\s*(\d{1,3})\s*(MESES|MES|M|AÑOS|AÑO|ANOS|ANO)\b')
 _TRAMO_SIN_PREFIJO = re.compile(r'\b(BASICO|MEDIO|FULL)\s*(\+\s*CIV)?\s*(\d{1,3})\s*(MESES|MES|M|AÑOS|AÑO)\b')
 
 
 def interpretar_observacion(texto):
-    """Plan y cantidad de meses de una observación como 'Provisión Empresa Demo
-    Connect Medio + CIV 3 meses (5 años)' o 'Servicios Conectados Full 12 MESES /
-    Contrato Blue 24 MESES'. Solo cuenta el tramo 'Servicios Conectados <plan> <N>';
+    """Plan y cantidad de meses de una observación como 'Provisión Volvo
+    Connect Medio + CIV 3 meses (5 años)' o 'Volvo Connect Full 12 MESES /
+    Contrato Blue 24 MESES'. Solo cuenta el tramo 'Volvo Connect <plan> <N>';
     los contratos Blue/Gold y el '(5 años)' son otra cosa. Devuelve (plan o
     None, meses como str o None); es una sugerencia para completar registros
     vacíos y el usuario puede corregirla."""
     limpio = re.sub(r'\s+', ' ', str(texto or '')).strip().upper()
     if not limpio or limpio in ('-', 'NAN', 'NONE'):
         return None, None
-    encontrado = _TRAMO_SERVICIOS_CONECTADOS.search(limpio)
+    encontrado = _TRAMO_VOLVO_CONNECT.search(limpio)
     if encontrado is None and not re.search(r'CONTRATO|BLUE|GOLD|SILVER', limpio):
         encontrado = _TRAMO_SIN_PREFIJO.search(limpio)
     if encontrado is None:
@@ -320,7 +339,7 @@ def interpretar_observacion(texto):
     base, civ, cantidad, unidad = encontrado.groups()
     plan = _PLANES_OBSERVACION[base]
     resto = limpio[encontrado.end():]
-    if civ or re.search(r'SERVICIOS CONECTADOS\s*\+\s*CIV', resto):
+    if civ or re.search(r'VOLVO CONNECT\s*\+\s*CIV', resto):
         plan += " + CIV"
     meses = int(cantidad) * (12 if unidad.startswith(('AÑ', 'AN')) else 1)
     # "(5 años)" entre paréntesis es el plazo del contrato: manda sobre los
@@ -332,7 +351,7 @@ def interpretar_observacion(texto):
 
 
 def meses_desde_observacion(texto):
-    """Meses de la observación solo si corresponden a Servicios Conectados (plan
+    """Meses de la observación solo si corresponden a Volvo Connect (plan
     Básico, Medio, Full, con o sin CIV). Los contratos Blue, Gold y Silver son
     de CM y no cuentan. None si no hay."""
     return interpretar_observacion(texto)[1]

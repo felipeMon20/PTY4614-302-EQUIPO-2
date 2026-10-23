@@ -44,11 +44,11 @@ for _metodo, _valor_por_defecto in [
     _patch.object(QMessageBox, _metodo, return_value=_valor_por_defecto).start()
 
 from test_comercial import (
-    TestComercial, TestRMReporteSyncActualizaHistorial, TestRMReporteSyncColumnasAutorizadas, TestComercialTabsEstructura,
+    TestComercial, TestRMJaviSyncActualizaHistorial, TestRMJaviSyncColumnasAutorizadas, TestComercialTabsEstructura,
     TestComercialRevisionCM, TestConfirmarBajaCM, TestDialogoAccionCm, TestEnviarCorreoCM,
     TestEnviarCorreoOtrasSubpestanas, TestEditarUnidadComercial, TestAgregarContactoComercial,
     TestConfirmarBajaCmFlujoRealDeGuardado,
-    TestReglaSinContrato, TestReglaTerminatedCm, TestRMReporteSyncNormalizaEstadoComercial,
+    TestReglaSinContrato, TestReglaTerminatedCm, TestRMJaviSyncNormalizaEstadoComercial,
     TestReconciliacionEstadoExpiredAlGuardarEnComercial, TestComercialFiltrosHeader,
     TestSaveExcelThreadLogsActualizadosSignal, TestSetLogsDfIntegracionConGeneralModule,
 )
@@ -95,7 +95,7 @@ from test_contacto_correo_service import TestActualizarCorreoPorCdb
 from test_comercial_services import (
     TestProcesarDfComercial, TestCalcularKpisVigencia, TestValidarValorPegado, TestQuitarVin, TestAgregarFila,
     TestAplicarCambiosPendientes, TestValidarDuracion, TestValidarFechaDdmmyyyy, TestParsearPagoCm,
-    TestFormatearPagoCm, TestAplicaReglaSinContrato, TestAplicaReglaTerminatedCm,
+    TestFormatearPagoCm, TestAplicaReglaSinContrato, TestExcluirContratosCerrados,
     TestClasificarVigenciaContratoCalendario, TestFiltrarRenovaciones, TestFiltrarVencimientos,
     TestFiltrarGestionarBajas, TestFiltrarPorGestionar, TestConstruirMascaraBusqueda,
     TestFormatearDiasRestantes, TestParsearDiasRestantes,
@@ -144,7 +144,7 @@ from test_mail_dialog_correo_faltante import (
     TestMailDialogPreseleccionDesdeGestionarCM,
 )
 from test_table_sorting import (
-    TestAppTableWidgetSorting, TestAppTableWidgetMenuEliminados, TestInstalacionesMenuType,
+    TestVolvoTableWidgetSorting, TestVolvoTableWidgetMenuEliminados, TestInstalacionesMenuType,
     TestPandasTableModelHeaderData, TestSetTableIdDescartaEstadoDesactualizado,
     TestPandasTableModelTerminoContratoForeground,
 )
@@ -200,10 +200,11 @@ _original_root_file_handlers = []
 
 import config.settings
 config.settings.EXCEL_PATH = os.path.join(MOCK_DIR, "PruebasFM_Test.xlsx").replace('\\', '/')
-config.settings.PROVISION_EXCEL_PATH = os.path.join(MOCK_DIR, "provisionContratos_Test.xlsx").replace('\\', '/')
+config.settings.PROVISION_EXCEL_PATH = os.path.join(MOCK_DIR, "provisionFelipe_Test.xlsx").replace('\\', '/')
 config.settings.CONTACTOS_EXCEL_PATH = os.path.join(MOCK_DIR, "contactos_Test.xlsx").replace('\\', '/')
 config.settings.LOG_EXCEL_PATH = os.path.join(MOCK_DIR, "LogApp_Test.xlsx").replace('\\', '/')
 config.settings.DELETED_LOG_EXCEL_PATH = os.path.join(MOCK_DIR, "RegistroEliminado_Test.xlsx").replace('\\', '/')
+config.settings.METAS_VC_PATH = os.path.join(MOCK_DIR, "MetasVC_Test.csv").replace('\\', '/')
 
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 logger = logging.getLogger("TestRunner")
@@ -252,7 +253,7 @@ def setup_sandbox():
 
     mock_config = {
         "EXCEL_PATH": os.path.join(MOCK_DIR, "PruebasFM_Test.xlsx").replace('\\', '/'),
-        "PROVISION_EXCEL_PATH": os.path.join(MOCK_DIR, "provisionContratos_Test.xlsx").replace('\\', '/'),
+        "PROVISION_EXCEL_PATH": os.path.join(MOCK_DIR, "provisionFelipe_Test.xlsx").replace('\\', '/'),
         "CONTACTOS_EXCEL_PATH": os.path.join(MOCK_DIR, "contactos_Test.xlsx").replace('\\', '/'),
         "INSTALACIONES_PATH": os.path.join(MOCK_DIR, "Instalaciones_Test.xlsx").replace('\\', '/'),
         "DELETED_LOG_EXCEL_PATH": os.path.join(MOCK_DIR, "RegistroEliminado_Test.xlsx").replace('\\', '/'),
@@ -308,8 +309,8 @@ if __name__ == '__main__':
     suite_restore_backup = unittest.TestLoader().loadTestsFromTestCase(TestRestoreBackupValidation)
     suite_backup_manager_snapshot = unittest.TestLoader().loadTestsFromTestCase(TestBackupManagerSnapshot)
     suite_backup_manager_retencion = unittest.TestLoader().loadTestsFromTestCase(TestBackupManagerRetencionYProgramacion)
-    suite_rm_reporte_historial = unittest.TestLoader().loadTestsFromTestCase(TestRMReporteSyncActualizaHistorial)
-    suite_rm_reporte_columnas_autorizadas = unittest.TestLoader().loadTestsFromTestCase(TestRMReporteSyncColumnasAutorizadas)
+    suite_rm_javi_historial = unittest.TestLoader().loadTestsFromTestCase(TestRMJaviSyncActualizaHistorial)
+    suite_rm_javi_columnas_autorizadas = unittest.TestLoader().loadTestsFromTestCase(TestRMJaviSyncColumnasAutorizadas)
     suite_comercial_tabs = unittest.TestLoader().loadTestsFromTestCase(TestComercialTabsEstructura)
     suite_comercial_revision_cm = unittest.TestLoader().loadTestsFromTestCase(TestComercialRevisionCM)
     suite_confirmar_baja_cm = unittest.TestLoader().loadTestsFromTestCase(TestConfirmarBajaCM)
@@ -322,7 +323,7 @@ if __name__ == '__main__':
     suite_regla_sin_contrato = unittest.TestLoader().loadTestsFromTestCase(TestReglaSinContrato)
     suite_regla_terminated_cm = unittest.TestLoader().loadTestsFromTestCase(TestReglaTerminatedCm)
     suite_reconciliacion_expired_comercial = unittest.TestLoader().loadTestsFromTestCase(TestReconciliacionEstadoExpiredAlGuardarEnComercial)
-    suite_rm_reporte_normaliza_estado_comercial = unittest.TestLoader().loadTestsFromTestCase(TestRMReporteSyncNormalizaEstadoComercial)
+    suite_rm_javi_normaliza_estado_comercial = unittest.TestLoader().loadTestsFromTestCase(TestRMJaviSyncNormalizaEstadoComercial)
     suite_contratos_no_limpia_vin_ausente = unittest.TestLoader().loadTestsFromTestCase(TestContratosNoLimpiaAutomaticamenteVinAusente)
     suite_contratos_regla_terminated_cm = unittest.TestLoader().loadTestsFromTestCase(TestContratosReglaTerminatedCm)
     suite_contratos_reconciliacion_expired_guardar = unittest.TestLoader().loadTestsFromTestCase(TestContratosReconciliacionEstadoExpiredAlGuardar)
@@ -374,7 +375,7 @@ if __name__ == '__main__':
     suite_parsear_pago_cm = unittest.TestLoader().loadTestsFromTestCase(TestParsearPagoCm)
     suite_formatear_pago_cm = unittest.TestLoader().loadTestsFromTestCase(TestFormatearPagoCm)
     suite_aplica_regla_sin_contrato = unittest.TestLoader().loadTestsFromTestCase(TestAplicaReglaSinContrato)
-    suite_aplica_regla_terminated_cm = unittest.TestLoader().loadTestsFromTestCase(TestAplicaReglaTerminatedCm)
+    suite_excluir_contratos_cerrados = unittest.TestLoader().loadTestsFromTestCase(TestExcluirContratosCerrados)
     suite_clasificar_vigencia_calendario = unittest.TestLoader().loadTestsFromTestCase(TestClasificarVigenciaContratoCalendario)
     suite_filtrar_renovaciones = unittest.TestLoader().loadTestsFromTestCase(TestFiltrarRenovaciones)
     suite_filtrar_vencimientos = unittest.TestLoader().loadTestsFromTestCase(TestFiltrarVencimientos)
@@ -432,8 +433,8 @@ if __name__ == '__main__':
     suite_mail_dialog_celda_correo = unittest.TestLoader().loadTestsFromTestCase(TestMailDialogCeldaCorreoFaltante)
     suite_contactos_add_prefill = unittest.TestLoader().loadTestsFromTestCase(TestContactosAddDialogPrefillBloqueado)
     suite_mail_dialog_preseleccion = unittest.TestLoader().loadTestsFromTestCase(TestMailDialogPreseleccionDesdeGestionarCM)
-    suite_table_sorting = unittest.TestLoader().loadTestsFromTestCase(TestAppTableWidgetSorting)
-    suite_menu_eliminados = unittest.TestLoader().loadTestsFromTestCase(TestAppTableWidgetMenuEliminados)
+    suite_table_sorting = unittest.TestLoader().loadTestsFromTestCase(TestVolvoTableWidgetSorting)
+    suite_menu_eliminados = unittest.TestLoader().loadTestsFromTestCase(TestVolvoTableWidgetMenuEliminados)
     suite_instalaciones_menu = unittest.TestLoader().loadTestsFromTestCase(TestInstalacionesMenuType)
     suite_header_data_fuera_de_rango = unittest.TestLoader().loadTestsFromTestCase(TestPandasTableModelHeaderData)
     suite_set_table_id_descarta_estado = unittest.TestLoader().loadTestsFromTestCase(TestSetTableIdDescartaEstadoDesactualizado)
@@ -500,7 +501,7 @@ if __name__ == '__main__':
         suite_editar_unidad_comercial, suite_agregar_contacto_comercial,
         suite_dialogo_accion_cm, suite_confirmar_baja_cm_flujo_real,
         suite_regla_sin_contrato,
-        suite_regla_terminated_cm, suite_reconciliacion_expired_comercial, suite_rm_reporte_normaliza_estado_comercial,
+        suite_regla_terminated_cm, suite_reconciliacion_expired_comercial, suite_rm_javi_normaliza_estado_comercial,
         suite_contratos_no_limpia_vin_ausente, suite_contratos_regla_terminated_cm,
         suite_contratos_reconciliacion_expired_guardar, suite_contratos_reconciliacion_expired_importar,
         suite_contratos_edicion_manual_flujo_real, suite_contratos_importacion_masiva_flujo_real,
@@ -525,7 +526,7 @@ if __name__ == '__main__':
         suite_fm_construir_plantilla_base, suite_fm_generar_plantilla_base,
         suite_backups, suite_punto_c, suite_log_deleted, suite_log_deleted_por_modulo, suite_restore_backup,
         suite_backup_manager_snapshot, suite_backup_manager_retencion,
-        suite_rm_reporte_historial, suite_rm_reporte_columnas_autorizadas, suite_configuracion_historial,
+        suite_rm_javi_historial, suite_rm_javi_columnas_autorizadas, suite_configuracion_historial,
         suite_configuracion_casos_baja_cm_path, suite_normalizacion_config,
         suite_clear_logs_bloqueado, suite_papelera_por_modulo, suite_vaciar_papelera_backup,
         suite_vaciar_logs_modificaciones_backup,
@@ -540,7 +541,7 @@ if __name__ == '__main__':
         suite_agregar_fila, suite_aplicar_cambios_pendientes,
         suite_validar_duracion, suite_validar_fecha_ddmmyyyy,
         suite_parsear_pago_cm, suite_formatear_pago_cm, suite_aplica_regla_sin_contrato,
-        suite_aplica_regla_terminated_cm, suite_obtener_modelo_desde_vin,
+        suite_excluir_contratos_cerrados, suite_obtener_modelo_desde_vin,
         suite_comercial_agregar_auto_modelo, suite_comercial_agregar_gestion_unidades,
         suite_comercial_agregar_modo_lote, suite_comercial_agregar_precarga_legados,
         suite_calcular_termino_contrato, suite_baja_no_limpia_al_cargar,

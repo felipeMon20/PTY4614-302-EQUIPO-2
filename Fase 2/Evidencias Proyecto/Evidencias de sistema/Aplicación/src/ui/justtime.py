@@ -1,5 +1,6 @@
-import pandas as pd
-from PyQt6.QtWidgets import QLineEdit, QMenu, QMessageBox, QComboBox
+﻿import pandas as pd
+from PyQt6.QtWidgets import (QLineEdit, QMenu, QMessageBox, QComboBox, QWidget, QVBoxLayout, QLabel, QTableWidget,
+                             QTableWidgetItem, QAbstractItemView, QHeaderView, QDialog)
 from PyQt6.QtCore import Qt
 
 from src.core.data_manager import DataManager
@@ -13,7 +14,7 @@ from src.core.constants import (
 )
 from src.services import justtime_service as jt
 from src.ui import comercial_estilo as estilo_com
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui.formulario_unidad import GuardadoUnidadesMixin, PESTANA_JUSTTIME_CM
 from src.ui.ingresos_base import PantallaIngresosBase, ComboFiltroBarra, boton_barra, estilo_combo_barra
 from src.theme.theme_manager import ThemeManager
@@ -47,7 +48,7 @@ _CHIP_ESTADO = {
     JUSTTIME_ESTADO_REVISAR_PAGO: ("#EDE9FE", "#5B21B6"),
 }
 _CHIP_DEFAULT = ("#EEF1F6", "#52607A")
-_CHIP_EMPRESA = ("#E1EAF4", BRAND_BLUE)
+_CHIP_VOLVO = ("#E1EAF4", VOLVO_BLUE)
 _CHIP_ROJO = ("#FEE2E2", "#991B1B")
 
 # Colores propios de Tipo de facturación y Etapa de gestión (no están en el
@@ -116,7 +117,7 @@ def _colores_celda(columna, valor):
         estado = _ESTADO_POR_ETIQUETA.get(str(valor).strip(), str(valor).strip())
         return _CHIP_ESTADO.get(estado, _CHIP_DEFAULT)
     if columna == COL_UNIDADES:
-        return _CHIP_EMPRESA
+        return _CHIP_VOLVO
     if columna == COL_POR_REVISAR:
         return _CHIP_ROJO if clave not in ("", "0") else None
     return None
@@ -171,12 +172,14 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
         self.combo_estado.setStyleSheet(estilo_combo_barra())
         self.combo_estado.setMaxVisibleItems(9)
         self.combo_estado.currentIndexChanged.connect(self._on_combo_estado)
-        self.agregar_filtro(self.combo_estado)
+        self.agregar_filtro_compacto(self.combo_estado)
 
-        self.btn_export_excel = boton_barra("Excel", 'fa5s.file-excel', 'excel')
+        self.btn_export_excel = boton_barra("", 'fa5s.file-excel', 'excel')
+        self.btn_export_excel.setToolTip("Exportar a Excel")
+        self.btn_export_excel.setFixedWidth(44)
         self.btn_export_excel.setIcon(ThemeManager.icon('fa5s.file-excel', color='#1B2B4E'))
         self.btn_export_excel.clicked.connect(lambda: self.table_export.export_to_excel("Reporte_JustTime"))
-        self.agregar_blanco(self.btn_export_excel)
+        self.agregar_general(self.btn_export_excel)
 
         self.btn_cambiar_estado = boton_barra("", 'fa5s.exchange-alt')
         self.btn_cambiar_estado.setToolTip("Cambiar estado: cambia el estado JustTime de todas las unidades mostradas")
@@ -186,56 +189,49 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
         self.btn_cambiar_estado.setMenu(menu_estados)
         self.agregar_capsula(self.btn_cambiar_estado)
 
-        self.btn_aplicar_sugerencias = boton_barra("", 'fa5s.magic')
-        self.btn_aplicar_sugerencias.setToolTip("Aplicar sugerencias: pasa los estados con formato antiguo al estado sugerido")
-        self.btn_aplicar_sugerencias.clicked.connect(self._aplicar_sugerencias_visibles)
-        self.agregar_capsula(self.btn_aplicar_sugerencias)
-
-        self.btn_corregir_matriz = boton_barra("", 'fa5s.broom')
-        self.btn_corregir_matriz.setToolTip(
-            "Corregir según la matriz: deja las unidades mostradas con el estado que les corresponde por su tipo de facturación")
-        self.btn_corregir_matriz.clicked.connect(self._corregir_visibles_segun_matriz)
-        self.agregar_capsula(self.btn_corregir_matriz)
-
-        self.btn_limpiar = boton_barra("", 'fa5s.eraser')
-        self.btn_limpiar.setToolTip(
-            "Limpiar datos de JustTime: deja en \"-\" las unidades mostradas que no van a JustTime y ya salieron de él")
-        self.btn_limpiar.clicked.connect(self._limpiar_visibles)
-        self.agregar_capsula(self.btn_limpiar)
+        self.btn_arreglar_fechas = boton_barra("", 'fa5s.calendar-check')
+        self.btn_arreglar_fechas.setToolTip(
+            "Arreglar fechas: el inicio pasa al primer día del mes de INICIO CONTRATO y el término suma la duración")
+        self.btn_arreglar_fechas.clicked.connect(self._on_arreglar_fechas_clicked)
+        self.agregar_capsula(self.btn_arreglar_fechas)
 
         self.btn_reload = boton_barra("", 'fa5s.sync-alt')
         self.btn_reload.setToolTip("Recargar")
         self.btn_reload.clicked.connect(self.load_data)
-        self.agregar_capsula(self.btn_reload)
+        self.agregar_general(self.btn_reload)
 
         # Tabla oculta: solo alimenta "Excel" con todas las unidades filtradas
-        self.table_export = AppTableWidget()
+        self.table_export = VolvoTableWidget()
         self.model_export = PandasTableModel()
         self.table_export.setModel(self.model_export)
 
-        self.btn_editar_unidad = estilo_com.BotonAccionPanel(
-            'fa5s.edit', 'Editar unidad',
-            "Abre el formulario de la unidad en la pestaña JustTime & CM.", BRAND_BLUE)
-        self.btn_editar_unidad.setEnabled(False)
-        self.btn_editar_unidad.clicked.connect(self._on_editar_unidad_clicked)
-        self.agregar_accion_panel(self.btn_editar_unidad)
+        acciones = QWidget()
+        grilla = estilo_com.GrillaAcciones(acciones)
 
-        self.btn_corregir_panel = estilo_com.BotonAccionPanel(
-            'fa5s.broom', 'Corregir según la matriz',
+        self.btn_corregir_panel = estilo_com.BotonAccionCompacta(
+            'fa5s.broom', 'Corregir según matriz',
             "Deja las unidades seleccionadas con el estado JustTime que les corresponde por su tipo de facturación.",
-            BRAND_BLUE)
+            VOLVO_BLUE)
         self.btn_corregir_panel.setEnabled(False)
         self.btn_corregir_panel.clicked.connect(self._corregir_seleccion_segun_matriz)
-        self.agregar_accion_panel(self.btn_corregir_panel)
+        grilla.agregar(self.btn_corregir_panel)
 
-        self.btn_limpiar_panel = estilo_com.BotonAccionPanel(
-            'fa5s.eraser', 'Limpiar datos de JustTime',
+        self.btn_sugerencias_panel = estilo_com.BotonAccionCompacta(
+            'fa5s.magic', 'Aplicar sugerencia',
+            "Pasa las unidades seleccionadas con formato antiguo al estado sugerido.", VOLVO_BLUE)
+        self.btn_sugerencias_panel.setEnabled(False)
+        self.btn_sugerencias_panel.clicked.connect(self._aplicar_sugerencias_seleccion)
+        grilla.agregar(self.btn_sugerencias_panel)
+
+        self.btn_limpiar_panel = estilo_com.BotonAccionCompacta(
+            'fa5s.eraser', 'Limpiar datos',
             "Deja en \"-\" el estado, inicio y término de las unidades que no van a JustTime y ya salieron de él.",
-            BRAND_BLUE)
+            VOLVO_BLUE)
         self.btn_limpiar_panel.setEnabled(False)
         self.btn_limpiar_panel.clicked.connect(self._limpiar_seleccion)
-        self.agregar_accion_panel(self.btn_limpiar_panel)
+        grilla.agregar(self.btn_limpiar_panel)
 
+        self.agregar_accion_panel(acciones)
     # --------------------------------------------- ganchos de la pantalla base
     def resolver_color(self, columna, valor, es_fondo):
         colores = _colores_celda(columna, valor)
@@ -256,10 +252,11 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
 
     def on_fila_cambiada(self, fila, cantidad):
         if cantidad == 0:
-            self.btn_editar_unidad.setEnabled(False)
             self.btn_corregir_panel.setEnabled(False)
             self.btn_limpiar_panel.setEnabled(False)
+            self.btn_sugerencias_panel.setEnabled(False)
             return
+        self.btn_sugerencias_panel.setEnabled(bool(self._lote_sugerencias_seleccion()))
         self.btn_corregir_panel.setEnabled(bool(self._lote_matriz_seleccion()))
         self.btn_limpiar_panel.setEnabled(bool(self._lote_limpieza_seleccion()))
         problema = str(fila.get(COL_INCONSISTENCIA_TABLA, "") or "")
@@ -268,15 +265,9 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
         if problema and problema != "OK":
             aviso = f"⚠  {problema}" + (f"\nSugerido: {sugerencia}" if sugerencia not in ("", "-") else "")
         self._pintar_panel(fila, cantidad, aviso)
-        self.btn_editar_unidad.setEnabled(cantidad == 1)
 
     def al_cambiar_nivel(self):
         self.filter_table()
-
-    def _on_editar_unidad_clicked(self):
-        vins = self._vins_seleccionados()
-        if len(vins) == 1:
-            self._abrir_formulario_unidad(vins[0])
 
     # --------------------------------------------------------------- datos
     def _on_global_data_ready(self):
@@ -337,11 +328,6 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
         self.model_export.set_data(df_filtrado[columnas_export].rename(columns={jt.COL_INCONSISTENCIA: "PROBLEMA"})
                                    if not df_filtrado.empty else pd.DataFrame())
 
-        hay_sugerencias = not df_filtrado.empty and bool(
-            ((df_filtrado[jt.COL_ESTADO_JT] == jt.POR_CORREGIR) & (df_filtrado[jt.COL_SUGERENCIA] != "")).any())
-        self.btn_aplicar_sugerencias.setEnabled(hay_sugerencias)
-        self.btn_corregir_matriz.setEnabled(not df_filtrado.empty and bool(jt.construir_cambios_matriz(df_filtrado)))
-        self.btn_limpiar.setEnabled(not df_filtrado.empty and bool(jt.construir_cambios_limpieza(df_filtrado)))
         self.btn_cambiar_estado.setEnabled(self.empresa_actual is not None and not df_filtrado.empty)
 
         if self.empresa_actual is None:
@@ -390,9 +376,6 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
         return df[_COLUMNAS_UNIDADES_VISTA]
 
     # ------------------------------------------------------------ edición
-    def _abrir_formulario_unidad(self, vin):
-        self.editar_y_guardar_unidad(vin, PESTANA_JUSTTIME_CM)
-
     def _confirmar_lote(self, cantidad, detalle):
         respuesta = QMessageBox.question(
             self, "Confirmar cambio", f"{detalle}\n\nSe modificarán {cantidad} unidad(es). ¿Continuar?",
@@ -423,10 +406,6 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
         lote = self._lote_limpieza_seleccion()
         self._ejecutar_limpieza(lote)
 
-    def _limpiar_visibles(self):
-        if not self._df_visible.empty:
-            self._ejecutar_limpieza(jt.construir_cambios_limpieza(self._df_visible))
-
     def _ejecutar_limpieza(self, lote):
         if lote and self._confirmar_lote(
                 len(lote), "Se limpian los datos de JustTime (estado, inicio y término quedan en \"-\"). "
@@ -448,11 +427,83 @@ class JustTimeModule(GuardadoUnidadesMixin, PantallaIngresosBase):
     def _corregir_seleccion_segun_matriz(self):
         self._ejecutar_correccion_matriz(self._lote_matriz_seleccion())
 
-    def _corregir_visibles_segun_matriz(self):
-        if not self._df_visible.empty:
-            self._ejecutar_correccion_matriz(jt.construir_cambios_matriz(self._df_visible))
+    def _correcciones_fechas(self):
+        return jt.construir_correcciones_fechas(self._df_visible, self.data_manager.get_contratos_actuales_df())
 
-    def _aplicar_sugerencias_visibles(self):
-        lote = jt.construir_cambios_sugeridos(self._df_visible)
+    def _on_arreglar_fechas_clicked(self):
+        filas, lote = self._correcciones_fechas()
+        if not filas:
+            QMessageBox.information(
+                self, "Arreglar fechas",
+                "Las unidades mostradas ya tienen sus fechas de JustTime al día "
+                "(o no tienen inicio de contrato y duración para calcularlas).")
+            return
+        if self._confirmar_fechas(filas):
+            self.guardar_lote_unidades(lote, f"Arreglando fechas de {len(lote)} unidad(es)…")
+
+    def _confirmar_fechas(self, filas):
+        from src.ui.dialogo_accion import DialogoAccion
+        n = len(filas)
+        cuerpo = QWidget()
+        cuerpo.setStyleSheet("background: transparent; border: none;")
+        lay = QVBoxLayout(cuerpo)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        titulo = QLabel(f"Unidades a corregir ({n})")
+        titulo.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 12px; font-weight: bold;")
+        lay.addWidget(titulo)
+
+        columnas = ["VIN", "Inicio", "Término"]
+        tabla = QTableWidget(n, len(columnas))
+        tabla.setHorizontalHeaderLabels(columnas)
+        tabla.verticalHeader().hide()
+        tabla.verticalHeader().setDefaultSectionSize(34)
+        tabla.setShowGrid(False)
+        tabla.setAlternatingRowColors(True)
+        tabla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        tabla.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        tabla.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        tabla.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tabla.setTextElideMode(Qt.TextElideMode.ElideRight)
+        tabla.setWordWrap(False)
+        cab = tabla.horizontalHeader()
+        cab.setHighlightSections(False)
+        cab.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        cab.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        cab.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        cab.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        tabla.setColumnWidth(0, 170)
+        tabla.setStyleSheet(f"""
+            QTableWidget {{ background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: 1px solid #E3E8F0;
+                            border-radius: 10px; color: {TEXT_PRIMARY}; font-size: 12px; outline: none; }}
+            QTableWidget::item {{ padding: 0 10px; border: none; }}
+            QHeaderView::section {{ background-color: #F3F5F9; color: {TEXT_SECONDARY}; font-size: 11px; font-weight: bold;
+                                    border: none; border-bottom: 1px solid #E3E8F0; padding: 6px 10px; text-align: left; }}
+        """)
+        for i, f in enumerate(filas):
+            textos = (f['VIN'], f"{f['INICIO ACTUAL']}  →  {f['INICIO NUEVO']}", f"{f['TERMINO ACTUAL']}  →  {f['TERMINO NUEVO']}")
+            for col, texto in enumerate(textos):
+                celda = QTableWidgetItem(texto)
+                celda.setToolTip(f"{f['RAZÓN SOCIAL']}\n{texto}" if col else f"{f['RAZÓN SOCIAL']}\n{f['VIN']}")
+                celda.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                tabla.setItem(i, col, celda)
+        tabla.setFixedHeight(min(300, 44 + 34 * n))
+        lay.addWidget(tabla)
+
+        dialogo = DialogoAccion(
+            self, " Arreglar fechas", icon_name="fa5s.calendar-check", icon_color=PRIMARY, icon_bg_color="#DBEAFE",
+            titulo="Arreglar fechas de JustTime", subtitulo=None,
+            descripcion="El inicio pasa al primer día del mes de INICIO CONTRATO y el término suma la duración del "
+                        "contrato a ese día. Cada fila muestra la fecha actual y la nueva.",
+            botones=[{'texto': 'Cancelar', 'clase': 'secondary', 'rol': 'reject'},
+                     {'texto': 'Arreglar', 'clase': 'primary', 'rol': 'accept'}],
+            widget_extra=cuerpo, ancho=640)
+        return dialogo.exec() == QDialog.DialogCode.Accepted
+
+    def _lote_sugerencias_seleccion(self):
+        return jt.construir_cambios_sugeridos(self._df_seleccion())
+
+    def _aplicar_sugerencias_seleccion(self):
+        lote = self._lote_sugerencias_seleccion()
         if lote and self._confirmar_lote(len(lote), "Los estados con formato antiguo pasan al estado sugerido."):
             self.guardar_lote_unidades(lote, f"Corrigiendo {len(lote)} unidad(es)…")

@@ -56,6 +56,7 @@ VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA = "BAJA SOLICITADA"
 VALOR_ESTADO_COMERCIAL_VENCIDO = "VENCIDO"
 VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE = "ACTIVACIÓN PENDIENTE"
 VALOR_ESTADO_COMERCIAL_REVISAR = "REVISAR"
+VALOR_ESTADO_COMERCIAL_RENOVADO = "RENOVADO"
 
 # Estados de ESTADO COMERCIAL que "Marcar como Vencido" (Comercial ->
 # Vencidos, 23-09-2026) puede corregir automaticamente a Vencido: solo los
@@ -133,7 +134,7 @@ FORMA_CONTRATO_MAP = {
     'TEST': 'Test',
     'VENTA': 'Venta',
     # Agregado 24-09-2026 junto con FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ:
-    # "Revisar" es una fila real de la matriz entregada por la contraparte comercial pero no
+    # "Revisar" es una fila real de la matriz entregada por Javiera pero no
     # tenía normalización propia (a diferencia del resto de valores de este
     # mapa) -- mismo criterio que ESTADO_COMERCIAL_MAP para "Revisar".
     'REVISAR': 'Revisar',
@@ -145,6 +146,11 @@ ESTADO_COMERCIAL_MAP = {
     'BAJA': 'Baja',
     'BAJA SOLICITADA': 'Baja Solicitada',
     'REVISAR': 'Revisar',
+    # 20-10-2026: contrato reemplazado por uno nuevo (renovación); queda como historial
+    'RENOVADO': 'Renovado',
+    # 19-10-2026: "-" son unidades que nunca tuvieron el servicio (casi todas
+    # Sin Contrato + No aplica). Fuera de la matriz de etapas, igual que antes.
+    '-': 'Sin Servicio',
 }
 
 # Normaliza el formato de ESTADO DEL CM (contrato de mantenimiento) a un
@@ -181,7 +187,7 @@ JUSTTIME_ESTADO_OPCIONES = [
 
 # Variantes antiguas (texto libre del RM) -> estado del catalogo que se
 # sugiere. NO se aplica sola: los datos se muestran tal como vienen y
-# la contraparte comercial los corrige desde la pantalla JustTime (a pedido del usuario).
+# Javiera los corrige desde la pantalla JustTime (a pedido del usuario).
 CONTRATO_JUSTTIME_MAP = {
     'CREAR EN JUSTTIME': JUSTTIME_ESTADO_PENDIENTE,
     'CREAR JUSTTIME': JUSTTIME_ESTADO_PENDIENTE,
@@ -195,18 +201,19 @@ CONTRATO_JUSTTIME_MAP = {
 # Correccion de un error de digitacion confirmado (no un valor de catalogo
 # valido): "ACTIVO" no es un ESTADO COMERCIAL reconocido, el dato correcto es
 # "VIGENTE". Se aplica ANTES de escribir a PruebasFM durante la sincronizacion
-# RM_CONTRATOS (ver RMReporteSyncWorker), en el mismo formato (mayusculas) en que el
+# RM_JAVI (ver RMJaviSyncWorker), en el mismo formato (mayusculas) en que el
 # RM entrega el resto de los valores de esta columna -- no usa el Title Case
 # de ESTADO_COMERCIAL_MAP (ese mapa normaliza capitalizacion en memoria al
 # cargar via DataFrameFormatter.clean(), un paso distinto y posterior).
 ESTADO_COMERCIAL_CORRECCIONES_RM = {
     'ACTIVO': 'VIGENTE',
+    '-': 'SIN SERVICIO',
 }
 
 # ESTADO DE ACTIVACIÓN ACTUAL: "No entregado" se trata como "Sin flota" (15-10-2026,
 # decisión del usuario). Ambos tienen el mismo destino en la matriz y la misma tarea
 # en Operaciones (completar Flota VC y CDB flota). Se aplica en la sincronización
-# RM_CONTRATOS, en mayúsculas como entrega el RM.
+# RM_JAVI, en mayúsculas como entrega el RM.
 ESTADO_ACTIVACION_CORRECCIONES_RM = {
     'NO ENTREGADO': 'SIN FLOTA',
 }
@@ -245,7 +252,7 @@ DROPDOWN_OPTIONS_UNIDAD = {
 
 # Valores de TIPO DE FACTURACION que van a JustTime: habilitan el bloque
 # JustTime en ComercialAgregarDialog y definen las inconsistencias de la
-# pantalla JustTime. Actualizado 05-10-2026 con la confirmación de la contraparte comercial:
+# pantalla JustTime. Actualizado 05-10-2026 con la confirmación de Javiera:
 # Facturación Manual NO va a JustTime (el 30-09-2026 se había asumido que sí);
 # Provisión + tampoco.
 TIPO_FACTURACION_HABILITA_JUSTTIME = {
@@ -264,7 +271,7 @@ TIPO_CM_OPCIONES = ["Gold", "Blue", "Silver", "Current Contract Type", "-"]
 ESTADO_CM_OPCIONES = ["Running", "Expired", "Terminated", "-"]
 
 # Relacion FORMA DE CONTRATO -> TIPO DE CM (nueva regla de negocio,
-# 16-09-2026, definida con la contraparte comercial para ComercialAgregarDialog): cuando
+# 16-09-2026, definida con Javiera para ComercialAgregarDialog): cuando
 # FORMA DE CONTRATO es uno de estos codigos de contrato de mantenimiento,
 # TIPO DE CM se autocompleta al tipo correspondiente. No reemplaza la
 # posibilidad de elegir TIPO DE CM manualmente despues.
@@ -275,15 +282,15 @@ FORMA_CONTRATO_TIPO_CM_MAP = {
 }
 
 # Inversa de FORMA_CONTRATO_TIPO_CM_MAP (30-09-2026, a pedido explícito para
-# contratos.py::importar_excel_reporte): a partir del TIPO DE CM que trae el
-# Excel de la contraparte comercial (Gold/Blue/Silver), la FORMA DE CONTRATO correspondiente.
+# contratos.py::importar_excel_javiera): a partir del TIPO DE CM que trae el
+# Excel de Javiera (Gold/Blue/Silver), la FORMA DE CONTRATO correspondiente.
 # Un TIPO DE CM que no esté aquí (ej. "-" o "Current Contract Type") no
 # fuerza ningún cambio de FORMA DE CONTRATO.
 TIPO_CM_FORMA_CONTRATO_MAP = {v: k for k, v in FORMA_CONTRATO_TIPO_CM_MAP.items()}
 
 # ==========================================
 # MATRIZ DE NEGOCIO: FORMA DE CONTRATO -> TIPO DE FACTURACION válidos
-# (24-09-2026, matriz entregada por la contraparte comercial -- ver captura compartida con
+# (24-09-2026, matriz entregada por Javiera -- ver captura compartida con
 # el usuario). Generaliza la regla anterior, que solo cubría CMB/CMG/CMS ->
 # CM a mano en comercial_agregar.py (_sincronizar_tipo_facturacion_con_forma_contrato).
 # Claves y valores en MAYÚSCULAS: el valor REAL que se guarda en PruebasFM
@@ -318,7 +325,7 @@ FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ = {
 # COMERCIAL u OPERACIONES.
 # ==========================================
 # NO APLICA -> COMERCIAL (28-09-2026, matriz corregida por el usuario junto
-# con la contraparte comercial): antes era OPERACIONES, pero ACTIVACIÓN PENDIENTE (que
+# con Javiera): antes era OPERACIONES, pero ACTIVACIÓN PENDIENTE (que
 # comparte esta fila) ya venía como COMERCIAL, así que las dos filas
 # quedaban inconsistentes entre sí sin razón de negocio. No cambia ninguna
 # pantalla (filtrar_por_gestionar ya captura "No aplica" sin mirar ETAPA
@@ -343,7 +350,7 @@ ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ = {
     # el valor que ofrece el combo (Gestión de Unidades, 16-09-2026) no
     # calzaba con la clave sin tilde de arriba. Se agrega en vez de reemplazar
     # la clave existente por si algún dato histórico ya trae la variante sin
-    # tilde (ej. digitado a mano en RM_CONTRATOS).
+    # tilde (ej. digitado a mano en RM_JAVI).
     'ACTIVACIÓN PENDIENTE': _FILA_OPERACIONES_SALVO_CONECTADO,
     'BAJA': _FILA_OPERACIONES_ACTIVANDO_O_CONECTADO,
     'BAJA SOLICITADA': _FILA_OPERACIONES_ACTIVANDO_O_CONECTADO,
@@ -390,13 +397,13 @@ ETAPA_GESTION_COLORES = {
 }
 
 # ==========================================
-# SINCRONIZACIÓN RM_CONTRATOS -> PRUEBASFM
+# SINCRONIZACIÓN RM_JAVI -> PRUEBASFM
 # (NOMBRES DE COLUMNA, no de valores: no mezclar con los *_MAP de arriba)
 # ==========================================
 
 # Alias de nombre de columna: "como puede venir del RM" -> "nombre oficial en PruebasFM".
 # Reemplaza al dict `renames` que antes vivía hardcodeado en comercial.py.
-RM_CONTRATOS_COLUMN_ALIASES = {
+RM_JAVI_COLUMN_ALIASES = {
     'FECHA INICIO FACTURACIÓN': COL_FECHA_INICIO_FACT,   # -> "INICIO"
     'FECHA TÉRMINO FACTURACIÓN': COL_FECHA_TERMINO_FACT, # -> "TERMINO"
     'OPERACION': COL_INDUSTRIA,
@@ -408,12 +415,12 @@ RM_CONTRATOS_COLUMN_ALIASES = {
 # Este patrón reconoce SOLO esa variante mensual oficial (mes/año al final) y la mapea a
 # "PAGO CM". Nombres que no calcen con el patrón (ej. "PAGO CM PRUEBA", "PAGO CM TEST")
 # no se consideran una variante válida y no se renombran.
-RM_CONTRATOS_PAGO_CM_PATTERN = re.compile(r'^PAGO CM\s+\d{1,2}/\d{4}$', re.IGNORECASE)
+RM_JAVI_PAGO_CM_PATTERN = re.compile(r'^PAGO CM\s+\d{1,2}/\d{4}$', re.IGNORECASE)
 
 # Columnas del RM autorizadas explícitamente a pasar a PruebasFM. Una columna del RM que
 # no esté en esta lista se descarta, aunque su nombre coincida con una columna que ya
 # exista en PruebasFM.xlsx.
-RM_CONTRATOS_COLUMNAS_AUTORIZADAS = [
+RM_JAVI_COLUMNAS_AUTORIZADAS = [
     COL_ID,
     COL_EJECUTIVO,
     COL_PERIODO_INTERNO,
@@ -452,19 +459,19 @@ RM_CONTRATOS_COLUMNAS_AUTORIZADAS = [
 # Columnas que son exclusivamente locales de PruebasFM (no vienen del RM) y deben
 # preservarse tal cual estén en el Excel local durante la sincronización.
 # ETAPA GESTIÓN (25-09-2026, a pedido explícito, corrigiendo un bug real de
-# datos): estaba en RM_CONTRATOS_COLUMNAS_AUTORIZADAS, así que cada sincronización
-# traía el valor de esa columna DESDE RM_CONTRATOS.xlsx (archivo externo mantenido
-# por la contraparte comercial), pisando el cálculo local de
+# datos): estaba en RM_JAVI_COLUMNAS_AUTORIZADAS, así que cada sincronización
+# traía el valor de esa columna DESDE RM_JAVI.xlsx (archivo externo mantenido
+# por Javiera), pisando el cálculo local de
 # DataFrameFormatter.calcular_etapa_gestion_esperada -- la propia "única
 # fuente de verdad" que ese método dice ser. Confirmado contra datos reales:
-# el RM_CONTRATOS tenía 427 filas con el número de CHASIS pegado por error en esa
+# el RM_JAVI tenía 427 filas con el número de CHASIS pegado por error en esa
 # columna y ~3.058 filas con el valor legado 'CLIENTE' (retirado del catálogo
 # el 21-09-2026) -- ambos se reintroducían en PruebasFM en cada sync sin que
 # nadie los hubiera vuelto a escribir a mano. Ahora se preserva el valor
 # LOCAL (el que ya calculó esta misma app) durante el merge, y
-# RMReporteSyncWorker.run() recalcula igual con la matriz de negocio antes de
+# RMJaviSyncWorker.run() recalcula igual con la matriz de negocio antes de
 # escribir a disco (ver el orden de clean() en ese método) -- la columna del
-# RM_CONTRATOS para este campo queda ignorada.
+# RM_JAVI para este campo queda ignorada.
 PRUEBAS_FM_COLUMNAS_LOCALES = [COL_ETAPA_GESTION]
 
 # Columnas técnicas usadas solo en memoria durante la sincronización (matching por VIN).

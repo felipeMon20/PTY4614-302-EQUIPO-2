@@ -13,8 +13,8 @@ from src.services.mail_sync_service import (
 
 def _comercial(**overrides):
     fila = {
-        'CDB': '99999', 'CDB FLOTA': '12345', 'VIN': '9BWZZZ377VT900053', 'CHASIS': 'CHS001',
-        'RAZÓN SOCIAL': 'TRANSPORTES ACME', 'RUT': '31.455.522-3',
+        'CDB': '99999', 'CDB FLOTA': '12345', 'VIN': '9BWZZZ377VT004001', 'CHASIS': 'CHS001',
+        'RAZÓN SOCIAL': 'TRANSPORTES ACME', 'RUT': '76.123.456-7',
         'TIPO DE SERVICIO': 'FULL', 'TERMINO': '31-12-2026',
     }
     fila.update(overrides)
@@ -29,33 +29,33 @@ class TestCruzarCorreosMaestro(unittest.TestCase):
 
     def test_match_normal(self):
         df_comercial = _comercial()
-        df_pbi = pd.DataFrame([{'CDB': '12345', 'Nombre': 'ACME SPA', 'RUT': '31.463.441-8'}])
-        df_contactos = pd.DataFrame([{'CDB': '12345', 'Correo electrónico': 'contacto@acme.example'}])
+        df_pbi = pd.DataFrame([{'CDB': '12345', 'Nombre': 'ACME SPA', 'RUT': '76.999.999-9'}])
+        df_contactos = pd.DataFrame([{'CDB': '12345', 'Correo electrónico': 'contacto@acme.cl'}])
 
         resultado = cruzar_correos_maestro(df_comercial, df_pbi, df_contactos)
 
         self.assertEqual(len(resultado), 1)
         fila = resultado.iloc[0]
-        self.assertEqual(fila['VIN'], '9BWZZZ377VT900053')
+        self.assertEqual(fila['VIN'], '9BWZZZ377VT004001')
         self.assertEqual(fila['CHASIS'], 'CHS001')
         # Razon social y RUT salen de Comercial; el Nombre/RUT de Power BI no se usan.
         self.assertEqual(fila['RAZÓN SOCIAL'], 'TRANSPORTES ACME')
-        self.assertEqual(fila['RUT'], '31.455.522-3')
+        self.assertEqual(fila['RUT'], '76.123.456-7')
         self.assertEqual(fila['TIPO DE SERVICIO'], 'FULL')
         self.assertEqual(fila['FECHA TERMINO'], '31-12-2026')
-        self.assertEqual(fila['CORREO ELECTRÓNICO'], 'contacto@acme.example')
+        self.assertEqual(fila['CORREO ELECTRÓNICO'], 'contacto@acme.cl')
 
     def test_sin_match(self):
         df_comercial = _comercial(**{'CDB FLOTA': '99999'})
         df_pbi = pd.DataFrame([{'CDB': '11111', 'Nombre': 'OTRA EMPRESA', 'RUT': '2-8'}])
-        df_contactos = pd.DataFrame([{'CDB': '11111', 'Correo electrónico': 'otro@empresa.example'}])
+        df_contactos = pd.DataFrame([{'CDB': '11111', 'Correo electrónico': 'otro@empresa.cl'}])
 
         resultado = cruzar_correos_maestro(df_comercial, df_pbi, df_contactos)
 
         self.assertEqual(len(resultado), 1, "La fila de Comercial debe incluirse aunque no haya match.")
         fila = resultado.iloc[0]
         self.assertEqual(fila['RAZÓN SOCIAL'], 'TRANSPORTES ACME')
-        self.assertEqual(fila['RUT'], '31.455.522-3')
+        self.assertEqual(fila['RUT'], '76.123.456-7')
         self.assertEqual(fila['CORREO ELECTRÓNICO'], '')
 
     def test_power_bi_no_completa_razon_social_ni_rut(self):
@@ -76,25 +76,25 @@ class TestCruzarCorreosMaestro(unittest.TestCase):
         df_comercial = _comercial()
         df_pbi = pd.DataFrame(columns=['CDB', 'Nombre', 'RUT'])
         df_contactos = pd.DataFrame([
-            {'CDB': '12345', 'Correo electrónico': 'correo1@empresa.example'},
-            {'CDB': '12345', 'Correo electrónico': 'correo2@empresa.example'},
+            {'CDB': '12345', 'Correo electrónico': 'correo1@empresa.cl'},
+            {'CDB': '12345', 'Correo electrónico': 'correo2@empresa.cl'},
         ])
 
         resultado = cruzar_correos_maestro(df_comercial, df_pbi, df_contactos)
 
-        self.assertEqual(resultado.iloc[0]['CORREO ELECTRÓNICO'], 'correo1@empresa.example; correo2@empresa.example')
+        self.assertEqual(resultado.iloc[0]['CORREO ELECTRÓNICO'], 'correo1@empresa.cl; correo2@empresa.cl')
 
     def test_correos_duplicados_del_mismo_cdb_no_se_repiten(self):
         df_comercial = _comercial()
         df_pbi = pd.DataFrame(columns=['CDB', 'Nombre', 'RUT'])
         df_contactos = pd.DataFrame([
-            {'CDB': '12345', 'Correo electrónico': 'correo1@empresa.example'},
-            {'CDB': '12345', 'Correo electrónico': 'correo1@empresa.example'},
+            {'CDB': '12345', 'Correo electrónico': 'correo1@empresa.cl'},
+            {'CDB': '12345', 'Correo electrónico': 'correo1@empresa.cl'},
         ])
 
         resultado = cruzar_correos_maestro(df_comercial, df_pbi, df_contactos)
 
-        self.assertEqual(resultado.iloc[0]['CORREO ELECTRÓNICO'], 'correo1@empresa.example')
+        self.assertEqual(resultado.iloc[0]['CORREO ELECTRÓNICO'], 'correo1@empresa.cl')
 
     def test_sin_fallback_de_razon_social_desde_power_bi_cuando_comercial_vacio(self):
         df_comercial = _comercial(**{'RAZÓN SOCIAL': ''})
@@ -105,7 +105,7 @@ class TestCruzarCorreosMaestro(unittest.TestCase):
 
         fila = resultado.iloc[0]
         self.assertEqual(fila['RAZÓN SOCIAL'], '')
-        self.assertEqual(fila['RUT'], '31.455.522-3')
+        self.assertEqual(fila['RUT'], '76.123.456-7')
 
     def test_razon_social_vacia_equivalente_nan_none_cero_queda_vacia(self):
         for valor_vacio in ['', 'nan', 'None', '<NA>', '0', '0.0']:
@@ -124,7 +124,7 @@ class TestCruzarCorreosMaestro(unittest.TestCase):
         # una entrada vacia, simplemente no produce filas.
         df_comercial = pd.DataFrame()
         df_pbi = pd.DataFrame([{'CDB': '12345', 'Nombre': 'X', 'RUT': 'Y'}])
-        df_contactos = pd.DataFrame([{'CDB': '12345', 'Correo electrónico': 'x@x.example'}])
+        df_contactos = pd.DataFrame([{'CDB': '12345', 'Correo electrónico': 'x@x.cl'}])
 
         resultado = cruzar_correos_maestro(df_comercial, df_pbi, df_contactos)
 

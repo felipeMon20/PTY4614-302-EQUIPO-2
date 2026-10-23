@@ -21,11 +21,12 @@ from src.theme.ui_scale import NIVELES_ESCALA, get_nivel_escala, set_nivel_escal
 from src.ui import admin_estilo
 from src.ui import comercial_estilo as estilo_com
 from src.ui.guia_conexion import GuiaConexionDialog
+from src.ui.ayuda_botones import crear_pagina_ayuda
 from src.theme.tema import GestorTema, CLARO, OSCURO
 
-EMPRESA = "#003057"
-BRAND_HOVER = "#00446F"
-BRAND_SUAVE = "#E4EDF6"
+VOLVO = "#003057"
+VOLVO_HOVER = "#00446F"
+VOLVO_SUAVE = "#E4EDF6"
 _SIN_FONDO = "border: none; background: transparent;"
 
 
@@ -48,7 +49,7 @@ class TarjetaOpcion(QFrame):
         self.lbl_titulo.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {estilo_com.TINTA}; {_SIN_FONDO}")
         self.lbl_actual = QLabel("Actual")
         self.lbl_actual.setStyleSheet(
-            f"font-size: 11px; font-weight: 600; color: {EMPRESA}; background: {BRAND_SUAVE}; border-radius: 9px; padding: 1px 9px; border: none;")
+            f"font-size: 11px; font-weight: 600; color: {VOLVO}; background: {VOLVO_SUAVE}; border-radius: 9px; padding: 1px 9px; border: none;")
         fila.addWidget(self.lbl_titulo)
         fila.addStretch()
         fila.addWidget(self.lbl_actual)
@@ -62,7 +63,7 @@ class TarjetaOpcion(QFrame):
         self.marcar(False)
 
     def marcar(self, activa):
-        borde = f"2px solid {EMPRESA}" if activa else f"1px solid {estilo_com.LINEA}"
+        borde = f"2px solid {VOLVO}" if activa else f"1px solid {estilo_com.LINEA}"
         self.setStyleSheet(f"QFrame#tarjetaOpcion {{ background: {estilo_com.SUPERFICIE}; border: {borde}; border-radius: 12px; }}")
         self.lbl_actual.setVisible(activa)
 
@@ -75,7 +76,7 @@ class TarjetaOpcion(QFrame):
 class ConfiguracionModule(QWidget):
     _CLAVES_RUTAS = ("EXCEL_PATH", "PROVISION_EXCEL_PATH", "POWERBI_EXCEL_PATH", "CONTACTOS_EXCEL_PATH",
                      "INSTALACIONES_PATH", "CORREOS_EXCEL_PATH", "LOG_CSV_PATH", "DELETED_LOG_EXCEL_PATH",
-                     "CASOS_BAJA_CM_PATH", "RM_REPORTE_PATH", "EJECUTIVOS_PATH")
+                     "CASOS_BAJA_CM_PATH", "RM_JAVI_PATH", "EJECUTIVOS_PATH", "METAS_VC_PATH")
 
     def __init__(self):
         super().__init__()
@@ -98,7 +99,7 @@ class ConfiguracionModule(QWidget):
         cabecera.setObjectName("cabeceraConfig")
         cabecera.setStyleSheet(
             f"QFrame#cabeceraConfig {{ background: {estilo_com.SUPERFICIE}; border: 1px solid {estilo_com.LINEA}; "
-            f"border-top: 3px solid {EMPRESA}; border-radius: 14px; }}")
+            f"border-top: 3px solid {VOLVO}; border-radius: 14px; }}")
         fila_cab = QHBoxLayout(cabecera)
         fila_cab.setContentsMargins(16, 12, 16, 12)
         fila_cab.setSpacing(14)
@@ -106,7 +107,7 @@ class ConfiguracionModule(QWidget):
         icono_cab.setFixedSize(40, 40)
         icono_cab.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icono_cab.setPixmap(qta.icon('fa5s.cog', color='white').pixmap(QSize(18, 18)))
-        icono_cab.setStyleSheet(f"background: {EMPRESA}; border-radius: 11px; border: none;")
+        icono_cab.setStyleSheet(f"background: {VOLVO}; border-radius: 11px; border: none;")
         bloque = QVBoxLayout()
         bloque.setSpacing(0)
         titulo_cab = QLabel("Configuración")
@@ -143,8 +144,8 @@ class ConfiguracionModule(QWidget):
             fila_kpis.addWidget(tarjeta['frame'], 1)
 
         contenedor_tabs, self.tabbar, self._badges = admin_estilo.subpestanas(
-            ["Archivos", "Enlaces", "Apariencia", "Avanzado"])
-        for i in (2, 3):
+            ["Archivos", "Enlaces", "Apariencia", "Avanzado", "Ayuda"])
+        for i in (2, 3, 4):
             self._badges[i].setVisible(False)
         admin_estilo.actualizar_contador(self.tabbar, self._badges, 1, 3)
         raiz.addWidget(contenedor_tabs)
@@ -153,15 +154,20 @@ class ConfiguracionModule(QWidget):
         for config_key in self._CLAVES_RUTAS:
             self.path_inputs[config_key] = QLineEdit(self.config.get(config_key, ""))
 
+        # Contenedores primero: mover una página ya armada a otro contenedor
+        # le reaplica los estilos a todos sus widgets, así se hace una sola vez
         self.paginas = QStackedWidget()
-        for pagina in (self._crear_grupo_carpeta_datos(), self._crear_pagina_enlaces(),
-                       self._crear_grupo_escala(), self._crear_pagina_avanzado()):
-            self.paginas.addWidget(self._con_desplazamiento(pagina))
         marco, capas = admin_estilo.tarjeta_contenido("tarjetaConfiguracion")
         capas.addWidget(self.paginas)
-        self.tabbar.currentChanged.connect(self.paginas.setCurrentIndex)
         raiz.addWidget(marco, 1)
         raiz.addWidget(tira_estado)
+        for pagina in (self._crear_grupo_carpeta_datos(), self._crear_pagina_enlaces(),
+                       self._crear_grupo_escala(), self._crear_pagina_avanzado()):
+            self._con_desplazamiento(pagina, self.paginas)
+        # Ayuda es la página más grande (~600 widgets): se arma la primera vez que se abre
+        self._area_ayuda = self._con_desplazamiento(None, self.paginas)
+        self.tabbar.currentChanged.connect(self._asegurar_pagina_ayuda)
+        self.tabbar.currentChanged.connect(self.paginas.setCurrentIndex)
 
         if not ajustes.MODO_PROGRAMADOR:
             self.tabbar.setTabVisible(3, False)
@@ -181,7 +187,7 @@ class ConfiguracionModule(QWidget):
         return pagina, lay
 
     @staticmethod
-    def _con_desplazamiento(pagina):
+    def _con_desplazamiento(pagina, pila):
         """Cada pestaña mantiene su altura natural y se desplaza si no cabe."""
         area = QScrollArea()
         area.setWidgetResizable(True)
@@ -189,8 +195,84 @@ class ConfiguracionModule(QWidget):
         area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         area.setStyleSheet(estilo_com.QSS_SCROLL_PANEL)
         area.viewport().setAutoFillBackground(False)
-        area.setWidget(pagina)
+        pila.addWidget(area)
+        if pagina is not None:
+            area.setWidget(pagina)
         return area
+
+    def _asegurar_pagina_ayuda(self, indice):
+        if self.paginas.widget(indice) is self._area_ayuda and self._area_ayuda.widget() is None:
+            contenedor = QWidget()
+            contenedor.setObjectName("paginaConfiguracion")
+            contenedor.setStyleSheet("QWidget#paginaConfiguracion { background: transparent; }")
+            lay = QVBoxLayout(contenedor)
+            lay.setContentsMargins(20, 18, 20, 0)
+            lay.setSpacing(0)
+            lay.addWidget(self._crear_grupo_actualizaciones())
+            lay.addWidget(crear_pagina_ayuda(self._titulo_pagina))
+            self._area_ayuda.setWidget(contenedor)
+
+    def _crear_grupo_actualizaciones(self):
+        from src.core.actualizador import ControlActualizacion
+        self._control_act = ControlActualizacion.instancia()
+        marco, caja = self._marco_lista("listaActualizaciones")
+        caja.setContentsMargins(18, 14, 18, 14)
+        caja.setSpacing(8)
+        self._titulo_pagina(caja, "Actualizaciones", "Versión instalada y última versión publicada por el equipo.")
+        self.lbl_act_instalada = QLabel(self._control_act.version_instalada)
+        self.lbl_act_publicada = QLabel()
+        for etiqueta, valor in (("Versión instalada", self.lbl_act_instalada), ("Última publicada", self.lbl_act_publicada)):
+            fila = QHBoxLayout()
+            lbl = QLabel(etiqueta)
+            lbl.setStyleSheet(f"font-size: 13px; color: {estilo_com.APAGADO}; {_SIN_FONDO}")
+            valor.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {estilo_com.TINTA}; {_SIN_FONDO}")
+            fila.addWidget(lbl)
+            fila.addStretch()
+            fila.addWidget(valor)
+            caja.addLayout(fila)
+        self.lbl_act_notas = QLabel()
+        self.lbl_act_notas.setWordWrap(True)
+        self.lbl_act_notas.setStyleSheet(f"font-size: 12px; color: {estilo_com.APAGADO}; {_SIN_FONDO}")
+        caja.addWidget(self.lbl_act_notas)
+        botones = QHBoxLayout()
+        self.btn_act_instalar = self._boton(" Actualizar ahora", 'fa5s.download', "primario")
+        self.btn_act_instalar.clicked.connect(self._instalar_actualizacion)
+        self.btn_act_buscar = self._boton(" Buscar actualizaciones", 'fa5s.sync-alt')
+        self.btn_act_buscar.clicked.connect(lambda *_: self._control_act.buscar())
+        self.lbl_act_revision = QLabel()
+        self.lbl_act_revision.setStyleSheet(f"font-size: 11px; color: {estilo_com.APAGADO}; {_SIN_FONDO}")
+        botones.addWidget(self.btn_act_instalar)
+        botones.addWidget(self.btn_act_buscar)
+        botones.addStretch()
+        botones.addWidget(self.lbl_act_revision)
+        caja.addLayout(botones)
+        self._control_act.cambio.connect(self._refrescar_actualizaciones)
+        self._refrescar_actualizaciones()
+        return marco
+
+    def _refrescar_actualizaciones(self):
+        from src.services.actualizador_service import puede_instalar
+        control = self._control_act
+        man = control.manifiesto
+        disponible = control.disponible()
+        if control.revision_en_curso:
+            publicada = "Buscando…"
+        elif man is None:
+            publicada = "No se pudo leer la carpeta de actualizaciones"
+        else:
+            publicada = f"{man['version']} · " + ("disponible" if disponible else "estás al día")
+        self.lbl_act_publicada.setText(publicada)
+        self.lbl_act_notas.setText(man["notas"] if disponible and man["notas"] else "")
+        self.lbl_act_notas.setVisible(bool(self.lbl_act_notas.text()))
+        self.btn_act_instalar.setEnabled(disponible and not control.revision_en_curso)
+        self.btn_act_instalar.setToolTip("" if puede_instalar() else "La instalación automática solo funciona en el ejecutable")
+        self.btn_act_buscar.setEnabled(not control.revision_en_curso)
+        if control.ultima_revision is not None:
+            self.lbl_act_revision.setText(f"Última revisión: {control.ultima_revision:%d-%m-%Y %H:%M}")
+
+    def _instalar_actualizacion(self):
+        from src.ui.dialogo_actualizacion import abrir_dialogo_actualizacion
+        abrir_dialogo_actualizacion(self.window())
 
     @staticmethod
     def _titulo_pagina(lay, titulo, info):
@@ -204,17 +286,17 @@ class ConfiguracionModule(QWidget):
 
     @staticmethod
     def _boton(texto, icono, tipo="secundario"):
-        """Botón de Configuración: 'primario' (azul Empresa Demo), 'secundario' (borde fino) o 'texto'."""
+        """Botón de Configuración: 'primario' (azul Volvo), 'secundario' (borde fino) o 'texto'."""
         btn = QPushButton(texto)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         if tipo == "primario":
             btn.setIcon(qta.icon(icono, color='white'))
-            qss = (f"QPushButton {{ background: {EMPRESA}; color: white; border: 1px solid {EMPRESA}; }}"
-                   f"QPushButton:hover {{ background: {BRAND_HOVER}; border-color: {BRAND_HOVER}; }}")
+            qss = (f"QPushButton {{ background: {VOLVO}; color: white; border: 1px solid {VOLVO}; }}"
+                   f"QPushButton:hover {{ background: {VOLVO_HOVER}; border-color: {VOLVO_HOVER}; }}")
         elif tipo == "texto":
-            btn.setIcon(qta.icon(icono, color=EMPRESA))
-            qss = (f"QPushButton {{ background: transparent; color: {EMPRESA}; border: 1px solid transparent; }}"
-                   f"QPushButton:hover {{ background: {BRAND_SUAVE}; }}")
+            btn.setIcon(qta.icon(icono, color=VOLVO))
+            qss = (f"QPushButton {{ background: transparent; color: {VOLVO}; border: 1px solid transparent; }}"
+                   f"QPushButton:hover {{ background: {VOLVO_SUAVE}; }}")
         else:
             btn.setIcon(qta.icon(icono, color=estilo_com.APAGADO))
             qss = (f"QPushButton {{ background: {estilo_com.SUPERFICIE}; color: {estilo_com.TINTA}; border: 1px solid {estilo_com.LINEA}; }}"
@@ -274,8 +356,8 @@ class ConfiguracionModule(QWidget):
             logo = QLabel()
             logo.setFixedSize(38, 38)
             logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            logo.setPixmap(qta.icon(icono, color=EMPRESA).pixmap(QSize(16, 16)))
-            logo.setStyleSheet(f"background: {BRAND_SUAVE}; border-radius: 10px; border: none;")
+            logo.setPixmap(qta.icon(icono, color=VOLVO).pixmap(QSize(16, 16)))
+            logo.setStyleSheet(f"background: {VOLVO_SUAVE}; border-radius: 10px; border: none;")
             textos = QVBoxLayout()
             textos.setSpacing(0)
             lbl_nombre = QLabel(nombre)
@@ -327,7 +409,7 @@ class ConfiguracionModule(QWidget):
         pildora.setText(texto)
         pildora.setStyleSheet(f"background: {fondo}; color: {color}; border-radius: 11px; padding: 3px 11px; "
                               "font-size: 11px; font-weight: 600; border: none;")
-        borde = DANGER if (url and not url.startswith(("http://", "https://"))) else EMPRESA
+        borde = DANGER if (url and not url.startswith(("http://", "https://"))) else VOLVO
         txt_input.setStyleSheet(
             f"QLineEdit {{ background: {estilo_com.SUPERFICIE}; color: {estilo_com.TINTA}; border: 1px solid {borde}; "
             f"border-radius: 9px; padding: 8px 12px; font-size: 13px; }}")
@@ -338,20 +420,20 @@ class ConfiguracionModule(QWidget):
         self._titulo_pagina(lay, "Herramientas de programador",
                             "Solo visible en modo programador (MODO_PROGRAMADOR en config/settings.py).")
 
-        marco, caja = self._marco_lista("grupoRMReporte")
+        marco, caja = self._marco_lista("grupoRMJaviera")
         interior = QVBoxLayout()
         interior.setContentsMargins(16, 14, 16, 14)
         interior.setSpacing(8)
-        lbl_rm = QLabel("Archivo de referencia (RM Reporte)")
+        lbl_rm = QLabel("Archivo de referencia (RM Javiera)")
         lbl_rm.setStyleSheet(f"font-weight: 600; font-size: 13px; color: {estilo_com.TINTA}; {_SIN_FONDO}")
         interior.addWidget(lbl_rm)
         fila_rm = QHBoxLayout()
-        campo_rm = self.path_inputs["RM_REPORTE_PATH"]
-        campo_rm.setPlaceholderText("RM_REPORTE_CONECTADOS.xlsx")
+        campo_rm = self.path_inputs["RM_JAVI_PATH"]
+        campo_rm.setPlaceholderText("RM_JAVI_VOLVO CONNECT.xlsx")
         campo_rm.setStyleSheet(self._qss_campo())
         fila_rm.addWidget(campo_rm, 1)
         btn_rm = self._boton("Seleccionar archivo", 'fa5s.folder-open', "secundario")
-        btn_rm.clicked.connect(self._elegir_rm_reporte)
+        btn_rm.clicked.connect(self._elegir_rm_javiera)
         fila_rm.addWidget(btn_rm)
         interior.addLayout(fila_rm)
         self.lbl_estado_rm = QLabel("")
@@ -363,8 +445,8 @@ class ConfiguracionModule(QWidget):
 
         fila = QHBoxLayout()
         fila.setSpacing(10)
-        self.btn_sync_reporte = self._boton("Sincronizar RM_CONTRATOS", 'fa5s.cloud-download-alt', "primario")
-        self.btn_sync_reporte.clicked.connect(self._abrir_sync_rm_reporte)
+        self.btn_sync_javi = self._boton("Sincronizar RM_JAVI", 'fa5s.cloud-download-alt', "primario")
+        self.btn_sync_javi.clicked.connect(self._abrir_sync_rm_javi)
         self.btn_refresh = self._boton("Actualizar diagnóstico", 'fa5s.sync-alt', "secundario")
         self.btn_refresh.clicked.connect(self.force_refresh)
         self.btn_view_errors = self._boton("Ver errores", 'fa5s.search', "primario")
@@ -373,7 +455,7 @@ class ConfiguracionModule(QWidget):
             "font-size: 13px; font-weight: 600; }")
         self.btn_view_errors.setVisible(False)
         self.btn_view_errors.clicked.connect(self._show_error_dialog)
-        for btn in (self.btn_sync_reporte, self.btn_refresh, self.btn_view_errors):
+        for btn in (self.btn_sync_javi, self.btn_refresh, self.btn_view_errors):
             fila.addWidget(btn)
         fila.addStretch()
         lay.addLayout(fila)
@@ -384,18 +466,18 @@ class ConfiguracionModule(QWidget):
     def _qss_campo():
         return (f"QLineEdit {{ background: {estilo_com.SUPERFICIE_2}; color: {estilo_com.TINTA}; border: 1px solid {estilo_com.LINEA}; "
                 "border-radius: 10px; padding: 9px 12px; font-size: 13px; }"
-                f"QLineEdit:focus {{ border-color: {EMPRESA}; }}")
+                f"QLineEdit:focus {{ border-color: {VOLVO}; }}")
 
-    def _elegir_rm_reporte(self):
-        actual = self.path_inputs["RM_REPORTE_PATH"].text().strip()
+    def _elegir_rm_javiera(self):
+        actual = self.path_inputs["RM_JAVI_PATH"].text().strip()
         ruta, _ = QFileDialog.getOpenFileName(
-            self, "Selecciona el archivo de referencia (RM Reporte)",
+            self, "Selecciona el archivo de referencia (RM Javiera)",
             os.path.dirname(actual) if actual else "", "Archivos Excel (*.xlsx *.xlsm)")
         if ruta:
-            self._asignar_ruta("RM_REPORTE_PATH", ruta)
+            self._asignar_ruta("RM_JAVI_PATH", ruta)
 
     def _refrescar_estado_rm(self):
-        ruta = self.path_inputs["RM_REPORTE_PATH"].text().strip()
+        ruta = self.path_inputs["RM_JAVI_PATH"].text().strip()
         if not ruta:
             self.lbl_estado_rm.setText("Sin archivo seleccionado")
             color = TEXT_SECONDARY
@@ -420,7 +502,7 @@ class ConfiguracionModule(QWidget):
         fila = QHBoxLayout()
         fila.setSpacing(8)
         self.data_dir_input = QLineEdit(carpeta_inicial)
-        self.data_dir_input.setPlaceholderText("Carpeta que contiene RM_CONTRATOS.csv y los demás archivos")
+        self.data_dir_input.setPlaceholderText("Carpeta que contiene RM_JAVI.csv y los demás archivos")
         self.data_dir_input.setStyleSheet(self._qss_campo())
         self.data_dir_input.addAction(qta.icon('fa5s.folder', color=estilo_com.APAGADO), QLineEdit.ActionPosition.LeadingPosition)
         fila.addWidget(self.data_dir_input, 1)
@@ -486,7 +568,7 @@ class ConfiguracionModule(QWidget):
         if not encontrados:
             QMessageBox.information(
                 self, "Autodetectar archivos",
-                "No encontré los archivos de la aplicación. Elige a mano la carpeta que contiene RM_CONTRATOS.csv.")
+                "No encontré los archivos de la aplicación. Elige a mano la carpeta que contiene RM_JAVI.csv.")
             return
         self.data_dir_input.setText(os.path.normpath(base))
         for clave, ruta in encontrados.items():
@@ -507,7 +589,7 @@ class ConfiguracionModule(QWidget):
     _GRUPOS_ARCHIVOS = (
         ("Base de datos principal", ("EXCEL_PATH", "PROVISION_EXCEL_PATH", "INSTALACIONES_PATH", "POWERBI_EXCEL_PATH")),
         ("Registros y contactos", ("LOG_CSV_PATH", "DELETED_LOG_EXCEL_PATH", "CONTACTOS_EXCEL_PATH", "CORREOS_EXCEL_PATH",
-                                    "EJECUTIVOS_PATH", "CASOS_BAJA_CM_PATH", "FACTURACION_MANUAL_PATH")),
+                                    "EJECUTIVOS_PATH", "METAS_VC_PATH", "CASOS_BAJA_CM_PATH", "FACTURACION_MANUAL_PATH")),
     )
 
     def _refrescar_estado_rutas(self):
@@ -600,7 +682,7 @@ class ConfiguracionModule(QWidget):
     @staticmethod
     def _vista_tema(oscuro):
         fondo, barra, linea, acento = (("#16202E", "#0B1A2B", "#33465F", "#5AA2DC") if oscuro
-                                       else ("#F5F7FA", EMPRESA, "#D3DBE6", EMPRESA))
+                                       else ("#F5F7FA", VOLVO, "#D3DBE6", VOLVO))
         vista = QFrame()
         vista.setFixedHeight(78)
         vista.setStyleSheet(f"QFrame {{ background: {fondo}; border: 1px solid {estilo_com.LINEA}; border-radius: 8px; }}")
@@ -741,10 +823,10 @@ class ConfiguracionModule(QWidget):
         layout.addLayout(texto, 1)
         return {'frame': frame, 'val_lbl': val_lbl, 'icon_color': icon_color}
 
-    def _abrir_sync_rm_reporte(self):
+    def _abrir_sync_rm_javi(self):
         # Solo modo desarrollador: en producción esta opción desaparece de la app.
-        from src.ui.comercial import SyncRMReporteDialog
-        if SyncRMReporteDialog(self).exec() == QDialog.DialogCode.Accepted:
+        from src.ui.comercial import SyncRMJaviDialog
+        if SyncRMJaviDialog(self).exec() == QDialog.DialogCode.Accepted:
             self.data_manager.data_ready.emit()
 
     def update_health_panel(self):
@@ -826,7 +908,7 @@ class ConfiguracionModule(QWidget):
         # el nombre de la clave de configuracion se mantiene igual para no
         # romper app_config.json existentes, solo cambio el formato del
         # archivo al que apunta. El resto sigue siendo *.xlsx/*.xlsm como siempre.
-        campos_csv = ("LOG_CSV_PATH", "CASOS_BAJA_CM_PATH", "CORREOS_EXCEL_PATH")
+        campos_csv = ("LOG_CSV_PATH", "CASOS_BAJA_CM_PATH", "CORREOS_EXCEL_PATH", "METAS_VC_PATH")
         filtro = "Archivo CSV (*.csv)" if config_key in campos_csv else "Archivos Excel (*.xlsx *.xlsm)"
         ruta, _ = QFileDialog.getOpenFileName(self, "Seleccionar archivo", os.path.dirname(text_input.text()) if text_input.text() else "", filtro)
         if ruta:
@@ -930,7 +1012,8 @@ class ConfiguracionModule(QWidget):
             nombre_base_excel = os.path.splitext(os.path.basename(EXCEL_PATH))[0]
             nombre_backup = os.path.basename(ruta_backup)
             if not (nombre_backup.startswith(f"{nombre_base_excel}_backup_")
-                    or (nombre_base_excel == "RM_CONTRATOS" and nombre_backup.startswith("PruebasFM_backup_"))):
+                    or (nombre_base_excel in ("RM_JAVI", "Registro Maestro")
+                        and nombre_backup.startswith(("RM_JAVI_backup_", "Registro Maestro_backup_", "PruebasFM_backup_")))):
                 QMessageBox.critical(self, "Backup incompatible",
                     f"El archivo seleccionado ('{nombre_backup}') no es una copia de seguridad de la base de datos principal ({os.path.basename(EXCEL_PATH)}).\n\n"
                     "Restaurarlo aquí sobrescribiría la base de datos con datos de otro archivo. Selecciona un backup que comience con "

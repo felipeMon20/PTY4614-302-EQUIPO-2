@@ -652,8 +652,8 @@ def sync(data: dict, project_root: str, calidad_dir: str = None) -> dict:
     events = []
     _log(events, "Sincronizacion iniciada.")
 
-    if os.environ.get("BRAND_SKIP_QUALITY_SYNC"):
-        _log(events, "BRAND_SKIP_QUALITY_SYNC activo: sincronizacion de calidad omitida.")
+    if os.environ.get("VOLVO_SKIP_QUALITY_SYNC"):
+        _log(events, "VOLVO_SKIP_QUALITY_SYNC activo: sincronizacion de calidad omitida.")
         return {"ok": True, "skipped": True, "events": events, "documents": {}}
 
     calidad_dir = calidad_dir or os.path.join(project_root, "duoc", "calidad")

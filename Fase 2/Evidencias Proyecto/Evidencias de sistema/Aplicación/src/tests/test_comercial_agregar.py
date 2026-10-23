@@ -40,37 +40,37 @@ class TestComercialAgregarDialogAutoModelo(unittest.TestCase):
 
     def test_posicion_r_completa_modelo_fh(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2RB00CXRA900064")
+        dialog.inputs['VIN'].setText("YV2RB00CXRA334990")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "FH")
 
     def test_posicion_r_mas_b40_completa_modelo_fhe(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2RB40CXRA900064")
+        dialog.inputs['VIN'].setText("YV2RB40CXRA334990")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "FHE")
 
     def test_posicion_x_completa_modelo_fm(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2XB00C0RA900056")
+        dialog.inputs['VIN'].setText("YV2XB00C0RA339736")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "FM")
 
     def test_posicion_x_mas_b40_completa_modelo_fme(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2XB40C0RA900056")
+        dialog.inputs['VIN'].setText("YV2XB40C0RA339736")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "FME")
 
     def test_posicion_k_completa_modelo_vm(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2KB00C0RA900056")
+        dialog.inputs['VIN'].setText("YV2KB00C0RA339736")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "VM")
 
     def test_posicion_t_completa_modelo_fl(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2TB00C0RA900056")
+        dialog.inputs['VIN'].setText("YV2TB00C0RA339736")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "FL")
 
     def test_posicion_v_completa_modelo_fe(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText("YV2VB00C0RA900056")
+        dialog.inputs['VIN'].setText("YV2VB00C0RA339736")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "FE")
 
     def test_codigo_desconocido_no_sobrescribe_modelo(self):
@@ -78,7 +78,7 @@ class TestComercialAgregarDialogAutoModelo(unittest.TestCase):
         # Deja MODELO con una seleccion manual previa, simulando que el
         # usuario ya habia elegido un valor a mano.
         dialog.inputs['MODELO'].setCurrentText("N/A")
-        dialog.inputs['VIN'].setText("YV2ZB00C0RA900056")
+        dialog.inputs['VIN'].setText("YV2ZB00C0RA339736")
         self.assertEqual(dialog.inputs['MODELO'].currentText(), "N/A")
 
 
@@ -112,14 +112,14 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
 
     # --- Autocompletado por RUT ---
     # Reproduce el bug real reportado el 16-09-2026: PruebasFM guarda el RUT
-    # con puntos y guion (ej. '31.431.765-6', mismo formato que
+    # con puntos y guion (ej. '12.345.678-9', mismo formato que
     # generar_mock_data.py), pero la comparación anterior era un match
     # exacto de texto -- cualquier RUT tecleado con un formato distinto
     # (sin puntos, sin guion, con espacios) no encontraba nada.
     def _df_comercial_rut_formateado(self):
         return pd.DataFrame({
             'VIN': ['YV2FMT0000001', 'YV2FMT0000002'],
-            'RUT': ['31.431.765-6', '31.431.765-6'],
+            'RUT': ['12.345.678-9', '12.345.678-9'],
             'RAZÓN SOCIAL': ['TRANSPORTES DEMO SPA', 'TRANSPORTES DEMO SPA'],
             'CDB': ['5550001', '5550001'],
             'EJECUTIVO': ['CARLA SOTO', 'CARLA SOTO'],
@@ -132,7 +132,7 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
             flotas_unicas=[], dropdown_options=_DROPDOWN_OPTIONS,
             df_comercial=self._df_comercial_rut_formateado(),
         )
-        dialog.inputs['RUT'].setText('314317656')  # RUT real: 31.431.765-6, tecleado "limpio"
+        dialog.inputs['RUT'].setText('123456789')  # RUT real: 12.345.678-9, tecleado "limpio"
         self.assertEqual(dialog.inputs['RAZÓN SOCIAL'].text(), 'TRANSPORTES DEMO SPA')
 
     def test_autocompletado_rut_sin_puntos_ni_guion_trae_cdb_ejecutivo_industria(self):
@@ -140,7 +140,7 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
             flotas_unicas=[], dropdown_options=_DROPDOWN_OPTIONS,
             df_comercial=self._df_comercial_rut_formateado(),
         )
-        dialog.inputs['RUT'].setText('31431765-6')  # con guion pero sin puntos
+        dialog.inputs['RUT'].setText('12345678-9')  # con guion pero sin puntos
         self.assertEqual(dialog.inputs['CDB'].text(), '5550001')
         self.assertEqual(dialog.inputs['EJECUTIVO'].currentText(), 'CARLA SOTO')
         self.assertEqual(dialog.inputs['INDUSTRIA'].currentText(), 'Minería')
@@ -150,13 +150,13 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
             flotas_unicas=[], dropdown_options=_DROPDOWN_OPTIONS,
             df_comercial=self._df_comercial_rut_formateado(),
         )
-        dialog.inputs['RUT'].setText(' 31.431.765-6 ')
+        dialog.inputs['RUT'].setText(' 12.345.678-9 ')
         self.assertEqual(dialog.inputs['RAZÓN SOCIAL'].text(), 'TRANSPORTES DEMO SPA')
 
     def test_autocompletado_rut_razon_social_inconsistente_no_autocompleta(self):
         df = pd.DataFrame({
             'VIN': ['YV2INC0000001', 'YV2INC0000002'],
-            'RUT': ['31.431.765-6', '31.431.765-6'],
+            'RUT': ['12.345.678-9', '12.345.678-9'],
             'RAZÓN SOCIAL': ['NOMBRE VIEJO SPA', 'NOMBRE NUEVO SPA'],
             'CDB': ['1', '1'],
             'EJECUTIVO': ['ANA', 'ANA'],
@@ -164,7 +164,7 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
             'INDUSTRIA': ['Minería', 'Minería'],
         })
         dialog = ComercialAgregarDialog(flotas_unicas=[], dropdown_options=_DROPDOWN_OPTIONS, df_comercial=df)
-        dialog.inputs['RUT'].setText('314317656')
+        dialog.inputs['RUT'].setText('123456789')
         self.assertEqual(dialog.inputs['RAZÓN SOCIAL'].text(), '')
         self.assertIn('NOMBRE VIEJO SPA', dialog.inputs['RAZÓN SOCIAL'].toolTip())
         self.assertIn('NOMBRE NUEVO SPA', dialog.inputs['RAZÓN SOCIAL'].toolTip())
@@ -204,7 +204,7 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
     def test_chasis_se_recalcula_al_cambiar_vin(self):
         dialog = self._make_dialog()
         dialog.inputs['VIN'].setText('YV2AAAAAAA334990')
-        self.assertEqual(dialog.inputs['CHASIS'].text(), 'A900064')
+        self.assertEqual(dialog.inputs['CHASIS'].text(), 'A334990')
         dialog.inputs['VIN'].setText('YV2BBBBBBB339736')
         self.assertEqual(dialog.inputs['CHASIS'].text(), 'B339736')
 
@@ -215,11 +215,11 @@ class TestComercialAgregarDialogGestionUnidades(unittest.TestCase):
 
     def test_modelo_manual_no_se_sobrescribe_con_nuevo_vin(self):
         dialog = self._make_dialog()
-        dialog.inputs['VIN'].setText('YV2RB00CXRA900064')
+        dialog.inputs['VIN'].setText('YV2RB00CXRA334990')
         self.assertEqual(dialog.inputs['MODELO'].currentText(), 'FH')
         dialog.inputs['MODELO'].setCurrentText('VM')
         dialog._on_modelo_editado_manualmente(0)  # simula la señal `activated` de una elección real del usuario
-        dialog.inputs['VIN'].setText('YV2XB00C0RA900056')  # decodificaría a FM
+        dialog.inputs['VIN'].setText('YV2XB00C0RA339736')  # decodificaría a FM
         self.assertEqual(dialog.inputs['MODELO'].currentText(), 'VM')
 
     # --- ESTADO DE ENTREGA ---
@@ -772,7 +772,7 @@ class TestComercialAgregarDialogJustTimeCM(unittest.TestCase):
         self.assertFalse(dialog.inputs['TERMINO'].isEnabled())
 
     def test_justtime_deshabilitado_para_facturacion_manual(self):
-        """05-10-2026 (confirmado por la contraparte comercial): Facturación Manual NO va a JustTime."""
+        """05-10-2026 (confirmado por Javiera): Facturación Manual NO va a JustTime."""
         dialog = self._make_dialog()
         dialog.inputs['FORMA DE CONTRATO'].setCurrentText('Venta')  # admite 'Facturación Manual'
         self._elegir_tipo_facturacion(dialog, 'Facturación Manual')
@@ -1415,13 +1415,13 @@ class TestComercialUnidadFormContratosPorId(unittest.TestCase):
     def setUp(self):
         from src.ui.comercial_agregar import ComercialUnidadFormWidget
         df = pd.DataFrame({
-            'ID': ['1', '2'], 'VIN': ['YV2AAA00000900054', 'YV2AAA00000900055'],
+            'ID': ['1', '2'], 'VIN': ['YV2AAA00000000001', 'YV2AAA00000000002'],
             'ESTADO COMERCIAL': ['Baja', 'Vigente'],
             'ESTADO DE ACTIVACIÓN ACTUAL': ['Desconectado', 'Conectado'],
         })
         self.form = ComercialUnidadFormWidget([], _DROPDOWN_OPTIONS_REALES, df)
         self.baja = {
-            'ID': '1', 'VIN': 'YV2AAA00000900054', 'ESTADO COMERCIAL': 'Baja',
+            'ID': '1', 'VIN': 'YV2AAA00000000001', 'ESTADO COMERCIAL': 'Baja',
             'ESTADO DE ACTIVACIÓN ACTUAL': 'Desconectado', 'RAZÓN SOCIAL': 'ACME', 'RUT': '1-9', 'CDB': '555',
             'FORMA DE CONTRATO': 'Venta', 'TIPO DE FACTURACION': 'CLIENTE', 'INICIO CONTRATO': '01-01-2024',
             'DURACIÓN (MESES)': '12', 'PERIODO INTERNO': 'Enero - 2024',
@@ -1457,7 +1457,7 @@ class TestComercialUnidadFormContratosPorId(unittest.TestCase):
         self.assertEqual(self.form._title_lbl.text(), 'Nuevo contrato')
         self.assertFalse(self.form.inputs['VIN'].isEnabled())
         datos = self.form.get_data()
-        self.assertEqual(datos['VIN'], 'YV2AAA00000900054')
+        self.assertEqual(datos['VIN'], 'YV2AAA00000000001')
         self.assertEqual(datos['RAZÓN SOCIAL'], 'ACME')
         self.assertEqual(datos['FORMA DE CONTRATO'], '-')
         self.assertEqual(datos['INICIO CONTRATO'], '-')
@@ -1468,7 +1468,7 @@ class TestComercialUnidadFormContratosPorId(unittest.TestCase):
         self.assertTrue(self.form.btn_save.isEnabled())
 
     def test_nuevo_contrato_sobre_vin_con_contrato_abierto_bloquea_guardar(self):
-        self.form.cargar_para_nuevo_contrato(dict(self.baja, **{'VIN': 'YV2AAA00000900055'}))
+        self.form.cargar_para_nuevo_contrato(dict(self.baja, **{'VIN': 'YV2AAA00000000002'}))
         self.assertFalse(self.form.btn_save.isEnabled())
 
     def test_volver_a_crear_unidad_limpia_los_modos_de_contrato(self):

@@ -46,7 +46,7 @@ class AsistenteRutasDialog(QDialog):
 
         fila = QHBoxLayout()
         self.txt_carpeta = QLineEdit()
-        self.txt_carpeta.setPlaceholderText("Carpeta que contiene RM_CONTRATOS.csv")
+        self.txt_carpeta.setPlaceholderText("Carpeta que contiene RM_JAVI.csv")
         self.txt_carpeta.setReadOnly(True)
         btn_buscar = QPushButton(" Buscar automáticamente")
         ThemeManager.apply_primary_button(btn_buscar)

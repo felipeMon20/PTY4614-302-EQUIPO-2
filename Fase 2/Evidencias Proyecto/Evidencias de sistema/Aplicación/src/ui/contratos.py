@@ -13,7 +13,7 @@ from PyQt6.QtGui import QGuiApplication, QColor
 import config.settings
 from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui.transiciones import cambiar_pagina_animada
 from src.ui.guardado_overlay import mostrar_guardando, guardado_listo, terminar_guardando, crear_tarjeta_carga
 from src.ui.formulario_unidad import editar_unidad, PESTANA_JUSTTIME_CM
@@ -26,14 +26,14 @@ from src.services import comercial_services
 from src.services import contratos_service as ct_service
 from src.services import provisiones_services
 from src.core.constants import (TIPO_CM_OPCIONES, ESTADO_CM_OPCIONES, COL_RUT, COL_RAZON_SOCIAL,
-                                 TIPO_CM_FORMA_CONTRATO_MAP, VALOR_TIPO_FACT_CM, COL_ESTADO_ACTIVACION)
+                                 TIPO_CM_FORMA_CONTRATO_MAP, VALOR_TIPO_FACT_CM, COL_ESTADO_ACTIVACION, COL_CDB_FLOTA)
 
 logger = logging.getLogger(__name__)
 
 MODULE_ACCENT = MODULE_COLORS.get("Contratos (CM)", PRIMARY)
 
 # Colores de badge para TIPO DE CM / ESTADO DEL CM (valores reales del Excel
-# 3PC, ver importar_excel_reporte). Mismo lenguaje visual que el _badge de
+# 3PC, ver importar_excel_javiera). Mismo lenguaje visual que el _badge de
 # facturacion_manual.py, con sus propios valores porque este modulo trabaja
 # con estados en ingles (Running/Expired/Terminated), no con los estados
 # comerciales en español que usa esa pantalla.
@@ -85,7 +85,7 @@ class SaveContratosThread(QThread):
 # =========================================================
 class ResumenImportacionDialog(QDialog):
     """Panel previo a inyectar un import de Contratos CM a la Base
-    Comercial (ver ContratosModule.importar_excel_reporte), con el resumen
+    Comercial (ver ContratosModule.importar_excel_javiera), con el resumen
     de lo que va a pasar antes de confirmar: mismo patron visual que
     DialogoAccionCm/VinsHuerfanosAlertDialog (tarjeta blanca sobre fondo
     gris), agregando una grilla de KPI y las filas de cambio de estado
@@ -249,7 +249,7 @@ class ResumenImportacionDialog(QDialog):
 class VinsNuevosContratoAlertDialog(QDialog):
     """Alerta simple (30-09-2026) para los VIN que trae el Excel de
     Contratos CM (3PC) pero que todavia no tienen fila en Comercial (RM):
-    hoy importar_excel_reporte() los ignora en silencio porque solo
+    hoy importar_excel_javiera() los ignora en silencio porque solo
     actualiza VIN que ya existen. Mismo patron visual y misma idea que
     provisiones.py::VinsHuerfanosAlertDialog -- unico camino para
     resolverlos es abrir VincularContratoComercialDialog."""
@@ -309,7 +309,7 @@ class VincularContratoComercialDialog(QDialog):
     """Único camino para resolver un VIN de Contratos CM sin ficha en
     Comercial. A diferencia de provisiones.py::VincularComercialDialog (que
     saca el 'CLIENTE' de Provisiones), acá el nombre del cliente viene
-    directo del propio Excel de la contraparte comercial (columna "Current Invoicing
+    directo del propio Excel de Javiera (columna "Current Invoicing
     Customer Name"), así que no hace falta cruzar con otro archivo. Busca
     candidatos contra la Razón Social ya existente en Comercial con
     provisiones_services.buscar_candidatos_por_cliente() (función pura,
@@ -489,16 +489,29 @@ class VincularContratoComercialDialog(QDialog):
 # CLASE PRINCIPAL DEL MÓDULO CONTRATOS
 # =========================================================
 COL_CONTRATOS_TABLA = "CONTRATOS"
-_COLUMNAS_EMPRESAS_CM = [COL_RAZON_SOCIAL, COL_RUT, COL_CONTRATOS_TABLA]
+COL_VIGENTES_TABLA = "VIGENTES"
+COL_DESCONECTADOS_TABLA = "DESCONECTADOS"
+COL_ACTIVANDO_TABLA = "ACTIVANDO"
+COL_CDB_VARIOS = "CDB_VARIOS"
+_COLUMNAS_EMPRESAS_CM = [COL_RAZON_SOCIAL, COL_RUT, COL_CDB_FLOTA, COL_VIGENTES_TABLA, COL_DESCONECTADOS_TABLA,
+                         COL_ACTIVANDO_TABLA, COL_CONTRATOS_TABLA, COL_CDB_VARIOS]
+COL_ACTIVACION_TABLA = "ACTIVACIÓN"
 _COLUMNAS_DETALLE_CM = [
-    'ID', 'VIN', 'CHASIS', 'N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'ESTADO DEL CM', 'PAGO CM',
+    'ID', COL_ACTIVACION_TABLA, 'VIN', 'CHASIS', 'N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'ESTADO DEL CM', 'PAGO CM',
 ]
-_CHIP_EMPRESA = ("#E1EAF4", BRAND_BLUE)
+_CHIP_VOLVO = ("#E1EAF4", VOLVO_BLUE)
+_CHIP_VIGENTES = ("#E3F6EE", "#0F9D6E")
+_CHIP_DESCONECTADOS = ("#FDE5E5", "#E04848")
+_CHIP_CDB_VARIOS = ("#FEF3C7", "#92400E")
+_CHIP_ACTIVANDO = ("#FFF1D6", "#B45309")
+_CHIPS_ACTIVACION = {"CONECTADO": _CHIP_VIGENTES, "DESCONECTADO": _CHIP_DESCONECTADOS, "ACTIVANDO": _CHIP_ACTIVANDO}
+_CHIPS_CONTEO_EMPRESAS = {COL_VIGENTES_TABLA: _CHIP_VIGENTES, COL_DESCONECTADOS_TABLA: _CHIP_DESCONECTADOS,
+                         COL_ACTIVANDO_TABLA: _CHIP_ACTIVANDO}
 
 # (título, clave, color, descripción)
 _KPI_SPECS_CM = [
     ("Unidades con CM", "total", "#1F6FEB", "Unidades con un contrato de mantenimiento (N° Contrato 3PC)."),
-    ("Con CM y VC", "vc", "#0F766E", "Unidades con contrato CM cuyo estado de activación es Conectado en Servicios Conectados."),
+    ("Con CM y VC", "vc", "#0F766E", "Unidades con contrato CM cuyo estado de activación es Conectado en Volvo Connect."),
     ("Ausentes de la carga", "ausentes", DANGER,
      "Unidades que están en el RM con contrato CM pero no vinieron en la última carga del Excel 3PC. "
      "Hay que revisar si corresponde darlas de baja."),
@@ -533,9 +546,11 @@ class ContratosModule(PantallaIngresosBase):
         ("Estado del CM", "ESTADO DEL CM"), ("Pago CM", "PAGO CM"),
         ("Inicio CM", "FECHA INICIO CM"), ("Término CM", "FECHA TERMINO CM"),
     ]
-    ANCHOS_EMPRESAS = {COL_RAZON_SOCIAL: 520, COL_RUT: 160, COL_CONTRATOS_TABLA: 160}
+    COLUMNAS_OCULTAS = PantallaIngresosBase.COLUMNAS_OCULTAS + (COL_CDB_VARIOS, 'ID')
+    ANCHOS_EMPRESAS = {COL_RAZON_SOCIAL: 400, COL_RUT: 140, COL_CDB_FLOTA: 170, COL_VIGENTES_TABLA: 120,
+                       COL_DESCONECTADOS_TABLA: 150, COL_ACTIVANDO_TABLA: 120, COL_CONTRATOS_TABLA: 130}
     ANCHOS_DETALLE = {
-        'ID': 80, 'VIN': 170, 'CHASIS': 110, 'N CONTRATO 3PC': 150, 'FECHA INICIO CM': 140, 'FECHA TERMINO CM': 150,
+        'ID': 80, COL_ACTIVACION_TABLA: 160, 'VIN': 170, 'CHASIS': 110, 'N CONTRATO 3PC': 150, 'FECHA INICIO CM': 140, 'FECHA TERMINO CM': 150,
         'TIPO DE CM': 120, 'ESTADO DEL CM': 130, 'PAGO CM': 120,
     }
 
@@ -573,54 +588,41 @@ class ContratosModule(PantallaIngresosBase):
             ThemeManager.apply_combo_box(combo)
             combo.setStyleSheet(estilo_combo_barra())
             combo.setMaxVisibleItems(9)
-            self.agregar_filtro(combo)
+            self.agregar_filtro_compacto(combo)
         self.combo_estado_cm.currentIndexChanged.connect(self._on_combo_estado_cm)
         self.combo_tipo_cm.currentIndexChanged.connect(self._on_combo_tipo_cm)
 
-        self.btn_importar = boton_barra("", 'fa5s.file-import', 'excel')
-        self.btn_importar.setIcon(ThemeManager.icon('fa5s.file-import', color='#1B2B4E'))
+        self.btn_importar = boton_barra("", 'fa5s.plus')
         self.btn_importar.setToolTip("Importar Excel CM")
-        self.btn_importar.clicked.connect(self.importar_excel_reporte)
-        self.agregar_blanco(self.btn_importar)
+        self.btn_importar.clicked.connect(self.importar_excel_javiera)
+        self.agregar_capsula(self.btn_importar)
 
-        self.btn_export_excel = boton_barra("Excel", 'fa5s.file-excel', 'excel')
+        self.btn_export_excel = boton_barra("", 'fa5s.file-excel', 'excel')
+        self.btn_export_excel.setToolTip("Exportar a Excel")
+        self.btn_export_excel.setFixedWidth(44)
         self.btn_export_excel.setIcon(ThemeManager.icon('fa5s.file-excel', color='#1B2B4E'))
         self.btn_export_excel.clicked.connect(lambda: self.table.export_to_excel("Reporte_CM"))
-        self.agregar_blanco(self.btn_export_excel)
-
-        self.btn_limpiar_cm = boton_barra("", 'fa5s.eraser')
-        self.btn_limpiar_cm.setToolTip(
-            "Limpiar datos de CM: deja en \"-\" los datos de CM de las unidades cuya forma de contrato y tipo de facturación no son de CM")
-        self.btn_limpiar_cm.clicked.connect(lambda: self._limpiar_datos_cm(False))
-        self.agregar_capsula(self.btn_limpiar_cm)
+        self.agregar_general(self.btn_export_excel)
 
         self.btn_reload = boton_barra("", 'fa5s.sync-alt')
         self.btn_reload.setToolTip("Recargar")
         self.btn_reload.clicked.connect(self.recargar_desde_cero)
-        self.agregar_capsula(self.btn_reload)
+        self.agregar_general(self.btn_reload)
 
         self.btn_editar_unidad = estilo_com.BotonAccionPanel(
             'fa5s.edit', 'Editar unidad',
-            "Abre el formulario de la unidad en la pestaña JustTime & CM.", BRAND_BLUE)
+            "Abre el formulario de la unidad en la pestaña JustTime & CM.", VOLVO_BLUE)
         self.btn_editar_unidad.setEnabled(False)
         self.btn_editar_unidad.clicked.connect(self._on_editar_unidad_clicked)
         self.agregar_accion_panel(self.btn_editar_unidad)
-
-        self.btn_limpiar_cm_panel = estilo_com.BotonAccionPanel(
-            'fa5s.eraser', 'Limpiar datos de CM',
-            "Deja en \"-\" los datos de CM de las unidades seleccionadas que no son de CM por su forma de contrato y tipo de facturación.",
-            BRAND_BLUE)
-        self.btn_limpiar_cm_panel.setEnabled(False)
-        self.btn_limpiar_cm_panel.clicked.connect(lambda: self._limpiar_datos_cm(True))
-        self.agregar_accion_panel(self.btn_limpiar_cm_panel)
 
         # --- MOTOR DE DATOS OCULTO ---
         # self.table/self.model nunca se agregan a un layout visible: siguen
         # siendo el mismo motor de on_item_edited/confirm_save de antes (ver
         # docstring de la clase) y también alimentan 'Exportar Excel'
-        # (AppTableWidget.export_to_excel), reutilizado sin duplicar su
+        # (VolvoTableWidget.export_to_excel), reutilizado sin duplicar su
         # lógica de formato de columnas monetarias.
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         self.model = PandasTableModel()
         opciones_desplegables = {
             'TIPO DE CM': TIPO_CM_OPCIONES,
@@ -652,7 +654,14 @@ class ContratosModule(PantallaIngresosBase):
             colores = _BADGE_COLOR.get(str(valor).strip().upper(), _BADGE_COLOR_DEFAULT)
             return colores[0] if es_fondo else colores[1]
         if columna == COL_CONTRATOS_TABLA:
-            return _CHIP_EMPRESA[0 if es_fondo else 1]
+            return _CHIP_VOLVO[0 if es_fondo else 1]
+        if columna == COL_CDB_FLOTA and self.empresa_actual is None and self.modelo.valor_fila_resuelta(COL_CDB_VARIOS) == "1":
+            return _CHIP_CDB_VARIOS[0 if es_fondo else 1]
+        if columna == COL_ACTIVACION_TABLA:
+            colores = _CHIPS_ACTIVACION.get(str(valor).strip().upper())
+            return colores[0 if es_fondo else 1] if colores else None
+        if columna in _CHIPS_CONTEO_EMPRESAS and str(valor).strip() not in ("", "0"):
+            return _CHIPS_CONTEO_EMPRESAS[columna][0 if es_fondo else 1]
         return None
 
     def colores_chip_ficha(self, columna, valor):
@@ -679,9 +688,7 @@ class ContratosModule(PantallaIngresosBase):
     def on_fila_cambiada(self, fila, cantidad):
         if cantidad == 0:
             self.btn_editar_unidad.setEnabled(False)
-            self.btn_limpiar_cm_panel.setEnabled(False)
             return
-        self.btn_limpiar_cm_panel.setEnabled(bool(self._lote_limpieza_cm(True)))
         aviso = ""
         if str(fila.get('VIN', '')).strip().upper() in self._vins_ausentes:
             aviso = "⚠  Ausente de la última carga del Excel 3PC. Revisa si corresponde darla de baja."
@@ -795,7 +802,7 @@ class ContratosModule(PantallaIngresosBase):
     def load_data(self):
         self._data_dirty = False
         self.pending_changes.clear()
-        df_master = comercial_services.excluir_contratos_finalizados_inactivos(
+        df_master = comercial_services.excluir_contratos_cerrados(
             self.data_manager.get_contratos_actuales_df())
         if df_master.empty:
             self.df_base = pd.DataFrame()
@@ -943,14 +950,20 @@ class ContratosModule(PantallaIngresosBase):
         return pd.DataFrame({
             COL_RAZON_SOCIAL: df_empresas[COL_RAZON_SOCIAL].astype(str).tolist(),
             COL_RUT: ruts,
+            COL_CDB_FLOTA: df_empresas[COL_CDB_FLOTA].astype(str).tolist(),
+            COL_VIGENTES_TABLA: df_empresas["VIGENTES"].astype(int).astype(str).tolist(),
+            COL_DESCONECTADOS_TABLA: df_empresas["DESCONECTADOS"].astype(int).astype(str).tolist(),
+            COL_ACTIVANDO_TABLA: df_empresas["ACTIVANDO"].astype(int).astype(str).tolist(),
             COL_CONTRATOS_TABLA: df_empresas["UNIDADES"].astype(int).astype(str).tolist(),
+            COL_CDB_VARIOS: df_empresas["CDB_VARIOS"].map({True: "1", False: ""}).tolist(),
         }, columns=_COLUMNAS_EMPRESAS_CM)
 
     def _armar_tabla_contratos(self, df_contratos):
         self._fila_por_vin = {}
         if df_contratos.empty:
             return pd.DataFrame(columns=_COLUMNAS_DETALLE_CM)
-        df = pd.DataFrame({col: (df_contratos[col].astype(str).tolist() if col in df_contratos.columns
+        origen = {COL_ACTIVACION_TABLA: COL_ESTADO_ACTIVACION}
+        df = pd.DataFrame({col: (df_contratos[origen.get(col, col)].astype(str).tolist() if origen.get(col, col) in df_contratos.columns
                                  else ["-"] * len(df_contratos)) for col in _COLUMNAS_DETALLE_CM})
         for pos, (row_idx, fila) in enumerate(df_contratos.iterrows()):
             registro = df.iloc[pos].to_dict()
@@ -979,11 +992,8 @@ class ContratosModule(PantallaIngresosBase):
     def _aplicar_cambios_formulario(self, row_idx, cambios):
         """Aplica los campos del formulario reutilizando on_item_edited (uno
         por columna, mismo mecanismo que una edicion de celda) y termina con
-        confirm_save(). ESTADO DEL CM va al final: si queda 'Terminated', la
-        limpieza de aplica_regla_terminated_cm no debe quedar pisada por los
-        demás campos del formulario."""
-        orden = sorted(cambios.items(), key=lambda item: item[0] == 'ESTADO DEL CM')
-        for col_name, new_value in orden:
+        confirm_save()."""
+        for col_name, new_value in cambios.items():
             self.on_item_edited(row_idx, col_name, new_value)
         self.confirm_save()
 
@@ -1028,7 +1038,7 @@ class ContratosModule(PantallaIngresosBase):
             val_limpio = str(new_value).replace('$', '').replace('.', '').replace(',', '').strip()
             try:
                 val_num = float(val_limpio) if val_limpio else 0.0
-                # Como texto: RM_CONTRATOS.csv es dtype=str y un float abortaba el guardado
+                # Como texto: RM_JAVI.csv es dtype=str y un float abortaba el guardado
                 self.pending_changes[vin_value]['cambios'][col_name] = str(val_num)
 
                 formato = _formato_pago(val_num)
@@ -1047,13 +1057,6 @@ class ContratosModule(PantallaIngresosBase):
 
         else:
             self.pending_changes[vin_value]['cambios'][col_name] = new_value
-
-        limpieza_terminated_cm = comercial_services.aplica_regla_terminated_cm(col_name, new_value)
-        for col_limpia, valor_limpia in limpieza_terminated_cm.items():
-            if col_limpia in df_actual.columns:
-                self.pending_changes[vin_value]['cambios'][col_limpia] = valor_limpia
-                df_actual.iat[row, df_actual.columns.get_loc(col_limpia)] = valor_limpia
-                self.model._edited_cells.add((row, df_actual.columns.get_loc(col_limpia)))
 
         self.model.layoutChanged.emit()
 
@@ -1078,33 +1081,6 @@ class ContratosModule(PantallaIngresosBase):
         self.save_thread = SaveContratosThread(self.writer, valid)
         self.save_thread.finished_signal.connect(self._on_save_finished)
         self.save_thread.start()
-
-    def _lote_limpieza_cm(self, solo_seleccion):
-        df = self.data_manager.get_contratos_actuales_df()
-        if df is None or df.empty:
-            return {}
-        if solo_seleccion:
-            vins = {v.upper() for v in self._vins_seleccionados()}
-            df = df[df['VIN'].astype(str).str.strip().str.upper().isin(vins)]
-        return ct_service.construir_cambios_limpieza_cm(df)
-
-    def _limpiar_datos_cm(self, solo_seleccion):
-        lote = self._lote_limpieza_cm(solo_seleccion)
-        if not lote:
-            QMessageBox.information(
-                self, "Limpiar datos de CM", "No hay unidades con datos de CM que no correspondan a su forma de contrato.")
-            return
-        respuesta = QMessageBox.question(
-            self, "Limpiar datos de CM",
-            f"{len(lote)} unidad(es) no son de CM (por su forma de contrato y tipo de facturación) pero tienen datos "
-            "de CM cargados.\n\nSe dejarán en \"-\" el N° contrato 3PC, las fechas, el tipo, el estado y el pago del CM. "
-            "El cambio queda registrado en el historial.\n\n¿Continuar?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if respuesta != QMessageBox.StandardButton.Yes:
-            return
-        comercial_services.agregar_id_a_cambios(lote, self.data_manager.get_contratos_actuales_df())
-        self.pending_changes = lote
-        self._iniciar_guardado(lote, f"Limpiando datos de CM de {len(lote)} unidad(es)…")
 
     def _on_save_finished(self, success):
         self.btn_reload.setEnabled(True)
@@ -1142,7 +1118,7 @@ class ContratosModule(PantallaIngresosBase):
     # =========================================================
     # IMPORTACIÓN MASIVA (sin cambios de comportamiento)
     # =========================================================
-    def importar_excel_reporte(self):
+    def importar_excel_javiera(self):
         filepath, _ = QFileDialog.getOpenFileName(self, "Seleccionar Excel de Contratos", "", "Excel (*.xlsx *.xls)")
         if not filepath: return
 
@@ -1201,7 +1177,7 @@ class ContratosModule(PantallaIngresosBase):
 
             # FORMA DE CONTRATO que puede ser sobrescrita por la regla CMG/
             # CMB/CMS (30-09-2026, a pedido explícito tras revisar una copia
-            # del RM_CONTRATOS real: 167 VIN con TIPO DE CM Gold/Blue/Silver ya
+            # del RM_JAVI real: 167 VIN con TIPO DE CM Gold/Blue/Silver ya
             # tenían FORMA DE CONTRATO=PROVISION/PROVISION +/CONVERSION/
             # VENTA/REVISAR -- clasificaciones de negocio distintas y
             # válidas que la regla NO debe pisar). Solo se aplica si el VIN
@@ -1218,7 +1194,7 @@ class ContratosModule(PantallaIngresosBase):
                 try:
                     pago_val = float(row.get(col_pago, 0))
                     # Bug real detectado (30-09-2026, simulación contra copia
-                    # de RM_CONTRATOS.csv real): guardar un float acá rompía el
+                    # de RM_JAVI.csv real): guardar un float acá rompía el
                     # guardado completo en el backend CSV real (dtype=str),
                     # que aborta con "Invalid value ... for dtype 'str'" al
                     # intentar escribir un float -- fallaba en silencio
@@ -1226,7 +1202,7 @@ class ContratosModule(PantallaIngresosBase):
                     # quedaba guardado. Los tests existentes no lo detectaban
                     # porque prueban contra el backend .xlsx legado, no
                     # contra el .csv real. Se guarda como texto, igual que
-                    # el resto de las columnas de RM_CONTRATOS.csv.
+                    # el resto de las columnas de RM_JAVI.csv.
                     cambios['PAGO CM'] = str(pago_val) if pd.notna(pago_val) else '0.0'
                 except:
                     cambios['PAGO CM'] = '0.0'
@@ -1274,7 +1250,7 @@ class ContratosModule(PantallaIngresosBase):
                 if vin == 'NAN' or not vin: continue
 
                 if vin not in df_import.index:
-                    # Regla de negocio confirmada con la contraparte comercial: que un VIN
+                    # Regla de negocio confirmada con Javiera: que un VIN
                     # desaparezca del Excel mensual de CM NO confirma una
                     # baja. La fila simplemente no se toca.
                     continue
@@ -1316,7 +1292,7 @@ class ContratosModule(PantallaIngresosBase):
             # ficha ni se completaba Razón Social/RUT/etc). Mismo camino
             # que Provisiones (VincularComercialDialog): se ofrece
             # vincularlos con un cliente ya existente usando el nombre que
-            # trae el propio Excel de la contraparte comercial (Current Invoicing Customer
+            # trae el propio Excel de Javiera (Current Invoicing Customer
             # Name), en vez de crearlos a ciegas.
             vins_comercial_set = set(vins_comercial)
             vins_nuevos_info = []

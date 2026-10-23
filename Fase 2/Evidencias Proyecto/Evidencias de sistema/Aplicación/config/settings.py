@@ -2,7 +2,7 @@ import os
 import json
 import sys
 
-from config.rutas import completar_rutas, CLAVES_OBSOLETAS
+from config.rutas import completar_rutas, resolver_nombre_anterior, CLAVES_OBSOLETAS
 
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
@@ -16,6 +16,11 @@ CONFIG_FILE = os.path.join(BASE_DIR, "app_config.json")
 # entorno; el ejecutable que recibe el usuario común lo deja en False.
 MODO_PROGRAMADOR = False or os.environ.get("GESTOR_SSCC_PROGRAMADOR") == "1"
 
+# Versión de esta compilación; publicar.bat la usa al publicar el zip
+APP_VERSION = "1.0.5"
+# Subcarpeta, hermana de la carpeta de datos, donde se publican Gestor_SSCC.zip y version.json
+CARPETA_ACTUALIZACIONES = "Codigo - APP"
+
 # Diccionario maestro de estructura. Será la fuente de verdad si falta el archivo.
 DEFAULT_CONFIG = {
     "DATA_DIR": "",
@@ -25,13 +30,14 @@ DEFAULT_CONFIG = {
     "DELETED_LOG_EXCEL_PATH": "",
     "PROVISION_EXCEL_PATH": "",
     "INSTALACIONES_PATH": "",
-    "RM_REPORTE_PATH": "",
+    "RM_JAVI_PATH": "",
     "POWERBI_EXCEL_PATH": "",
     "CONTACTOS_EXCEL_PATH": "",
     "CORREOS_EXCEL_PATH": "",
     "CASOS_BAJA_CM_PATH": "",
     "FACTURACION_MANUAL_PATH": "",
     "EJECUTIVOS_PATH": "",
+    "METAS_VC_PATH": "",
     "PROVISIONES_SHAREPOINT_URL": "",
     "REPORTE_NOTAS_VENTAS_URL": "",
     "POWERBI_URL": ""
@@ -56,6 +62,11 @@ def load_config():
         # definida siempre tiene prioridad. Solo en memoria, no escribe a disco.
         completar_rutas(user_config)
 
+        # Si el Registro Maestro se renombró (RM_JAVI.csv -> Registro Maestro.csv)
+        # y la ruta guardada ya no existe, se usa el mismo archivo con el otro
+        # nombre. Solo en memoria: se persiste cuando el usuario guarde Configuración.
+        user_config["EXCEL_PATH"] = resolver_nombre_anterior("EXCEL_PATH", user_config.get("EXCEL_PATH", ""))
+
         # Normalizacion en memoria: LogApp.csv es el historial oficial (ver
         # excel_writer.migrar_historial_legacy). Si una config antigua solo
         # tiene LOG_EXCEL_PATH (el .xlsx legado) y todavia no tiene
@@ -79,12 +90,19 @@ def load_config():
                 os.path.dirname(user_config["EXCEL_PATH"]), "CasosBajaCM.csv"
             )
 
-        # facturacionManual.xlsx vive por defecto junto a provisionContratos.xlsx
+        # facturacionManual.xlsx vive por defecto junto a provisionFelipe.xlsx
         # (misma derivación en memoria, sin escribir a disco).
         if not user_config.get("FACTURACION_MANUAL_PATH") and user_config.get("PROVISION_EXCEL_PATH"):
             user_config["FACTURACION_MANUAL_PATH"] = os.path.join(
                 os.path.dirname(user_config["PROVISION_EXCEL_PATH"]), "facturacionManual.xlsx"
             )
+
+        # MetasVC.csv vive en la misma carpeta de datos que Ejecutivos_VC.csv
+        # (derivación en memoria, sin escribir a disco).
+        if not user_config.get("METAS_VC_PATH"):
+            carpeta = os.path.dirname(user_config.get("EJECUTIVOS_PATH") or user_config.get("EXCEL_PATH") or "")
+            if carpeta:
+                user_config["METAS_VC_PATH"] = os.path.join(carpeta, "MetasVC.csv")
 
         return user_config
     except Exception:
@@ -106,13 +124,14 @@ LOG_CSV_PATH = _current_config.get("LOG_CSV_PATH", "")
 DELETED_LOG_EXCEL_PATH = _current_config.get("DELETED_LOG_EXCEL_PATH", "")
 PROVISION_EXCEL_PATH = _current_config.get("PROVISION_EXCEL_PATH", "")
 INSTALACIONES_PATH = _current_config.get("INSTALACIONES_PATH", "")
-RM_REPORTE_PATH = _current_config.get("RM_REPORTE_PATH", "")
+RM_JAVI_PATH = _current_config.get("RM_JAVI_PATH", "")
 POWERBI_EXCEL_PATH = _current_config.get("POWERBI_EXCEL_PATH", "")
 CONTACTOS_EXCEL_PATH = _current_config.get("CONTACTOS_EXCEL_PATH", "")
 CORREOS_EXCEL_PATH = _current_config.get("CORREOS_EXCEL_PATH", "")
 CASOS_BAJA_CM_PATH = _current_config.get("CASOS_BAJA_CM_PATH", "")
 FACTURACION_MANUAL_PATH = _current_config.get("FACTURACION_MANUAL_PATH", "")
 EJECUTIVOS_PATH = _current_config.get("EJECUTIVOS_PATH", "")
+METAS_VC_PATH = _current_config.get("METAS_VC_PATH", "")
 
 # --- ENLACES WEB Y NUBE ---
 PROVISIONES_SHAREPOINT_URL = _current_config.get("PROVISIONES_SHAREPOINT_URL", "")

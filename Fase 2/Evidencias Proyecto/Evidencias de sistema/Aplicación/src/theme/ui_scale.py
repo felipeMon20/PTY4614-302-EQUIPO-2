@@ -13,7 +13,7 @@ _CLAVE = "ui_scale"
 
 
 def _settings():
-    return QSettings("GestorApp", "Dashboard")
+    return QSettings("VolvoApp", "Dashboard")
 
 
 def get_nivel_escala():

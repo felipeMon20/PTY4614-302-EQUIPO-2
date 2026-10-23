@@ -40,7 +40,8 @@ def cruzar_correos_maestro(df_comercial, df_pbi=None, df_contactos=None):
         vin = str(row.get('VIN', '')).strip()
         chasis = str(row.get('CHASIS', '')).strip()
         plan = str(row.get('TIPO DE SERVICIO', '')).strip()
-        termino = str(row.get('TERMINO', row.get('TÉRMINO CONTRATO', ''))).strip()
+        # TERMINO es el fin de facturación; el de contrato es TÉRMINO CONTRATO
+        termino = str(row.get('TÉRMINO CONTRATO', row.get('TERMINO', ''))).strip()
 
         rs_raw = str(row.get('RÁZON SOCIAL', row.get('RAZÓN SOCIAL', row.get('RAZON SOCIAL', '')))).strip()
         razon_social = "" if rs_raw.lower() in ['nan', 'none', '<na>', '0', '0.0', ''] else rs_raw

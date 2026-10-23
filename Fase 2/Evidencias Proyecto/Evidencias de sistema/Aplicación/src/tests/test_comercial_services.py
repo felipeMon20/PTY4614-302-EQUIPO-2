@@ -7,7 +7,7 @@ from src.services.comercial_services import (
     procesar_df_comercial, calcular_kpis_vigencia, validar_valor_pegado, quitar_vin, agregar_fila,
     aplicar_cambios_pendientes, validar_duracion, validar_fecha_ddmmyyyy, parsear_pago_cm, formatear_pago_cm,
     detectar_contradicciones_etapa_gestion, aplica_regla_sin_contrato, COLUMNAS_LIMPIEZA_SIN_CONTRATO,
-    aplica_regla_terminated_cm, COLUMNAS_LIMPIEZA_TERMINATED_CM,
+    excluir_contratos_cerrados,
     clasificar_vigencia_contrato, filtrar_renovaciones, filtrar_vencimientos, filtrar_gestionar_bajas,
     filtrar_por_gestionar, filtrar_vigentes, construir_mascara_busqueda, formatear_dias_restantes,
     parsear_dias_restantes, _calcular_etapa_gestion_esperada_vectorizado,
@@ -39,7 +39,7 @@ class TestProcesarDfComercial(unittest.TestCase):
         self.assertEqual(resultado.iloc[0]['TÉRMINO CONTRATO'], 'MENSUAL')
 
     def test_duracion_guion_con_termino_guion_no_informado_queda_guion(self):
-        # VIN nuevo en RM_CONTRATOS: '-' / '-' significa dato aun no informado,
+        # VIN nuevo en RM_JAVI: '-' / '-' significa dato aun no informado,
         # no mensual (misma regla que DataFrameFormatter.calcular_termino).
         df = pd.DataFrame({'DURACIÓN (MESES)': ['-'], 'TÉRMINO CONTRATO': ['-']})
         resultado = procesar_df_comercial(df)
@@ -141,7 +141,7 @@ class TestCalcularKpisVigencia(unittest.TestCase):
 
 
 class TestClasificarVigenciaContratoCalendario(unittest.TestCase):
-    """Regla confirmada con la contraparte comercial: Renovaciones (y el KPI 'xvencer') se
+    """Regla confirmada con Javiera: Renovaciones (y el KPI 'xvencer') se
     calculan en dias CALENDARIO, no habiles. Cubre los 5 casos limite
     explicitos: vencido, vence hoy, vence en 1 dia, vence en exactamente 30
     dias (incluido) y vence en 31 dias (excluido)."""
@@ -223,7 +223,7 @@ class TestFormatearDiasRestantes(unittest.TestCase):
 
 class TestParsearDiasRestantes(unittest.TestCase):
     """parsear_dias_restantes() es el inverso de formatear_dias_restantes():
-    lo usa AppTableWidget._parse_number_like (custom_table.py) para poder
+    lo usa VolvoTableWidget._parse_number_like (custom_table.py) para poder
     ordenar 'DÍAS RESTANTES' por magnitud numérica en vez de alfabéticamente
     (bug reportado: ordenar esa columna no reordenaba nada)."""
 
@@ -419,7 +419,7 @@ class TestFiltrarGestionarBajas(unittest.TestCase):
 
 
 class TestFiltrarPorGestionar(unittest.TestCase):
-    """Regla confirmada con la contraparte comercial: ESTADO DE ACTIVACIÓN ACTUAL == 'NO
+    """Regla confirmada con Javiera: ESTADO DE ACTIVACIÓN ACTUAL == 'NO
     APLICA', igualdad exacta. No debe confundirse con otros estados
     operacionales similares."""
 
@@ -948,7 +948,7 @@ class TestDetectarContradiccionesEtapaGestion(unittest.TestCase):
 
 class TestDetectarInconsistenciasFormaContratoTipoFacturacion(unittest.TestCase):
     """detectar_inconsistencias_forma_contrato_tipo_facturacion() reutiliza
-    FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ (constants.py, matriz de la contraparte comercial,
+    FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ (constants.py, matriz de Javiera,
     24-09-2026) como única fuente de verdad -- misma matriz que ya aplica en
     vivo ComercialAgregarDialog. Es una herramienta de solo DETECCIÓN para
     datos históricos: nunca modifica ninguna fila."""
@@ -994,7 +994,7 @@ class TestDetectarInconsistenciasFormaContratoTipoFacturacion(unittest.TestCase)
     def test_tipo_facturacion_vacio_no_se_marca_aunque_forma_este_en_la_matriz(self):
         """'' significa 'todavia sin asignar', no una combinacion
         contradictoria (ver docstring de la funcion: confirmado contra los
-        datos reales de RM_CONTRATOS.csv, mayoria de los casos)."""
+        datos reales de RM_JAVI.csv, mayoria de los casos)."""
         df = self._df_una_fila('YV2INC0006', 'Demo', '')
         self.assertEqual(len(detectar_inconsistencias_forma_contrato_tipo_facturacion(df)), 0)
 
@@ -1254,7 +1254,7 @@ class TestCalcularEtapaGestionEsperadaVectorizadoEquivaleARowWise(unittest.TestC
 
 
 class TestAplicaReglaSinContrato(unittest.TestCase):
-    """Regla confirmada con la contraparte comercial: al editar FORMA DE CONTRATO a
+    """Regla confirmada con Javiera: al editar FORMA DE CONTRATO a
     'Sin Contrato' en Vista Completa, se limpian a '-' TIPO DE SERVICIO,
     INICIO CONTRATO, DURACIÓN (MESES) y TÉRMINO CONTRATO. Función pura: no
     conoce pending_changes, PyQt ni el DataFrame completo (eso es
@@ -1302,40 +1302,23 @@ class TestAplicaReglaSinContrato(unittest.TestCase):
         self.assertEqual(resultado, {})
 
 
-class TestAplicaReglaTerminatedCm(unittest.TestCase):
-    """Regla confirmada: al editar ESTADO DEL CM a 'Terminated' (en Comercial
-    Vista Completa o en Contratos CM), se limpian a '-' N CONTRATO 3PC,
-    FECHA INICIO CM, FECHA TERMINO CM, TIPO DE CM y PAGO CM. ESTADO DEL CM
-    en si NO se limpia. Función pura, mismo contrato que
-    aplica_regla_sin_contrato: no conoce pending_changes ni PyQt6."""
+class TestExcluirContratosCerrados(unittest.TestCase):
+    """Contratos (CM) no muestra ningún contrato en Baja o Baja solicitada,
+    aunque la unidad siga conectada."""
 
-    def _assert_limpia_los_cinco_campos(self, resultado):
-        self.assertEqual(set(resultado.keys()), set(COLUMNAS_LIMPIEZA_TERMINATED_CM))
-        for col in COLUMNAS_LIMPIEZA_TERMINATED_CM:
-            self.assertEqual(resultado[col], '-')
-        self.assertNotIn('ESTADO DEL CM', resultado, "ESTADO DEL CM no debe limpiarse a sí mismo.")
+    def test_quita_baja_y_baja_solicitada_aunque_sigan_conectados(self):
+        df = pd.DataFrame({
+            'VIN': ['A', 'B', 'C', 'D'],
+            'ESTADO COMERCIAL': ['Vigente', 'Baja', 'Baja Solicitada', 'Revisar'],
+            'ESTADO DE ACTIVACIÓN ACTUAL': ['Conectado', 'Conectado', 'Activando', 'No aplica'],
+        })
+        resultado = excluir_contratos_cerrados(df)
+        self.assertEqual(resultado['VIN'].tolist(), ['A', 'D'])
 
-    def test_running_a_terminated_limpia_cinco_campos(self):
-        resultado = aplica_regla_terminated_cm('ESTADO DEL CM', 'Terminated')
-        self._assert_limpia_los_cinco_campos(resultado)
-
-    def test_es_insensible_a_mayusculas_y_espacios(self):
-        resultado = aplica_regla_terminated_cm('ESTADO DEL CM', '  TERMINATED  ')
-        self._assert_limpia_los_cinco_campos(resultado)
-
-    def test_columna_distinta_no_hace_nada(self):
-        resultado = aplica_regla_terminated_cm('TIPO DE CM', 'Terminated')
-        self.assertEqual(resultado, {})
-
-    def test_valor_nuevo_no_es_terminated_no_hace_nada(self):
-        resultado = aplica_regla_terminated_cm('ESTADO DEL CM', 'Running')
-        self.assertEqual(resultado, {})
-
-    def test_terminated_hacia_otro_valor_no_aplica_regla_inversa(self):
-        # Cambiar DESDE 'Terminated' hacia otro valor no debe reconstruir
-        # nada: la función solo mira el valor NUEVO, nunca el anterior.
-        resultado = aplica_regla_terminated_cm('ESTADO DEL CM', 'Running')
-        self.assertEqual(resultado, {})
+    def test_sin_columna_o_vacio_devuelve_igual(self):
+        self.assertTrue(excluir_contratos_cerrados(pd.DataFrame()).empty)
+        df = pd.DataFrame({'VIN': ['A']})
+        self.assertEqual(excluir_contratos_cerrados(df)['VIN'].tolist(), ['A'])
 
 
 class TestContratosPorId(unittest.TestCase):

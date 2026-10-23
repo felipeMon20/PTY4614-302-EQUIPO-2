@@ -41,9 +41,9 @@ class DialogoEjecutivo(QDialog):
         lay.addWidget(titulo)
 
         self.txt_nombre = QLineEdit()
-        self.txt_nombre.setPlaceholderText("Tal como aparece en PruebasFM (ej. Andres Muestra)")
+        self.txt_nombre.setPlaceholderText("Tal como aparece en PruebasFM (ej. Miguel Gonzalez)")
         self.txt_correo = QLineEdit()
-        self.txt_correo.setPlaceholderText("nombre.apellido@example.com")
+        self.txt_correo.setPlaceholderText("nombre.apellido@volvo.com")
         self.txt_alias = QLineEdit()
         self.txt_alias.setPlaceholderText("Otras grafías del nombre, separadas por |")
         self.chk_activo = QCheckBox("Ejecutivo activo")
@@ -205,9 +205,9 @@ class EjecutivosModule(QWidget):
         self.btn_editar.clicked.connect(self._on_editar)
         self.btn_activo = admin_estilo.boton_capsula(self._barra, 'fa5s.user-slash', "Desactivar ejecutivo seleccionado")
         self.btn_activo.clicked.connect(self._on_alternar_activo)
-        self.btn_exportar = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel")
+        self.btn_exportar = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel", grupo='generales')
         self.btn_exportar.clicked.connect(lambda: admin_estilo.exportar_excel(self, self.df_tabla, "Ejecutivos"))
-        self.btn_recargar = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Recargar")
+        self.btn_recargar = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Recargar", grupo='generales')
         self.btn_recargar.clicked.connect(self.load_data)
 
         marco, capas = admin_estilo.tarjeta_contenido("tarjetaEjecutivos")
@@ -301,7 +301,7 @@ class EjecutivosModule(QWidget):
                 item.widget().deleteLater()
         self._tarjetas = {}
         for _, fila in self.df_tabla.iterrows():
-            tarjeta = TarjetaEjecutivo(fila)
+            tarjeta = TarjetaEjecutivo(fila, self._contenido)
             tarjeta.seleccionada.connect(self._seleccionar)
             tarjeta.editar_pedido.connect(self._on_editar_tarjeta)
             self._tarjetas[str(fila["ID"])] = tarjeta

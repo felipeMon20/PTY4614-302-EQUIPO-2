@@ -16,7 +16,6 @@ from src.core.constants import (
     COL_ESTADO_COMERCIAL, COL_TIPO_FACTURACION, COL_ETAPA_GESTION, COL_ESTADO_ACTIVACION,
 )
 from src.core.dataframe_formatter import DataFrameFormatter
-from src.core.perf_log import medir
 from src.services import ejecutivos_service, powerbi_import_service
 from src.ui.comercial_agregar import (
     _DEFAULTS_INICIALES, _MESES, COLUMNAS_EXTRA_DEFAULT_GUION, _tipo_facturacion_default_para_forma_contrato,
@@ -124,8 +123,7 @@ def iniciar_importacion_power_bi(parent, form_widget, boton_importar, flotas_uni
         return
 
     try:
-        with medir("B-8 leer_hoja_export (Main Thread)"):
-            filas, texto_filtros = powerbi_import_service.leer_hoja_export(filepath)
+        filas, texto_filtros = powerbi_import_service.leer_hoja_export(filepath)
     except Exception as e:
         QMessageBox.critical(parent, "Error al leer el Excel", str(e))
         return

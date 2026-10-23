@@ -31,7 +31,7 @@ class TestMailRegistro(unittest.TestCase):
         return [
             {
                 "id_envio": f"{prefijo}-{i}", "fecha_hora": "2026-09-01 10:00:00", "tipo_correo": "BIENVENIDA",
-                "razon_social": f"EMPRESA {i}", "chasis": f"CHS{i}", "destinatario": f"correo{i}@test.example",
+                "razon_social": f"EMPRESA {i}", "chasis": f"CHS{i}", "destinatario": f"correo{i}@test.cl",
                 "estado": "ENVIADO A OUTLOOK", "asunto": "Bienvenida",
             }
             for i in range(n)
@@ -47,7 +47,7 @@ class TestMailRegistro(unittest.TestCase):
         df = pd.read_csv(csv_path, dtype=str)
         self.assertEqual(len(df), 2)
         self.assertEqual(list(df.columns), mail_registro._COLUMNAS)
-        self.assertEqual(df.iloc[0]["destinatario"], "correo0@test.example")
+        self.assertEqual(df.iloc[0]["destinatario"], "correo0@test.cl")
 
     def test_registrar_envios_lista_vacia_no_crea_archivo(self):
         resultado = mail_registro.registrar_envios([])
@@ -67,7 +67,8 @@ class TestMailRegistro(unittest.TestCase):
         self.assertEqual(len(df), 2)
 
     def test_fallo_de_escritura_devuelve_false_sin_lanzar_excepcion(self):
-        with patch('src.services.mail_registro.open', side_effect=PermissionError("bloqueado"), create=True):
+        with patch('src.services.mail_registro.open', side_effect=PermissionError("bloqueado"), create=True), \
+                self.assertLogs(mail_registro.logger, level='ERROR'):
             resultado = mail_registro.registrar_envios(self._registro_ejemplo(1))
         self.assertFalse(resultado)
 
@@ -94,7 +95,7 @@ class TestMailRegistro(unittest.TestCase):
 
     def test_migracion_legado_no_destructiva_y_verificada(self):
         legacy_path = self._crear_legacy_xlsx([
-            ["ENV-VIEJO", "2026-08-01 09:00:00", "BIENVENIDA", "EMPRESA VIEJA", "CHS0", "viejo@test.example", "ENVIADO A OUTLOOK", "Bienvenida"],
+            ["ENV-VIEJO", "2026-08-01 09:00:00", "BIENVENIDA", "EMPRESA VIEJA", "CHS0", "viejo@test.cl", "ENVIADO A OUTLOOK", "Bienvenida"],
         ])
 
         migrado = mail_registro.migrar_historial_legacy()
@@ -113,14 +114,14 @@ class TestMailRegistro(unittest.TestCase):
 
     def test_migracion_es_idempotente(self):
         self._crear_legacy_xlsx([
-            ["ENV-VIEJO", "2026-08-01 09:00:00", "BIENVENIDA", "EMPRESA VIEJA", "CHS0", "viejo@test.example", "ENVIADO A OUTLOOK", "Bienvenida"],
+            ["ENV-VIEJO", "2026-08-01 09:00:00", "BIENVENIDA", "EMPRESA VIEJA", "CHS0", "viejo@test.cl", "ENVIADO A OUTLOOK", "Bienvenida"],
         ])
         primera = mail_registro.migrar_historial_legacy()
         self.assertTrue(primera)
 
         csv_path = mail_registro.get_historial_csv_path()
         with open(csv_path, 'a', newline='', encoding='utf-8-sig') as f:
-            csv.writer(f).writerow(["ENV-NUEVO", "2026-09-01 10:00:00", "BIENVENIDA", "EMPRESA NUEVA", "CHS1", "nuevo@test.example", "ENVIADO A OUTLOOK", "Bienvenida"])
+            csv.writer(f).writerow(["ENV-NUEVO", "2026-09-01 10:00:00", "BIENVENIDA", "EMPRESA NUEVA", "CHS1", "nuevo@test.cl", "ENVIADO A OUTLOOK", "Bienvenida"])
 
         segunda = mail_registro.migrar_historial_legacy()
         self.assertFalse(segunda, "Fallo: la migración no debe repetirse si el CSV ya existe.")
@@ -130,7 +131,7 @@ class TestMailRegistro(unittest.TestCase):
 
     def test_registrar_envios_migra_automaticamente_antes_de_escribir(self):
         self._crear_legacy_xlsx([
-            ["ENV-VIEJO", "2026-08-01 09:00:00", "BIENVENIDA", "EMPRESA VIEJA", "CHS0", "viejo@test.example", "ENVIADO A OUTLOOK", "Bienvenida"],
+            ["ENV-VIEJO", "2026-08-01 09:00:00", "BIENVENIDA", "EMPRESA VIEJA", "CHS0", "viejo@test.cl", "ENVIADO A OUTLOOK", "Bienvenida"],
         ])
 
         mail_registro.registrar_envios(self._registro_ejemplo(1, prefijo="ENV-NUEVO"))
@@ -163,7 +164,7 @@ class TestOutlookSenderThreadUsaMailRegistro(unittest.TestCase):
         from src.ui.mail_dialog import OutlookSenderThread
 
         destinatarios = [{
-            "correo": "test@empresa.example", "flota": "EMPRESA TEST", "nombre": "Juan Perez",
+            "correo": "test@empresa.cl", "flota": "EMPRESA TEST", "nombre": "Juan Perez",
             "chasis_list": ["CHS001"], "grupos_plan": {},
         }]
 
@@ -211,7 +212,9 @@ class TestOutlookSenderThreadUsaMailRegistro(unittest.TestCase):
         capturado, _, fake_mail = self._run_thread_sync(registro_mock_return=True)
 
         self.assertEqual(capturado['exitos'], 1)
-        self.assertEqual(fake_mail.HTMLBody, "Hola Juan de EMPRESA TEST")
+        # Desde el 21-10-2026 el texto va dentro de la barra azul con el logo
+        self.assertIn("Hola Juan de EMPRESA TEST", fake_mail.HTMLBody)
+        self.assertIn("cid:logo_volvo_blanco", fake_mail.HTMLBody)
 
 
 if __name__ == '__main__':

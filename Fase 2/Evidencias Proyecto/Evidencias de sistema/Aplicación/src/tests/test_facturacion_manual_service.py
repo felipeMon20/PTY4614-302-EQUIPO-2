@@ -12,7 +12,7 @@ from src.core.constants import COL_RAZON_SOCIAL, COL_RUT, COL_TIPO_FACTURACION
 def _df_master_mock():
     return pd.DataFrame({
         "RAZÓN SOCIAL": ["MAQSA", "MAQSA", "GENERA", "CLIENTE X", "CLIENTE X"],
-        "RUT": ["969670100", "969670100", "764188616", "314238461", "314238461"],
+        "RUT": ["969670100", "969670100", "764188616", "111111111", "111111111"],
         "VIN": ["VIN1", "VIN2", "VIN3", "VIN4", "VIN5"],
         "CHASIS": ["E1", "E2", "E3", "E4", "E5"],
         "FLOTA VC": ["MAQSA", "MAQSA", "GENERA", "CLIENTE X", "CLIENTE X"],

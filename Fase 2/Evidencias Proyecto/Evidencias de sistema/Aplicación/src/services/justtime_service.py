@@ -5,7 +5,7 @@ sin PyQt6. Trabaja sobre una copia de DataManager().df_master.
 CONTRATO CREADO EN JUSTTIME llega tal como está en PruebasFM (texto libre
 heredado del RM): acá solo se clasifica contra JUSTTIME_ESTADO_OPCIONES, sin
 modificar el dato. Los valores fuera del catálogo quedan "Por corregir" con
-un estado sugerido (CONTRATO_JUSTTIME_MAP) que la contraparte comercial aplica a mano.
+un estado sugerido (CONTRATO_JUSTTIME_MAP) que Javiera aplica a mano.
 """
 
 import pandas as pd
@@ -15,6 +15,7 @@ from src.core.constants import (
     COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_ETAPA_GESTION, COL_CONTRATO_JUSTTIME,
     COL_FECHA_INICIO_FACT, COL_FECHA_TERMINO_FACT, JUSTTIME_ESTADO_OPCIONES, JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_PENDIENTE, JUSTTIME_ESTADO_NO_APLICA, JUSTTIME_ESTADO_ELIMINAR,
     CONTRATO_JUSTTIME_MAP, TIPO_FACTURACION_HABILITA_JUSTTIME, VALOR_TIPO_FACT_CLIENTE, VALOR_TIPO_FACT_INTERNO,
+    COL_INICIO_CONTRATO, COL_DURACION_MESES, JUSTTIME_ESTADO_REVISAR_PAGO,
 )
 
 COLUMNAS_BASE = [
@@ -54,7 +55,7 @@ def estado_sugerido(valor):
 
 
 def normalizar_columna_justtime(df):
-    """Limpieza usada por la sincronización con RM_CONTRATOS: cada valor pasa a su
+    """Limpieza usada por la sincronización con RM_JAVI: cada valor pasa a su
     estado del catálogo (sin distinguir mayúsculas) o al estado sugerido para
     su variante antigua. Vacío y valores desconocidos no se tocan. Devuelve
     (df, cantidad de celdas cambiadas)."""
@@ -90,7 +91,7 @@ def _finalizado_sin_pendientes(estado_comercial, estado_activacion):
 
 
 def _inconsistencia(tipo_facturacion, estado):
-    """Regla confirmada por la contraparte comercial (05-10-2026): solo CLIENTE e INTERNO van
+    """Regla confirmada por Javiera (05-10-2026): solo CLIENTE e INTERNO van
     a JustTime; FACTURACIÓN MANUAL y PROVISION + no."""
     if estado == POR_CORREGIR:
         return "Estado escrito con un formato antiguo"
@@ -293,6 +294,62 @@ def construir_cambios_limpieza(df):
                 COL_FECHA_TERMINO_FACT: JUSTTIME_ESTADO_NO_APLICA,
             }}
     return lote
+
+
+ESTADOS_CON_FECHAS = (JUSTTIME_ESTADO_SI, JUSTTIME_ESTADO_PENDIENTE, JUSTTIME_ESTADO_REVISAR_PAGO)
+
+
+def _fecha_texto(valor):
+    from src.core.dataframe_formatter import DataFrameFormatter
+    if not _tiene_fecha(valor):
+        return pd.NaT
+    return DataFrameFormatter.parsear_fecha_segura(valor)
+
+
+def construir_correcciones_fechas(df_base, df_actuales):
+    """Fechas de facturación que corresponden a cada unidad que sigue en
+    JustTime (Si, Pendiente o Revisar pago, sin Bajas): el inicio es el primer
+    día del mes de INICIO CONTRATO y el término suma DURACIÓN (MESES) a ese
+    día. Devuelve (filas, lote): `filas` para mostrar (VIN, razón social, fechas
+    actuales y nuevas) y `lote` para SaveExcelThread, solo con las unidades
+    cuyas fechas cambian. Sin inicio de contrato o con duración no numérica no
+    se puede calcular y la unidad se omite."""
+    if df_base is None or df_base.empty or df_actuales is None or df_actuales.empty:
+        return [], {}
+    if COL_INICIO_CONTRATO not in df_actuales.columns or COL_DURACION_MESES not in df_actuales.columns:
+        return [], {}
+    contrato = {
+        str(v).strip().upper(): (i, d)
+        for v, i, d in zip(df_actuales[COL_VIN], df_actuales[COL_INICIO_CONTRATO], df_actuales[COL_DURACION_MESES])
+    }
+    filas, lote = [], {}
+    for _, f in df_base.iterrows():
+        vin = str(f[COL_VIN]).strip().upper()
+        if f[COL_ESTADO_JT] not in ESTADOS_CON_FECHAS or _clave(f[COL_ESTADO_COMERCIAL]) in ESTADOS_COMERCIALES_BAJA \
+                or vin not in contrato:
+            continue
+        inicio_contrato, duracion = contrato[vin]
+        try:
+            meses = int(float(str(duracion).strip().replace(',', '.')))
+        except ValueError:
+            continue
+        inicio_dt = _fecha_texto(inicio_contrato)
+        if pd.isna(inicio_dt) or meses <= 0:
+            continue
+        inicio_nuevo = inicio_dt.replace(day=1).normalize()
+        termino_nuevo = inicio_nuevo + pd.DateOffset(months=meses)
+        inicio_act, termino_act = _fecha_texto(f[COL_FECHA_INICIO_FACT]), _fecha_texto(f[COL_FECHA_TERMINO_FACT])
+        if not pd.isna(inicio_act) and not pd.isna(termino_act) \
+                and inicio_act.normalize() == inicio_nuevo and termino_act.normalize() == termino_nuevo:
+            continue
+        nuevo_ini, nuevo_ter = inicio_nuevo.strftime("%d-%m-%Y"), termino_nuevo.strftime("%d-%m-%Y")
+        filas.append({
+            'VIN': vin, 'RAZÓN SOCIAL': f[COL_RAZON_SOCIAL],
+            'INICIO ACTUAL': str(f[COL_FECHA_INICIO_FACT]).strip() or '-', 'INICIO NUEVO': nuevo_ini,
+            'TERMINO ACTUAL': str(f[COL_FECHA_TERMINO_FACT]).strip() or '-', 'TERMINO NUEVO': nuevo_ter,
+        })
+        lote[vin] = {'VIN': vin, 'cambios': {COL_FECHA_INICIO_FACT: nuevo_ini, COL_FECHA_TERMINO_FACT: nuevo_ter}}
+    return filas, lote
 
 
 def construir_cambios_sugeridos(df):

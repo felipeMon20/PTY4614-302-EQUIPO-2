@@ -14,7 +14,7 @@ from src.services.ejecutivos_service import buscar_ejecutivo
 from src.services.provisiones_services import mapear_industria
 from src.services.vin_service import obtener_modelo_desde_vin
 
-# Mapeo cerrado con la contraparte comercial (16-09-2026): columnas del Excel de Power BI
+# Mapeo cerrado con Javiera (16-09-2026): columnas del Excel de Power BI
 # (hoja "Export") -> columnas de PruebasFM. El resto de columnas del Excel
 # (Chasis, Chasis_II, Patente, HDV, Fecha_Facturacion, y todas las de
 # contacto/conectividad) queda fuera de este alcance.
@@ -84,6 +84,27 @@ def leer_hoja_export(filepath):
     return filas_validas, texto_filtros
 
 
+_MODELOS_OFICIALES = ('FMX', 'FME', 'FML', 'FHE', 'FHL', 'FH', 'FM', 'FL', 'FE', 'VM')
+
+
+def modelo_desde_tipo(tipo):
+    """MODELO a partir del 'Tipo' de Power BI (ej. 'FMX13B 6x4 R' -> FMX,
+    'FM GNL 6x2 T' -> FM, 'FH13B 6x2 T' -> FH): las letras iniciales, que
+    deben ser un modelo oficial. Vacío si el Tipo viene vacío."""
+    tipo = str(tipo or '').strip()
+    if not tipo:
+        return ''
+    coincidencia = re.match(r'[A-Za-z]+', tipo)
+    letras = coincidencia.group(0).upper() if coincidencia else ''
+    for modelo in _MODELOS_OFICIALES:
+        if letras == modelo:
+            return modelo
+    for modelo in _MODELOS_OFICIALES:
+        if letras.startswith(modelo):
+            return modelo
+    return tipo[:2].strip()
+
+
 def mapear_fila_powerbi(fila):
     """Convierte una fila cruda de la hoja 'Export' al diccionario de
     campos de PruebasFM que le corresponden, más `_CHASIS_BI`: el Chasis que
@@ -102,9 +123,9 @@ def mapear_fila_powerbi(fila):
         datos[col_rm] = valor
 
     tipo = _limpiar_valor(fila.get('Tipo'))
-    datos['MODELO'] = tipo[:2].strip() if tipo else ''
+    datos['MODELO'] = modelo_desde_tipo(tipo)
 
-    # Traspaso literal de la fecha de entrega (regla confirmada con la contraparte comercial,
+    # Traspaso literal de la fecha de entrega (regla confirmada con Javiera,
     # 16-09-2026): si hay fecha, se conserva en formato DD-MM-YYYY; si
     # 'Fecha Entrega' viene vacía (NaN/NaT/None/texto vacío), ESTADO DE
     # ENTREGA queda en "-" (nunca NaN/NaT/None ni texto raro).
@@ -210,8 +231,8 @@ def _catalogo_ejecutivos(df_comercial):
 
 def _resolver_ejecutivo_detallado(vendedor, catalogo, directorio=None):
     """(nombre, resuelto). Power BI entrega el vendedor completo y con
-    puntuación ("Andres Jose Muestra .") mientras PruebasFM guarda nombre +
-    primer apellido ("Andres Muestra"). Primero se busca en el directorio
+    puntuación ("Miguel Angel Gonzalez .") mientras PruebasFM guarda nombre +
+    primer apellido ("Miguel Gonzalez"). Primero se busca en el directorio
     Ejecutivos_VC.csv (nombre o alias, devuelve el nombre canónico) y luego
     entre los ejecutivos ya usados en PruebasFM; si no hay coincidencia se
     conserva el nombre limpio con resuelto=False."""
@@ -350,9 +371,11 @@ def construir_altas_nuevas(filas, df_comercial, plantilla, periodo_interno, dire
         registro = dict(plantilla)
         registro.update({k: v for k, v in datos.items() if v and not k.startswith('_')})
         registro['CHASIS'] = vin[-7:]
-        modelo = obtener_modelo_desde_vin(vin)
-        if modelo:
-            registro['MODELO'] = modelo
+        # El Tipo de Power BI manda (distingue FMX de FM); el VIN solo se usa si no vino Tipo
+        if not datos.get('MODELO'):
+            modelo = obtener_modelo_desde_vin(vin)
+            if modelo:
+                registro['MODELO'] = modelo
         flota = flotas.get(datos.get('CDB', '').upper())
         if flota:
             registro['FLOTA VC'] = flota

@@ -174,11 +174,11 @@ class ContactosAddDialog(QDialog):
         if not embebido:
             self.setFixedWidth(540)
         self.setStyleSheet(f"""
-            QDialog {{ background-color: {BACKGROUND}; }}
+            QDialog {{ background-color: {'transparent' if embebido else BACKGROUND}; }}
             QLabel {{ background: transparent; border: none; font-family: 'Segoe UI'; }}
             QLabel[rol="campo"] {{ color: {TEXT_SECONDARY}; font-size: 11px; font-weight: bold; }}
             QLabel[rol="seccion"] {{ color: {PRIMARY}; font-size: 10px; font-weight: bold; letter-spacing: 1px; }}
-            QLineEdit {{ padding: 8px 10px; border: 1px solid #D1D5DB; border-radius: 8px;
+            QLineEdit {{ padding: {'5px' if embebido else '8px'} 10px; border: 1px solid #D1D5DB; border-radius: 8px;
                          background-color: {SURFACE}; color: {TEXT_PRIMARY}; font-size: 12px; }}
             QLineEdit:hover {{ border: 1px solid #9CA3AF; }}
             QLineEdit:focus {{ border: 1px solid {PRIMARY}; }}
@@ -252,7 +252,7 @@ class ContactosAddDialog(QDialog):
 
         if self.embebido:
             layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(10)
+            layout.setSpacing(6)
 
         # Encabezado: icono + título + subtítulo
         header = QHBoxLayout()
@@ -280,9 +280,9 @@ class ContactosAddDialog(QDialog):
         tarjeta.setObjectName("tarjeta_contacto")
         tarjeta.setStyleSheet(f"QFrame#tarjeta_contacto {{ background-color: {SURFACE}; border-radius: 14px; border: 1px solid {BORDER}; }}")
         grid = QGridLayout(tarjeta)
-        grid.setContentsMargins(22, 18, 22, 22)
+        grid.setContentsMargins(*((16, 10, 16, 12) if self.embebido else (22, 18, 22, 22)))
         grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(6)
+        grid.setVerticalSpacing(3 if self.embebido else 6)
 
         def crear_campo(nombre, icono_nombre, placeholder="", solo_lectura=False):
             w = QLineEdit()
@@ -305,7 +305,7 @@ class ContactosAddDialog(QDialog):
             nonlocal fila
             lbl = etiqueta(texto, "seccion")
             if fila > 0:
-                lbl.setContentsMargins(0, 12, 0, 0)
+                lbl.setContentsMargins(0, 6 if self.embebido else 12, 0, 0)
             grid.addWidget(lbl, fila, 0, 1, 2)
             fila += 1
 
@@ -331,7 +331,7 @@ class ContactosAddDialog(QDialog):
         seccion("CONTACTO")
         par(("Nombre", crear_campo('Nombre', 'fa5s.user')),
             ("Apellidos", crear_campo('Apellidos', 'fa5s.user')))
-        par(("Correo electrónico", crear_campo('Correo electrónico', 'fa5s.envelope', "nombre@empresa.example")))
+        par(("Correo electrónico", crear_campo('Correo electrónico', 'fa5s.envelope', "nombre@empresa.cl")))
         self.lbl_correo = QLabel()
         self.lbl_correo.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px;")
         self.lbl_correo.hide()
@@ -371,9 +371,7 @@ class ContactosAddDialog(QDialog):
         btn_layout = QHBoxLayout()
         nota = QLabel("* Campos obligatorios")
         nota.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        if self.embebido:
-            layout.addWidget(nota)
-        else:
+        if not self.embebido:
             btn_layout.addWidget(nota)
         btn_layout.addStretch()
 
@@ -386,7 +384,10 @@ class ContactosAddDialog(QDialog):
         btn_save = QPushButton(" Guardar contacto")
         btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_save.setMinimumWidth(130 if self.embebido else 150)
-        ThemeManager.apply_primary_button(btn_save)
+        btn_save.setStyleSheet(
+            "QPushButton { background-color: #1B2B4E; color: white; border: 1px solid #1B2B4E; border-radius: 9px; "
+            "padding: 8px 16px; font-weight: 700; font-size: 12px; } "
+            "QPushButton:hover { background-color: #2A3F6E; border-color: #2A3F6E; }")
         btn_save.setIcon(qta.icon('fa5s.save', color='white'))
         btn_save.setDefault(True)
         btn_save.clicked.connect(self._validate_and_accept)
@@ -518,7 +519,7 @@ class ContactosAddDialog(QDialog):
                 self._rechazar(campo, f"{campo} solo puede contener letras (se aceptan acentos y ñ).")
                 return
         if not contactos_service.validar_correo(self.inputs['Correo electrónico'].text()):
-            self._rechazar('Correo electrónico', "El correo no tiene un formato válido (ej: nombre@empresa.example).")
+            self._rechazar('Correo electrónico', "El correo no tiene un formato válido (ej: nombre@empresa.cl).")
             return
         correo = self.inputs['Correo electrónico'].text().strip()
         if correo:

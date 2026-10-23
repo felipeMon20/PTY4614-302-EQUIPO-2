@@ -14,13 +14,12 @@ from PyQt6.QtWidgets import (QDialog, QWidget, QVBoxLayout, QHBoxLayout, QFrame,
                              QAbstractItemView, QProgressDialog, QScrollArea, QGridLayout,
                              QGraphicsDropShadowEffect, QCheckBox, QSpinBox)
 from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QTimer, QSettings, QUrl, QPoint, QStandardPaths,
-                          QPropertyAnimation, QEasingCurve, QEvent, QRect)
+                          QPropertyAnimation, QEasingCurve, QEvent, QRect, QDate, QObject)
 from PyQt6.QtGui import QDesktopServices, QKeySequence, QFontMetrics, QFont, QColor
 
 from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
 from src.core import excel_writer_csv_backend
-from src.core.perf_log import medir
 from src.services import comercial_services
 from src.services import cm_bajas_service
 from src.services import mail_sync_service
@@ -32,20 +31,23 @@ from src.ui.comercial_agregar import ComercialUnidadFormWidget
 from src.ui.importar_powerbi import iniciar_importacion_power_bi
 from src.ui.contactos_agregar import ContactosAddDialog
 from src.ui.contactos import AddContactoThread
-from src.ui.custom_table import (AppTableWidget, PandasTableModel, ExportExcelThread,
+from src.ui.custom_table import (VolvoTableWidget, PandasTableModel, ExportExcelThread,
                                  _FONDO_CATALOGO, _TEXTO_CATALOGO)
 from src.ui import comercial_estilo as estilo_com
 from src.ui.transiciones import TransicionFundidoSubida
+from src.ui.esqueleto_carga import animar_sobre_tabla
 from src.ui.guardado_overlay import mostrar_guardando, guardado_listo, terminar_guardando
 from src.ui.dialogo_accion import DialogoAccion
+from src.ui.ingresos_base import PantallaIngresosBase
+from src.ui.selector_fecha import SelectorFecha
 from src.theme.theme_manager import ThemeManager
 from src.theme.colors import *     
 import config.settings
-from config.settings import RM_REPORTE_PATH, REPORTE_NOTAS_VENTAS_URL
+from config.settings import RM_JAVI_PATH, REPORTE_NOTAS_VENTAS_URL
 from src.core.dataframe_formatter import DataFrameFormatter
 from src.core.constants import (
-    RM_CONTRATOS_COLUMN_ALIASES, RM_CONTRATOS_COLUMNAS_AUTORIZADAS,
-    PRUEBAS_FM_COLUMNAS_LOCALES, COLUMNAS_TECNICAS_SYNC, RM_CONTRATOS_PAGO_CM_PATTERN,
+    RM_JAVI_COLUMN_ALIASES, RM_JAVI_COLUMNAS_AUTORIZADAS,
+    PRUEBAS_FM_COLUMNAS_LOCALES, COLUMNAS_TECNICAS_SYNC, RM_JAVI_PAGO_CM_PATTERN,
     COL_ESTADO_COMERCIAL, ESTADO_COMERCIAL_CORRECCIONES_RM, ESTADO_ACTIVACION_CORRECCIONES_RM,
     VALOR_ESTADO_COMERCIAL_BAJA,
     VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA,
@@ -67,7 +69,7 @@ class SaveExcelThread(QThread):
     # el resultado a DataManager.set_logs_df() en el hilo principal, sin que
     # Historial (historial.py y el historial por VIN de general.py) quede
     # desactualizado hasta presionar "Recargar" -- mismo patron que ya usa
-    # RMReporteSyncWorker.success_signal / SyncRMReporteDialog.handle_success. No
+    # RMJaviSyncWorker.success_signal / SyncRMJaviDialog.handle_success. No
     # se emite si el guardado fallo o si la relectura del CSV fallo.
     logs_actualizados_signal = pyqtSignal(object)
 
@@ -97,6 +99,55 @@ class AddRowThread(QThread):
     def run(self):
         success = self.writer.add_new_row(self.new_data, module_name=self.module_name)
         self.finished_signal.emit(success, self.new_data)
+
+class AddRowRenovacionThread(QThread):
+    """Agrega el contrato nuevo y, si se guardó, marca el anterior (por ID) como
+    Renovado. Emite (se_agregó_el_nuevo, se_actualizó_el_anterior, datos_nuevos)."""
+    finished_signal = pyqtSignal(bool, bool, dict)
+
+    def __init__(self, writer, new_data, vin, id_anterior, cambios_anterior, module_name="Sistema"):
+        super().__init__()
+        self.writer = writer
+        self.new_data = new_data
+        self.vin = vin
+        self.id_anterior = id_anterior
+        self.cambios_anterior = cambios_anterior
+        self.module_name = module_name
+
+    def run(self):
+        agregado = self.writer.add_new_row(self.new_data, module_name=self.module_name)
+        anterior = False
+        if agregado:
+            anterior = self.writer.update_cells(
+                {self.vin: {'VIN': self.vin, 'ID': self.id_anterior, 'cambios': self.cambios_anterior}},
+                module_name=self.module_name)
+        self.finished_signal.emit(agregado, anterior, self.new_data)
+
+
+class AddRowsRenovacionThread(QThread):
+    """Renovación de varias unidades: por cada una agrega el contrato nuevo y marca el anterior
+    (por ID) como Renovado. Emite (lista de {'nuevo', 'vin', 'id_anterior', 'cambios_anterior',
+    'anterior_ok'} de los que sí se agregaron, total pedido)."""
+    finished_signal = pyqtSignal(list, int)
+
+    def __init__(self, writer, renovaciones, module_name="Sistema"):
+        super().__init__()
+        self.writer = writer
+        self.renovaciones = renovaciones
+        self.module_name = module_name
+
+    def run(self):
+        # Dos guardados en total (contratos nuevos y contratos anteriores): reescribir el archivo
+        # una vez por unidad llenaba de copias de conflicto a OneDrive
+        hechos = []
+        if self.writer.add_new_rows_batch([r['nuevo'] for r in self.renovaciones], module_name=self.module_name):
+            anteriores = {
+                r['vin']: {'VIN': r['vin'], 'ID': r['id_anterior'], 'cambios': r['cambios_anterior']}
+                for r in self.renovaciones}
+            anterior_ok = bool(self.writer.update_cells(anteriores, module_name=self.module_name))
+            hechos = [{**r, 'anterior_ok': anterior_ok} for r in self.renovaciones]
+        self.finished_signal.emit(hechos, len(self.renovaciones))
+
 
 class EnviarPapeleraThread(QThread):
     """Envía a la papelera, por ID, una lista de (vin, id_contrato). Emite
@@ -176,16 +227,16 @@ COMERCIAL_COL_WIDTH_RAZON_SOCIAL = 300
 # espacio a otra que el usuario ensanchó a mano.
 NEW_UI_COL_WIDTH_MINIMO = 60
 
-# Columnas de texto largo: se muestran completas en varias líneas y la fila crece (AppTableWidget.set_columnas_ajuste_texto).
+# Columnas de texto largo: se muestran completas en varias líneas y la fila crece (VolvoTableWidget.set_columnas_ajuste_texto).
 COMERCIAL_COLUMNAS_AJUSTE_TEXTO = ['RAZÓN SOCIAL', 'FLOTA VC', 'FLOTA VC 2', 'ESTADO DE ACTIVACIÓN ACTUAL']
 
 # Alto de fila de la bandeja de la Nueva interfaz (23-09-2026, a pedido
-# explícito): con el alto estándar (38px, AppTableWidget._setup_style) una
+# explícito): con el alto estándar (38px, VolvoTableWidget._setup_style) una
 # razón social larga se cortaba salvo que se ensanchara la columna a mano.
 # En vez de eso, la fila se hace más alta y RAZÓN SOCIAL se muestra con
 # ajuste de línea (ver _build_new_ui_bandeja) para verla completa sin tocar
 # el ancho. Se aplica solo a new_ui_table (y su frozen_view, ver
-# AppTableWidget._setup_frozen_view) -- no a AppTableWidget en general,
+# VolvoTableWidget._setup_frozen_view) -- no a VolvoTableWidget en general,
 # que sigue en 38px para el resto de la app (Vista Completa incluida).
 COMERCIAL_NEW_UI_ROW_HEIGHT = 44
 
@@ -251,6 +302,20 @@ NEW_UI_SUBTAB_COLUMN_WIDTHS = {
 }
 
 
+class _FiltroAnchoViewport(QObject):
+    """Avisa cada vez que cambia el ancho útil de la tabla (menú lateral,
+    barra de desplazamiento, ventana) para reacomodar sus columnas."""
+
+    def __init__(self, tabla, al_cambiar):
+        super().__init__(tabla)
+        self._al_cambiar = al_cambiar
+
+    def eventFilter(self, objeto, evento):
+        if evento.type() == QEvent.Type.Resize:
+            self._al_cambiar()
+        return False
+
+
 def _aplicar_anchos_columnas_new_ui(table, columnas, anchos_fijos=None):
     """Ancho inicial de columnas exclusivo de new_ui_table (las 6
     sub-pestañas de la Nueva interfaz de Comercial), separado de
@@ -310,7 +375,7 @@ def _normalizar_vacios_a_guion(df, columnas_excluir=None):
 
     columnas_excluir: columnas que deben quedar tal cual (vacío = vacío/pendiente,
     no se fuerza a '-'). Usada por 'DURACIÓN (MESES)': un vacío ahí significa que
-    la contraparte comercial todavía no gestionó el dato, y no debe interpretarse como mensual
+    Javiera todavía no gestionó el dato, y no debe interpretarse como mensual
     (ver calcular_termino en DataFrameFormatter, que solo trata '-' como mensual)."""
     df = df.copy()
     columnas_excluir = set(columnas_excluir or [])
@@ -328,8 +393,8 @@ def _normalizar_id_contrato(valor):
     return texto[:-2] if texto.endswith('.0') else texto
 
 
-class RMReporteSyncWorker(QThread):
-    """SOLO MODO DESARROLLADOR: esta sincronización (RM_CONTRATOS -> PruebasFM) se usa
+class RMJaviSyncWorker(QThread):
+    """SOLO MODO DESARROLLADOR: esta sincronización (RM_JAVI -> PruebasFM) se usa
     únicamente durante el desarrollo y las pruebas. En producción la opción
     desaparece de la app y el usuario no podrá utilizarla."""
     log_signal = pyqtSignal(str)
@@ -338,109 +403,109 @@ class RMReporteSyncWorker(QThread):
 
     def run(self):
         try:
-            if not os.path.exists(RM_REPORTE_PATH): raise Exception(f"No se encontró el archivo de la contraparte comercial en:\n{RM_REPORTE_PATH}")
-            if not os.path.exists(config.settings.EXCEL_PATH): raise Exception("No se encontró el archivo RM_CONTRATOS.csv.")
+            if not os.path.exists(RM_JAVI_PATH): raise Exception(f"No se encontró el archivo de Javiera en:\n{RM_JAVI_PATH}")
+            if not os.path.exists(config.settings.EXCEL_PATH): raise Exception("No se encontró el archivo RM_JAVI.csv.")
 
             temp_dir = os.path.join(os.getcwd(), 'data', 'temp')
             os.makedirs(temp_dir, exist_ok=True)
-            temp_reporte_path = os.path.join(temp_dir, 'temp_rm_reporte.xlsx')
+            temp_javi_path = os.path.join(temp_dir, 'temp_rm_javi.xlsx')
             
             self.log_signal.emit("[SISTEMA] Creando copia temporal de lectura para evitar colapsos de red...")
-            try: shutil.copy2(RM_REPORTE_PATH, temp_reporte_path)
-            except Exception as e: raise Exception(f"No se pudo copiar el RM de la contraparte comercial. Asegúrate de que ella no lo esté guardando en este momento.\n{e}")
+            try: shutil.copy2(RM_JAVI_PATH, temp_javi_path)
+            except Exception as e: raise Exception(f"No se pudo copiar el RM de Javiera. Asegúrate de que ella no lo esté guardando en este momento.\n{e}")
 
-            self.log_signal.emit(f"[LECTURA] Extrayendo datos maestros desde copia temporal RM_CONTRATOS...")
-            df_reporte = pd.read_excel(temp_reporte_path, sheet_name='BBDD')
+            self.log_signal.emit(f"[LECTURA] Extrayendo datos maestros desde copia temporal RM_JAVI...")
+            df_javi = pd.read_excel(temp_javi_path, sheet_name='BBDD')
             
-            self.log_signal.emit(f"[LECTURA] Leyendo base local RM_CONTRATOS...")
+            self.log_signal.emit(f"[LECTURA] Leyendo base local RM_JAVI...")
             # Fase 2 (migracion PruebasFM.xlsx -> .csv, 23-09-2026): esta
             # lectura (para el merge/preservar columnas locales) tambien
             # depende del formato de EXCEL_PATH, igual que la escritura
             # final de mas abajo -- sin esto, la sincronizacion fallaria de
-            # entrada contra un RM_CONTRATOS.csv, antes de llegar siquiera a
+            # entrada contra un RM_JAVI.csv, antes de llegar siquiera a
             # escribir nada.
             if config.settings.EXCEL_PATH.lower().endswith('.csv'):
                 df_pruebas = cdb_a_memoria(pd.read_csv(config.settings.EXCEL_PATH, dtype=str, keep_default_na=False))
             else:
                 df_pruebas = pd.read_excel(config.settings.EXCEL_PATH, sheet_name='BBDD (2)')
 
-            df_reporte['VIN_CLEAN'] = df_reporte['VIN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
+            df_javi['VIN_CLEAN'] = df_javi['VIN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
             df_pruebas['VIN_CLEAN'] = df_pruebas['VIN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
 
             self.log_signal.emit("[CRUCE] Aplicando reglas de renombrado y limpieza...")
-            renames = dict(RM_CONTRATOS_COLUMN_ALIASES)
-            for col in df_reporte.columns:
-                if RM_CONTRATOS_PAGO_CM_PATTERN.match(str(col).strip()): renames[col] = 'PAGO CM'
-            df_reporte.rename(columns=renames, inplace=True)
+            renames = dict(RM_JAVI_COLUMN_ALIASES)
+            for col in df_javi.columns:
+                if RM_JAVI_PAGO_CM_PATTERN.match(str(col).strip()): renames[col] = 'PAGO CM'
+            df_javi.rename(columns=renames, inplace=True)
             
-            if 'INDUSTRIA' in df_reporte.columns:
+            if 'INDUSTRIA' in df_javi.columns:
                 self.log_signal.emit("[LIMPIEZA] Estandarizando idioma y nombres de Industrias...")
                 def limpiar_industria(val):
                     val_str = str(val).strip().upper()
                     if val_str in ['NAN', 'NONE', '<NA>', '', '-', '0', '0.0']: return "NO DEFINIDA"
                     if val_str in INDUSTRIA_MAP: return INDUSTRIA_MAP[val_str]
                     return val_str
-                df_reporte['INDUSTRIA'] = df_reporte['INDUSTRIA'].apply(limpiar_industria)
+                df_javi['INDUSTRIA'] = df_javi['INDUSTRIA'].apply(limpiar_industria)
 
-            if COL_ESTADO_COMERCIAL in df_reporte.columns:
+            if COL_ESTADO_COMERCIAL in df_javi.columns:
                 self.log_signal.emit("[LIMPIEZA] Corrigiendo errores de digitación en Estado Comercial...")
                 def corregir_estado_comercial(val):
                     val_str = str(val).strip().upper()
                     return ESTADO_COMERCIAL_CORRECCIONES_RM.get(val_str, val)
-                df_reporte[COL_ESTADO_COMERCIAL] = df_reporte[COL_ESTADO_COMERCIAL].apply(corregir_estado_comercial)
+                df_javi[COL_ESTADO_COMERCIAL] = df_javi[COL_ESTADO_COMERCIAL].apply(corregir_estado_comercial)
 
-            if COL_ESTADO_ACTIVACION in df_reporte.columns:
-                antes = df_reporte[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
+            if COL_ESTADO_ACTIVACION in df_javi.columns:
+                antes = df_javi[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
                 n_unificados = int(antes.isin(ESTADO_ACTIVACION_CORRECCIONES_RM).sum())
                 if n_unificados:
                     self.log_signal.emit(f"[LIMPIEZA] {n_unificados} unidad(es) 'No entregado' pasan a 'Sin flota'...")
-                    df_reporte[COL_ESTADO_ACTIVACION] = [ESTADO_ACTIVACION_CORRECCIONES_RM.get(v, o)
-                                                      for v, o in zip(antes, df_reporte[COL_ESTADO_ACTIVACION])]
+                    df_javi[COL_ESTADO_ACTIVACION] = [ESTADO_ACTIVACION_CORRECCIONES_RM.get(v, o)
+                                                      for v, o in zip(antes, df_javi[COL_ESTADO_ACTIVACION])]
 
             for col_cdb in ('CDB FLOTA', 'CDB'):
-                if col_cdb in df_reporte.columns:
-                    df_reporte[col_cdb] = (df_reporte[col_cdb].fillna('').astype(str).str.strip()
+                if col_cdb in df_javi.columns:
+                    df_javi[col_cdb] = (df_javi[col_cdb].fillna('').astype(str).str.strip()
                                         .str.replace(r'^(\d+)\.0$', r'\1', regex=True)
                                         .replace({'nan': '', 'NaN': '', '<NA>': '', 'None': ''}))
 
             self.log_signal.emit("[LIMPIEZA] Verificando y auto-completando números de CHASIS...")
-            if 'CHASIS' not in df_reporte.columns: df_reporte['CHASIS'] = ""
-            df_reporte['CHASIS'] = df_reporte['VIN_CLEAN'].apply(lambda x: x[-7:] if isinstance(x, str) and len(x) >= 7 else x)
+            if 'CHASIS' not in df_javi.columns: df_javi['CHASIS'] = ""
+            df_javi['CHASIS'] = df_javi['VIN_CLEAN'].apply(lambda x: x[-7:] if isinstance(x, str) and len(x) >= 7 else x)
 
-            if 'DURACIÓN (MESES)' in df_reporte.columns:
+            if 'DURACIÓN (MESES)' in df_javi.columns:
                 def safe_duracion_sync(val):
                     if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', '<NA>', 'None']: return ""
                     val_str = str(val).strip().upper()
                     if val_str in ['-', 'MENSUAL']: return val_str
                     try:
                         num = float(val)
-                        # Regla confirmada con la contraparte comercial: duracion >= 100 se normaliza a '-'
+                        # Regla confirmada con Javiera: duracion >= 100 se normaliza a '-'
                         # (calcular_termino en DataFrameFormatter la traduce luego a MENSUAL).
                         if num >= 100: return "-"
                         return str(int(round(num)))
                     except (ValueError, TypeError): return val_str
-                df_reporte['DURACIÓN (MESES)'] = df_reporte['DURACIÓN (MESES)'].apply(safe_duracion_sync)
+                df_javi['DURACIÓN (MESES)'] = df_javi['DURACIÓN (MESES)'].apply(safe_duracion_sync)
 
             self.log_signal.emit("[SEGURIDAD] Filtrando columnas del RM a las autorizadas por el sistema...")
-            cols_reporte_autorizadas = [c for c in RM_CONTRATOS_COLUMNAS_AUTORIZADAS if c in df_reporte.columns]
-            df_reporte = df_reporte[cols_reporte_autorizadas + ['VIN_CLEAN']]
+            cols_javi_autorizadas = [c for c in RM_JAVI_COLUMNAS_AUTORIZADAS if c in df_javi.columns]
+            df_javi = df_javi[cols_javi_autorizadas + ['VIN_CLEAN']]
 
             cols_to_preserve = [c for c in PRUEBAS_FM_COLUMNAS_LOCALES if c in df_pruebas.columns]
 
             self.log_signal.emit("[LIMPIEZA] Purgando filas clonadas o duplicadas en memoria...")
-            if COL_ID in df_reporte.columns:
-                df_reporte[COL_ID] = df_reporte[COL_ID].map(_normalizar_id_contrato)
-                df_reporte = df_reporte.sort_values(by=COL_ID, key=lambda s: s.eq(''), kind='stable')
-            df_reporte = df_reporte.drop_duplicates(subset=['VIN_CLEAN'], keep='first')
+            if COL_ID in df_javi.columns:
+                df_javi[COL_ID] = df_javi[COL_ID].map(_normalizar_id_contrato)
+                df_javi = df_javi.sort_values(by=COL_ID, key=lambda s: s.eq(''), kind='stable')
+            df_javi = df_javi.drop_duplicates(subset=['VIN_CLEAN'], keep='first')
             df_locales = df_pruebas.drop_duplicates(subset=['VIN_CLEAN'], keep='last')[['VIN_CLEAN'] + cols_to_preserve].copy()
 
             self.log_signal.emit("[CRUCE] Fusionando bases de datos (1 a 1 perfecto)...")
-            df_final = pd.merge(df_reporte, df_locales, on='VIN_CLEAN', how='left')
+            df_final = pd.merge(df_javi, df_locales, on='VIN_CLEAN', how='left')
 
             # Lista explícita y cerrada: RM autorizado + locales autorizadas. No depende
             # de list(df_pruebas.columns), asi que una columna no autorizada del RM no
             # entra aunque coincida de nombre con algo que ya existiera en PruebasFM.
-            columnas_finales = [c for c in (RM_CONTRATOS_COLUMNAS_AUTORIZADAS + PRUEBAS_FM_COLUMNAS_LOCALES)
+            columnas_finales = [c for c in (RM_JAVI_COLUMNAS_AUTORIZADAS + PRUEBAS_FM_COLUMNAS_LOCALES)
                                  if c not in COLUMNAS_TECNICAS_SYNC]
 
             # --- AUTO-HEALING: una columna autorizada entra aunque PruebasFM no la tuviera aún ---
@@ -454,7 +519,7 @@ class RMReporteSyncWorker(QThread):
             # Nuevo (23-09-2026, a pedido explícito): unifica automáticamente
             # los clientes con el mismo RUT+CDB pero Razón Social distinta
             # (típico error de tipeo al cargar, ver GeneralModule ->
-            # pestaña Duplicados) en cada sincronización con RM_CONTRATOS. Se
+            # pestaña Duplicados) en cada sincronización con RM_JAVI. Se
             # aplica ANTES de armar df_new_cmp (más abajo) para que el
             # renombrado quede registrado como un cambio más en LogApp.csv
             # por el mismo mecanismo de diff/auditoría que ya usa esta
@@ -475,7 +540,7 @@ class RMReporteSyncWorker(QThread):
             writer = ExcelWriter()
             writer._crear_backup(config.settings.EXCEL_PATH)
             if not writer.last_backup_ok:
-                self.error_signal.emit("No se pudo crear la copia de seguridad de RM_CONTRATOS.csv antes de sincronizar. La operación fue cancelada y no se realizó ningún cambio.")
+                self.error_signal.emit("No se pudo crear la copia de seguridad de RM_JAVI.csv antes de sincronizar. La operación fue cancelada y no se realizó ningún cambio.")
                 return
 
             # La sincronización ya no escribe en LogApp.csv (historial de cambios);
@@ -519,7 +584,7 @@ class RMReporteSyncWorker(QThread):
             df_logs_actualizado = None
 
             self.log_signal.emit("[LIMPIEZA] Convirtiendo celdas vacías a '-'...")
-            # 'DURACIÓN (MESES)' vacía queda excluida: significa que la contraparte comercial aún no
+            # 'DURACIÓN (MESES)' vacía queda excluida: significa que Javiera aún no
             # gestionó ese dato (pendiente), no un contrato mensual. Solo '-' explícito
             # (o 'MENSUAL', normalizado luego en DataFrameFormatter.clean) representa mensual.
             df_final = _normalizar_vacios_a_guion(df_final, columnas_excluir=['DURACIÓN (MESES)', COL_ID])
@@ -536,17 +601,17 @@ class RMReporteSyncWorker(QThread):
             # un valor real ya asignado. Va DESPUÉS de _normalizar_vacios_a_guion
             # de arriba a propósito: ahí "sin asignar" ya es siempre '' o '-',
             # nunca NaN, así que la función reutiliza esa normalización en vez
-            # de reimplementarla. Se guarda en RM_CONTRATOS.csv (a diferencia de la
+            # de reimplementarla. Se guarda en RM_JAVI.csv (a diferencia de la
             # detección informativa de más abajo, que no escribe nada) porque
             # es la única corrección de este tipo que no depende de una
-            # decisión de negocio pendiente en RM_CONTRATOS.xlsx.
+            # decisión de negocio pendiente en RM_JAVI.xlsx.
             n_sin_asignar_antes_normalizar = comercial_services.contar_forma_contrato_sin_tipo_facturacion_asignado(df_final)
             df_final = comercial_services.normalizar_tipo_facturacion_por_forma_contrato(df_final)
 
             # ETAPA GESTIÓN (25-09-2026, corrección de bug real de datos):
-            # esta columna salió de RM_CONTRATOS_COLUMNAS_AUTORIZADAS y pasó a
+            # esta columna salió de RM_JAVI_COLUMNAS_AUTORIZADAS y pasó a
             # PRUEBAS_FM_COLUMNAS_LOCALES (constants.py) -- ya no se trae el
-            # valor crudo desde RM_CONTRATOS.xlsx (que en los datos reales traía
+            # valor crudo desde RM_JAVI.xlsx (que en los datos reales traía
             # basura: el número de CHASIS pegado por error, y miles de filas
             # con el valor legado 'CLIENTE'). Se recalcula aquí, ANTES de
             # escribir a disco (a diferencia de DataFrameFormatter.clean()
@@ -556,14 +621,14 @@ class RMReporteSyncWorker(QThread):
             # merge. Reutiliza la misma función que ya usa clean() y
             # comercial_services.detectar_contradicciones_etapa_gestion, sin
             # reimplementar la regla.
-            self.log_signal.emit("[LIMPIEZA] Recalculando ETAPA GESTIÓN con la matriz de negocio (se ignora el valor crudo de RM_CONTRATOS)...")
+            self.log_signal.emit("[LIMPIEZA] Recalculando ETAPA GESTIÓN con la matriz de negocio (se ignora el valor crudo de RM_JAVI)...")
             if COL_ETAPA_GESTION in df_final.columns:
                 df_final[COL_ETAPA_GESTION] = DataFrameFormatter.calcular_etapa_gestion_df(df_final)
 
-            self.log_signal.emit("[ESCRITURA] Inyectando datos actualizados a RM_CONTRATOS.csv...")
+            self.log_signal.emit("[ESCRITURA] Inyectando datos actualizados a RM_JAVI.csv...")
 
             # Fase 2 (migracion PruebasFM.xlsx -> .csv, 23-09-2026): unico
-            # cambio de esta fase en RMReporteSyncWorker -- el merge, limpieza,
+            # cambio de esta fase en RMJaviSyncWorker -- el merge, limpieza,
             # renombrados, calculo de diffs y logging de arriba no se tocan.
             # CSV no tiene concepto de hoja, asi que el reemplazo total del
             # dataset usa el mismo patron atomico (temporal -> fsync ->
@@ -581,7 +646,7 @@ class RMReporteSyncWorker(QThread):
                     try:
                         excel_writer_csv_backend._escribir_csv_atomico(cdb_a_disco(df_final), config.settings.EXCEL_PATH, temp_pruebas)
                     except PermissionError:
-                        raise Exception("¡El archivo RM_CONTRATOS.csv está abierto! Ciérralo para poder guardar.")
+                        raise Exception("¡El archivo RM_JAVI.csv está abierto! Ciérralo para poder guardar.")
                     except Exception as e:
                         raise Exception(f"Error escribiendo el CSV: {e}")
                 else:
@@ -594,7 +659,7 @@ class RMReporteSyncWorker(QThread):
 
                         shutil.copy2(temp_pruebas, config.settings.EXCEL_PATH)
                     except PermissionError:
-                        raise Exception("¡El archivo RM_CONTRATOS.xlsx está abierto! Ciérralo en Excel para poder guardar.")
+                        raise Exception("¡El archivo RM_JAVI.xlsx está abierto! Ciérralo en Excel para poder guardar.")
                     except Exception as e:
                         raise Exception(f"Error escribiendo el Excel: {e}")
             finally:
@@ -602,7 +667,7 @@ class RMReporteSyncWorker(QThread):
                 dm_guardado.is_app_saving = False
 
             try: 
-                os.remove(temp_reporte_path)
+                os.remove(temp_javi_path)
                 os.remove(temp_pruebas)
             except: pass
 
@@ -629,23 +694,22 @@ class RMReporteSyncWorker(QThread):
             # error de esta sincronizacion, en vez de escapar sin control desde un
             # slot de Main Thread.
             self.log_signal.emit("[LIMPIEZA] Normalizando datos para la vista en memoria (ETAPA GESTIÓN, fechas, catálogos)...")
-            with medir(f"B-7 RMReporteSyncWorker.run > DataFrameFormatter.clean ({len(df_final)} filas)", hilo="WORKER"):
-                df_final = DataFrameFormatter.clean(df_final)
+            df_final = DataFrameFormatter.clean(df_final)
 
-            # Resumen informativo (24-09-2026, a pedido explícito). Reutiliza
-            # tal cual las mismas funciones/matriz que ya usa el botón
-            # "Revisar inconsistencias" -- no se duplica la lógica de
-            # negocio. Tres categorías, sin mezclarlas:
-            # - normalizados automáticamente: ya se escribieron arriba (único
-            #   caso sin ambigüedad -- ver normalizar_tipo_facturacion_por_forma_contrato).
-            # - aún sin asignar: la matriz permite más de una opción (ej.
-            #   CONVERSION/VENTA) o FORMA DE CONTRATO no está en la matriz;
-            #   nadie puede decidir esto por la contraparte comercial, no se toca.
-            # - inconsistentes reales: ya tienen un valor, pero no calza con
-            #   la matriz para su FORMA DE CONTRATO. Nunca se corrigen solos
-            #   (TIPO DE FACTURACION es un campo gobernado por RM_CONTRATOS.xlsx,
-            #   ver RM_CONTRATOS_COLUMNAS_AUTORIZADAS/PRUEBAS_FM_COLUMNAS_LOCALES
-            #   vacía) -- quedan para revisión manual.
+        # Resumen informativo (24-09-2026, a pedido explícito). Reutiliza
+        # tal cual las mismas funciones/matriz que ya usa el botón
+        # "Revisar inconsistencias" -- no se duplica la lógica de
+        # negocio. Tres categorías, sin mezclarlas:
+        # - normalizados automáticamente: ya se escribieron arriba (único
+        #   caso sin ambigüedad -- ver normalizar_tipo_facturacion_por_forma_contrato).
+        # - aún sin asignar: la matriz permite más de una opción (ej.
+        #   CONVERSION/VENTA) o FORMA DE CONTRATO no está en la matriz;
+        #   nadie puede decidir esto por Javiera, no se toca.
+        # - inconsistentes reales: ya tienen un valor, pero no calza con
+        #   la matriz para su FORMA DE CONTRATO. Nunca se corrigen solos
+        #   (TIPO DE FACTURACION es un campo gobernado por RM_JAVI.xlsx,
+        #   ver RM_JAVI_COLUMNAS_AUTORIZADAS/PRUEBAS_FM_COLUMNAS_LOCALES
+        #   vacía) -- quedan para revisión manual.
             n_sin_asignar = comercial_services.contar_forma_contrato_sin_tipo_facturacion_asignado(df_final)
             n_normalizados = n_sin_asignar_antes_normalizar - n_sin_asignar
             n_inconsistentes = len(comercial_services.detectar_inconsistencias_forma_contrato_tipo_facturacion(df_final))
@@ -670,17 +734,17 @@ class RMReporteSyncWorker(QThread):
             self.success_signal.emit(mensaje_final, df_final, df_logs_actualizado)
 
         except Exception as e:
-            try: os.remove(temp_reporte_path)
+            try: os.remove(temp_javi_path)
             except: pass
             self.error_signal.emit(str(e))
 
-class SyncRMReporteDialog(QDialog):
-    """SOLO MODO DESARROLLADOR: esta sincronización (RM_CONTRATOS -> PruebasFM) se usa
+class SyncRMJaviDialog(QDialog):
+    """SOLO MODO DESARROLLADOR: esta sincronización (RM_JAVI -> PruebasFM) se usa
     únicamente durante el desarrollo y las pruebas. En producción la opción
     desaparece de la app y el usuario no podrá utilizarla."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Sincronización Maestra (RM_CONTRATOS de la contraparte comercial -> RM_CONTRATOS.csv)")
+        self.setWindowTitle("Sincronización Maestra (RM_JAVI de Javiera -> RM_JAVI.csv)")
         self.resize(700, 400)
         self.setStyleSheet(f"QDialog {{ background-color: {BACKGROUND}; }}")
         self.worker = None
@@ -723,7 +787,7 @@ class SyncRMReporteDialog(QDialog):
         self.btn_cancel.setEnabled(False) 
         self.terminal.clear()
         
-        self.worker = RMReporteSyncWorker()
+        self.worker = RMJaviSyncWorker()
         self.worker.log_signal.connect(self.write_log)
         self.worker.success_signal.connect(self.handle_success)
         self.worker.error_signal.connect(self.handle_error)
@@ -734,12 +798,9 @@ class SyncRMReporteDialog(QDialog):
 
         dm = DataManager()
         # B-7 (auditoria de rendimiento, 18-09-2026): DataFrameFormatter.clean()
-        # ya se ejecuto DENTRO de RMReporteSyncWorker.run() (ver mas arriba, antes
-        # del success_signal.emit), no aqui -- df_final llega ya limpio. Antes
-        # este with medir() media ~8-11s en Main Thread; se deja para poder
-        # comprobar en consola que el costo de este callback bajo.
-        with medir(f"B-7 handle_success ({len(df_final)} filas, clean() ya hecho en Worker)"):
-            dm.df_master = df_final
+        # ya se ejecuto DENTRO de RMJaviSyncWorker.run() (ver mas arriba, antes
+        # del success_signal.emit), no aqui -- df_final llega ya limpio.
+        dm.df_master = df_final
         if df_logs_actualizado is not None:
             # set_logs_df solo asigna en RAM y emite logs_updated; no vuelve
             # a leer el CSV (ya se leyo en el worker, fuera del hilo principal).
@@ -772,7 +833,7 @@ class SyncRMReporteDialog(QDialog):
 class _ComercialModuleLegacy(QWidget):
     def __init__(self, tabla_diferida=False):
         super().__init__()
-        self.settings = QSettings("GestorApp", "ComercialSettings")
+        self.settings = QSettings("VolvoApp", "ComercialSettings")
         # Embebido y oculto en ComercialModule: la tabla propia solo se llena
         # cuando se necesita (exportar a Excel o mostrarla), ver _asegurar_tabla
         self._tabla_diferida = tabla_diferida
@@ -956,22 +1017,34 @@ class _ComercialModuleLegacy(QWidget):
         self.btn_revisar_inconsistencias_forma_contrato.setToolTip(
             "Filtra la tabla a las unidades cuya combinación de FORMA DE CONTRATO / TIPO DE FACTURACION "
             "no cumple la matriz de negocio. No corrige nada automáticamente.\n\n"
-            "Nota: TIPO DE FACTURACION proviene de RM_CONTRATOS.xlsx y se sobrescribe en cada sincronización -- "
+            "Nota: TIPO DE FACTURACION proviene de RM_JAVI.xlsx y se sobrescribe en cada sincronización -- "
             "una corrección hecha solo aquí puede volver a quedar inconsistente si el RM no se actualiza también."
         )
         self.btn_revisar_inconsistencias_forma_contrato.toggled.connect(self._toggle_filtro_inconsistencias_forma_contrato)
         self._df_inconsistencias_forma_contrato = pd.DataFrame()
         self._filtro_inconsistencias_forma_contrato_activo = False
 
+        # Contratos cuyo término en el archivo no coincide con inicio + duración
+        # (la app lo recalcula al cargar, así que solo se ve contra el original).
+        self.btn_revisar_fechas_contrato = QPushButton(" Revisar fechas")
+        self.btn_revisar_fechas_contrato.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_revisar_fechas_contrato.setCheckable(True)
+        ThemeManager.apply_secondary_button(self.btn_revisar_fechas_contrato)
+        self.btn_revisar_fechas_contrato.setIcon(ThemeManager.icon('fa5s.not-equal', color=TEXT_SECONDARY))
+        self.btn_revisar_fechas_contrato.toggled.connect(self._toggle_filtro_fechas_contrato)
+        self._df_fechas_contrato = pd.DataFrame()
+        self._filtro_fechas_contrato_activo = False
+        self._actualizar_tooltip_fechas_contrato()
+
         self.btn_reload = QPushButton(" Recargar")
         self.btn_reload.setIcon(ThemeManager.icon('fa5s.sync-alt', color=TEXT_SECONDARY))
         ThemeManager.apply_secondary_button(self.btn_reload)
         self.btn_reload.clicked.connect(self._trigger_reload)
 
-        self.btn_sync_reporte = QPushButton(" Sincronizar RM_CONTRATOS")
-        self.btn_sync_reporte.setIcon(ThemeManager.icon('fa5s.cloud-download-alt', color='white'))
-        self.btn_sync_reporte.setStyleSheet(f"background-color: #8B5CF6; color: white; border-radius: 6px; font-weight: bold; padding: 6px 12px;") 
-        self.btn_sync_reporte.clicked.connect(self._open_sync_dialog)
+        self.btn_sync_javi = QPushButton(" Sincronizar RM_JAVI")
+        self.btn_sync_javi.setIcon(ThemeManager.icon('fa5s.cloud-download-alt', color='white'))
+        self.btn_sync_javi.setStyleSheet(f"background-color: #8B5CF6; color: white; border-radius: 6px; font-weight: bold; padding: 6px 12px;") 
+        self.btn_sync_javi.clicked.connect(self._open_sync_dialog)
         
         self.btn_save = QPushButton(" Guardar")
         self.btn_save.setIcon(ThemeManager.icon('fa5s.save', color='white'))
@@ -984,8 +1057,9 @@ class _ComercialModuleLegacy(QWidget):
         controls_layout.addWidget(self.btn_export_excel)
         controls_layout.addWidget(self.btn_alerta_etapa)
         controls_layout.addWidget(self.btn_revisar_inconsistencias_forma_contrato)
+        controls_layout.addWidget(self.btn_revisar_fechas_contrato)
         controls_layout.addWidget(self.btn_reload)
-        controls_layout.addWidget(self.btn_sync_reporte)
+        controls_layout.addWidget(self.btn_sync_javi)
         controls_layout.addWidget(self.btn_save)
         
         main_layout.addWidget(self.controls_frame)
@@ -1028,7 +1102,7 @@ class _ComercialModuleLegacy(QWidget):
         
         main_layout.addWidget(self.advanced_filters_frame)
 
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         self.table.menu_type = "comercial"
         self.table.action_editar_unidad.connect(self._handle_editar_unidad)
         self.table.item_edited.connect(self.on_item_edited)
@@ -1310,6 +1384,8 @@ class _ComercialModuleLegacy(QWidget):
             )
             return
 
+        if checked and getattr(self, '_filtro_fechas_contrato_activo', False):
+            self.btn_revisar_fechas_contrato.setChecked(False)
         self._filtro_inconsistencias_forma_contrato_activo = checked
         if checked:
             estilo_com.aplicar_estilo_boton_barra(self.btn_revisar_inconsistencias_forma_contrato, 'activo')
@@ -1318,6 +1394,34 @@ class _ComercialModuleLegacy(QWidget):
             estilo_com.aplicar_estilo_boton_barra(self.btn_revisar_inconsistencias_forma_contrato, 'neutro')
             self.btn_revisar_inconsistencias_forma_contrato.setIcon(ThemeManager.icon('fa5s.clipboard-check', color=TEXT_SECONDARY))
 
+        self.filter_table()
+
+    def _actualizar_tooltip_fechas_contrato(self):
+        n = len(self._df_fechas_contrato) if self._df_fechas_contrato is not None else 0
+        self.btn_revisar_fechas_contrato.setToolTip(
+            "Muestra los contratos cuyo término en el archivo no coincide con INICIO CONTRATO + DURACIÓN "
+            "(las Bajas no se revisan). No corrige nada: la app ya usa el término calculado; esto sirve para "
+            "corregir el RM.\n\n" + (f"{n} contrato(s) con diferencia." if n else "Sin diferencias detectadas."))
+
+    def _toggle_filtro_fechas_contrato(self, checked):
+        if checked and (self._df_fechas_contrato is None or self._df_fechas_contrato.empty):
+            self.btn_revisar_fechas_contrato.blockSignals(True)
+            self.btn_revisar_fechas_contrato.setChecked(False)
+            self.btn_revisar_fechas_contrato.blockSignals(False)
+            QMessageBox.information(
+                self, "Revisar fechas",
+                "Todos los contratos tienen un término que coincide con INICIO CONTRATO + DURACIÓN.")
+            return
+
+        if checked and self._filtro_inconsistencias_forma_contrato_activo:
+            self.btn_revisar_inconsistencias_forma_contrato.setChecked(False)
+        self._filtro_fechas_contrato_activo = checked
+        if checked:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_revisar_fechas_contrato, 'activo')
+            self.btn_revisar_fechas_contrato.setIcon(ThemeManager.icon('fa5s.not-equal', color=estilo_com.PRIMARIO))
+        else:
+            estilo_com.aplicar_estilo_boton_barra(self.btn_revisar_fechas_contrato, 'neutro')
+            self.btn_revisar_fechas_contrato.setIcon(ThemeManager.icon('fa5s.not-equal', color=TEXT_SECONDARY))
         self.filter_table()
 
     def _toggle_advanced_filters(self, checked):
@@ -1586,7 +1690,7 @@ class _ComercialModuleLegacy(QWidget):
         valor (a diferencia de `desde_por_gestionar`)."""
         if self.df_base.empty or 'VIN' not in self.df_base.columns:
             return
-        coincidencias = self.df_base[self.df_base['VIN'].astype(str).str.strip() == str(vin).strip()]
+        coincidencias = self.df_base[self.df_base['VIN'].astype(str).str.strip().str.upper() == str(vin).strip().upper()]
         if coincidencias.empty:
             QMessageBox.warning(self, "Unidad no encontrada", f"No se encontró la unidad con VIN {vin} en los datos actuales.")
             return
@@ -1647,14 +1751,13 @@ class _ComercialModuleLegacy(QWidget):
         self.pending_changes.clear()
         self.df_base = comercial_services.preparar_df_base_comercial(self.data_manager.get_comercial_df())
 
-        # Instrumentacion temporal (auditoria de rendimiento B-6, 18-09-2026):
-        # mide el costo real del apply(axis=1) sobre el df completo en Main
-        # Thread. No cambia el comportamiento.
-        with medir(f"B-6 detectar_contradicciones_etapa_gestion ({len(self.df_base)} filas)"):
-            self._df_contradicciones_etapa = comercial_services.detectar_contradicciones_etapa_gestion(self.df_base)
+        self._df_contradicciones_etapa = comercial_services.detectar_contradicciones_etapa_gestion(self.df_base)
         self._actualizar_alerta_etapa_gestion()
 
         self._df_inconsistencias_forma_contrato = comercial_services.detectar_inconsistencias_forma_contrato_tipo_facturacion(self.df_base)
+        self._df_fechas_contrato = comercial_services.filtrar_termino_distinto_de_duracion(
+            self.df_base, getattr(self.data_manager, 'termino_distinto_de_duracion', {}))
+        self._actualizar_tooltip_fechas_contrato()
 
         if self.df_base.empty:
             self._tabla_pendiente = False
@@ -1742,6 +1845,9 @@ class _ComercialModuleLegacy(QWidget):
         avisos_filtran = getattr(self, '_avisos_filtran_tabla', True)
         if avisos_filtran and getattr(self, '_filtro_inconsistencias_forma_contrato_activo', False):
             df_f = comercial_services.detectar_inconsistencias_forma_contrato_tipo_facturacion(df_f)
+
+        if avisos_filtran and getattr(self, '_filtro_fechas_contrato_activo', False):
+            df_f = df_f[df_f.index.isin(self._df_fechas_contrato.index)]
 
         # Filtro de alerta ETAPA GESTIÓN (25-09-2026, a pedido explícito,
         # mismo criterio de composición AND que el filtro de arriba): ver
@@ -1884,13 +1990,6 @@ class _ComercialModuleLegacy(QWidget):
                 df_actual.iat[row, df_actual.columns.get_loc(col_limpia)] = valor_limpia
                 self.model._edited_cells.add((row, df_actual.columns.get_loc(col_limpia)))
 
-        limpieza_terminated_cm = comercial_services.aplica_regla_terminated_cm(col_name, new_value)
-        for col_limpia, valor_limpia in limpieza_terminated_cm.items():
-            if col_limpia in df_actual.columns:
-                self.pending_changes[vin_value]['cambios'][col_limpia] = valor_limpia
-                df_actual.iat[row, df_actual.columns.get_loc(col_limpia)] = valor_limpia
-                self.model._edited_cells.add((row, df_actual.columns.get_loc(col_limpia)))
-
         if col_name in ['INICIO CONTRATO', 'DURACIÓN (MESES)']:
             from dateutil.relativedelta import relativedelta
 
@@ -1923,12 +2022,6 @@ class _ComercialModuleLegacy(QWidget):
         msg.setText("Se aplicarán en la nube.")
         msg.setStandardButtons(QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel)
         if msg.exec() == QMessageBox.StandardButton.Save:
-            # Medicion Fase 0 (auditoria de rendimiento, 17-09-2026): linea
-            # base "guardado -> interfaz nuevamente disponible", tomada como
-            # referencia para Comercial (el modulo con la cascada mas pesada
-            # tras data_ready). Se cierra en _on_save_finished. Ver
-            # src/core/perf_log.py.
-            self._t_inicio_guardado = time.perf_counter()
             self.btn_save.setEnabled(False)
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             mostrar_guardando(self)
@@ -1985,16 +2078,6 @@ class _ComercialModuleLegacy(QWidget):
                 self._skip_self_triggered_reload = True
                 self.data_manager.data_ready.emit()
 
-                # Cierre de la medicion Fase 0 iniciada en confirm_save(): la
-                # cascada sincrona de data_ready.emit() (todos los modulos
-                # visibles conectados) ya termino de ejecutarse en la linea
-                # anterior, asi que aqui la interfaz vuelve a estar disponible.
-                # Se mide antes del QMessageBox de exito (que es un modal
-                # bloqueante aparte, no parte del costo de guardado).
-                if hasattr(self, '_t_inicio_guardado'):
-                    duracion_ms = (time.perf_counter() - self._t_inicio_guardado) * 1000
-                    print(f"[PERF] guardado (Comercial) -> interfaz nuevamente disponible: {duracion_ms:.0f} ms")
-
                 terminar_guardando(self)
             except Exception as e:
                 print(f"Fallo en inyección RAM: {e}")
@@ -2005,7 +2088,7 @@ class _ComercialModuleLegacy(QWidget):
             QMessageBox.warning(self, "Error", "No se guardaron los cambios. SharePoint puede estar bloqueando el archivo. Intenta de nuevo.")
 
     def _open_sync_dialog(self):
-        dialog = SyncRMReporteDialog(self)
+        dialog = SyncRMJaviDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.data_manager.data_ready.emit()
 
@@ -2022,7 +2105,7 @@ class DialogoAccionCm(DialogoAccion):
         """Diálogo previo a confirmar: reemplaza el QMessageBox.question de
         antes. `vins` es la lista (ya deduplicada) de VIN seleccionados en
         Gestionar CM. Acento rojo/danger en el botón principal: es una
-        acción de negocio importante (limpia datos de contrato CM)."""
+        acción de negocio importante (da de baja el contrato y lo envía a Operaciones)."""
         cantidad = len(vins)
         plural = "vehículo" if cantidad == 1 else "vehículos"
         return cls(
@@ -2031,8 +2114,8 @@ class DialogoAccionCm(DialogoAccion):
             titulo="Confirmar baja de CM",
             subtitulo=f"{cantidad} {plural} seleccionado{'s' if cantidad != 1 else ''}",
             descripcion=(
-                "Se cambiará el estado de CM a Terminated y se limpiarán los datos de "
-                "contrato CM (N Contrato 3PC, fechas, tipo y pago) de los vehículos seleccionados."
+                "El contrato pasará a Baja y el estado de CM a Terminated. Operaciones recibirá "
+                "los vehículos seleccionados en Bajas para desconectarlos. Los datos del CM se conservan."
             ),
             items=vins,
             botones=[
@@ -2044,7 +2127,7 @@ class DialogoAccionCm(DialogoAccion):
     @classmethod
     def vins_faltantes_en_correos(cls, parent, vins):
         """Aviso cuando uno o mas VIN seleccionados en Gestionar CM no
-        estan en Correo.xlsx (desactualizado respecto a Comercial, ver
+        estan en Correos.csv (desactualizado respecto a Comercial, ver
         mail_sync_service.cruzar_correos_maestro): no abre MailDialog
         preseleccionado; ofrece abrir el Gestor de Correos normal para que
         el usuario sincronice manualmente (nunca se dispara sola). Boton
@@ -2163,7 +2246,7 @@ class DialogoAccionCm(DialogoAccion):
         vehículos de la bandeja "Vigentes" con ESTADO COMERCIAL =
         "Activación Pendiente" Y ESTADO DE ACTIVACIÓN ACTUAL = "Conectado"
         (ver ComercialModule._on_accion_marcar_vigente_clicked) -- unidades
-        que Servicios Conectados ya muestra conectadas pero cuyo ESTADO COMERCIAL
+        que Volvo Connect ya muestra conectadas pero cuyo ESTADO COMERCIAL
         quedó desactualizado (error humano). Mismo patrón visual que
         confirmacion_marcar_vencidos."""
         cantidad = len(vins)
@@ -2289,6 +2372,10 @@ class ComercialModule(QWidget):
     _COLUMNAS_BANDEJA_AVISOS = [
         "RAZÓN SOCIAL", "CHASIS", "ESTADO COMERCIAL", "ETAPA GESTIÓN", "FORMA DE CONTRATO", "TIPO DE FACTURACION",
     ]
+    _COLUMNAS_BANDEJA_FECHAS = [
+        "RAZÓN SOCIAL", "CHASIS", "ESTADO COMERCIAL", "INICIO CONTRATO", "DURACIÓN (MESES)", "TÉRMINO CONTRATO",
+        "TÉRMINO EN ARCHIVO",
+    ]
     _COLUMNAS_BANDEJA_INCONSISTENCIAS = [
         "RAZÓN SOCIAL", "CHASIS", "ESTADO COMERCIAL", "ESTADO DE ACTIVACIÓN ACTUAL", "FORMA DE CONTRATO", "TIPO DE FACTURACION",
     ]
@@ -2326,6 +2413,14 @@ class ComercialModule(QWidget):
     # _on_accion_editar_unidad_clicked, que activa el mismo modo de edición
     # restringida que "Por gestionar" (caso "cliente interesado en volver").
     _NEW_UI_SUBTAB_OFRECER_REACTIVAR = 1
+
+    # Plantilla que "Enviar correo" deja preseleccionada en cada sub-pestaña
+    # (Renovar contratos no preselecciona ninguna).
+    _PLANTILLA_CORREO_POR_SUBTAB = {
+        _NEW_UI_SUBTAB_OFRECER_REACTIVAR: mail_service.PLANTILLA_REACTIVACION,
+        _NEW_UI_SUBTAB_POR_GESTIONAR: mail_service.PLANTILLA_CONOCE_VOLVO_CONNECT,
+        _NEW_UI_SUBTAB_REVISION_CM: mail_service.PLANTILLA_AVISO_VENCIMIENTO,
+    }
 
     # Índice de "Renovaciones" -- único uso: calcular_kpis_renovaciones/
     # obtener_masks_kpi_renovaciones necesitan además self.legacy.
@@ -2367,7 +2462,7 @@ class ComercialModule(QWidget):
     _NEW_UI_KPI_SPECS = {
         2: [  # "Nuevas oportunidades" (antes "Por gestionar")
             ("total", "UNIDADES POTENCIALES", "fa5s.tasks", "#D1FAE5", SUCCESS,
-             "Unidades con ESTADO DE ACTIVACIÓN ACTUAL = No aplica.", "unidades sin Servicios Conectados"),
+             "Unidades con ESTADO DE ACTIVACIÓN ACTUAL = No aplica.", "unidades sin Volvo Connect"),
             ("clientes_totales", "CLIENTES TOTALES", "fa5s.building", "#DBEAFE", PRIMARY,
              "Número de RAZÓN SOCIAL distintas dentro de esta bandeja.", "cartera de oportunidades"),
             ("contactados", "CLIENTES CONTACTADOS", "fa5s.envelope", "#FEF3C7", WARNING,
@@ -2439,17 +2534,20 @@ class ComercialModule(QWidget):
         'legacy', 'tabs', 'new_ui_tab', 'new_ui_table', 'new_ui_model', 'new_ui_kpi_labels', 'new_ui_subtabs',
         '_new_ui_kpi_cards', '_new_ui_kpi_filtro_por_subtab',
         'new_ui_search_input', 'acciones_rapidas_comunes', 'acciones_rapidas_cm', 'acciones_rapidas_vencidos',
-        'acciones_rapidas_vigentes', 'acciones_rapidas_papelera', 'btn_accion_papelera',
+        'acciones_rapidas_vigentes', '_grilla_acciones_vencidos', 'acciones_rapidas_papelera', 'btn_accion_papelera',
+        'acciones_rapidas_conversion', '_grilla_maestra', 'btn_accion_a_conversion', '_a_conversion_thread', '_renovacion_multiple_thread',
         'btn_accion_cm_enviar_correo', 'btn_accion_editar_unidad', 'btn_accion_agregar_contacto',
         'btn_accion_enviar_operaciones', 'btn_accion_cm_confirmar_baja', 'btn_accion_cm_exportar_lista',
         'btn_accion_marcar_vencido', 'btn_accion_renovar', 'btn_accion_ver_general', 'btn_accion_crear_contrato',
         'btn_accion_marcar_vigente', 'acciones_rapidas_inconsistencias', 'btn_accion_arreglar_tipo_fact',
+        'acciones_rapidas_fechas', 'btn_accion_fecha_real', 'btn_arreglar_fechas_barra', '_arreglar_fechas_thread',
         # "Unidad nueva" (25-09-2026, refactor: alta/edición de unidades
         # centralizada en Comercial, ver _build_unidad_nueva_tab).
         'unidad_nueva_tab', 'unidad_nueva_form', 'btn_unidad_nueva_importar_powerbi',
         'btn_unidad_nueva_restablecer',
         '_unidad_nueva_vin_en_edicion', '_unidad_nueva_datos_originales', '_unidad_nueva_restricciones',
         '_add_unidad_thread', '_importar_powerbi_worker', '_unidad_nueva_form_layout',
+        'btn_accion_renovar_nuevo', '_unidad_nueva_renovacion', '_renovacion_thread',
         '_unidad_nueva_loading_lbl',
         # Rediseño visual (comercial_estilo.py)
         'selector_pestanas', '_delegado_celdas', 'btn_ampliar_bandeja',
@@ -2769,17 +2867,25 @@ class ComercialModule(QWidget):
     def _on_nuevo_contrato_solicitado(self):
         self._iniciar_nuevo_contrato(self._unidad_nueva_datos_originales)
 
-    def _iniciar_nuevo_contrato(self, datos_unidad):
+    def _iniciar_nuevo_contrato(self, datos_unidad, renovacion=None):
+        cantidad = len((renovacion or {}).get('datos_por_vin', {})) or 1
+        self._iniciar_nuevo_contrato_n(datos_unidad, renovacion, cantidad)
+
+    def _iniciar_nuevo_contrato_n(self, datos_unidad, renovacion, cantidad):
         """Abre "Unidad nueva" en modo "Nuevo contrato" sobre una unidad cuyo
         contrato actual está cerrado. Al guardar se agrega una fila nueva con
-        ID nuevo; el contrato anterior queda intacto como historial."""
+        ID nuevo; el contrato anterior queda intacto como historial. Con
+        `renovacion` ({'vin', 'id', 'cambios'}) el contrato actual sigue
+        abierto y al guardar pasa a Renovado."""
         self._asegurar_unidad_nueva_form()
         self._unidad_nueva_vin_en_edicion = None
         self._unidad_nueva_datos_originales = None
         self._unidad_nueva_restricciones = {}
         self._unidad_nueva_nuevo_contrato = datos_unidad
+        self._unidad_nueva_renovacion = renovacion
         self.unidad_nueva_form.actualizar_datos_comercial(self.legacy.df_base)
-        self.unidad_nueva_form.cargar_para_nuevo_contrato(datos_unidad)
+        self.unidad_nueva_form.cargar_para_nuevo_contrato(
+            datos_unidad, renovacion=renovacion is not None, cantidad=cantidad)
         self.tabs.setCurrentWidget(self.unidad_nueva_tab)
 
     def _resetear_formulario_unidad_nueva(self):
@@ -2793,7 +2899,8 @@ class ComercialModule(QWidget):
         if self._unidad_nueva_datos_originales is not None:
             self._iniciar_edicion_unidad(self._unidad_nueva_datos_originales, **self._unidad_nueva_restricciones)
         elif getattr(self, '_unidad_nueva_nuevo_contrato', None) is not None:
-            self._iniciar_nuevo_contrato(self._unidad_nueva_nuevo_contrato)
+            self._iniciar_nuevo_contrato(self._unidad_nueva_nuevo_contrato,
+                                         renovacion=getattr(self, '_unidad_nueva_renovacion', None))
         else:
             self._entrar_modo_crear_unidad()
 
@@ -2813,6 +2920,7 @@ class ComercialModule(QWidget):
         self._unidad_nueva_datos_originales = None
         self._unidad_nueva_restricciones = {}
         self._unidad_nueva_nuevo_contrato = None
+        self._unidad_nueva_renovacion = None
         self.unidad_nueva_form.actualizar_datos_comercial(self.legacy.df_base)
         self.unidad_nueva_form.resetear_para_crear()
         for widget in (self.new_ui_tab,):
@@ -2853,6 +2961,19 @@ class ComercialModule(QWidget):
             id_nuevo = comercial_services.proximo_id_contrato(self.legacy.data_manager.df_master)
             if id_nuevo:
                 data = {**data, 'ID': id_nuevo}
+            renovacion = getattr(self, '_unidad_nueva_renovacion', None)
+            if renovacion and renovacion.get('datos_por_vin'):
+                self._guardar_renovacion_multiple(data, renovacion)
+                return
+            if renovacion:
+                self.unidad_nueva_form.setEnabled(False)
+                mostrar_guardando(self, "Guardando el contrato nuevo…")
+                self._renovacion_thread = AddRowRenovacionThread(
+                    self.legacy.writer, data, renovacion['vin'], renovacion['id'], renovacion['cambios'],
+                    module_name="Comercial")
+                self._renovacion_thread.finished_signal.connect(self._on_renovacion_finished)
+                self._renovacion_thread.start()
+                return
             self.unidad_nueva_form.setEnabled(False)
             mostrar_guardando(self, "Agregando la unidad nueva…")
             self._add_unidad_thread = AddRowThread(self.legacy.writer, data, module_name="Comercial")
@@ -2870,6 +2991,67 @@ class ComercialModule(QWidget):
             QMessageBox.information(self, "Sin cambios", "No se modificó ningún campo.")
             return
         self.legacy.guardar_edicion_unidad(vin, cambios)
+
+    def _guardar_renovacion_multiple(self, data, renovacion):
+        """Un contrato nuevo por cada unidad seleccionada, con las condiciones del formulario."""
+        renovaciones = comercial_services.armar_renovaciones_multiples(
+            data, renovacion['datos_por_vin'], renovacion['prototipo'], data.get('ID', ''))
+        self.unidad_nueva_form.setEnabled(False)
+        mostrar_guardando(self, f"Renovando {len(renovaciones)} contratos…")
+        self._renovacion_multiple_thread = AddRowsRenovacionThread(self.legacy.writer, renovaciones, module_name="Comercial")
+        self._renovacion_multiple_thread.finished_signal.connect(self._on_renovacion_multiple_finished)
+        self._renovacion_multiple_thread.start()
+
+    def _on_renovacion_multiple_finished(self, hechos, total):
+        self.unidad_nueva_form.setEnabled(True)
+        dm = self.legacy.data_manager
+        if hechos and not dm.df_master.empty:
+            for r in hechos:
+                dm.df_master = comercial_services.agregar_fila(dm.df_master, r['nuevo'])
+                if r['anterior_ok'] and r['id_anterior']:
+                    dm.df_master = comercial_services.aplicar_cambios_pendientes(
+                        dm.df_master, {r['vin']: {'VIN': r['vin'], 'ID': r['id_anterior'], 'cambios': r['cambios_anterior']}})
+            dm.data_ready.emit()
+        sin_anterior = [r['vin'] for r in hechos if not r['anterior_ok']]
+        if len(hechos) == total:
+            terminar_guardando(self, texto_exito=f"{total} contratos renovados")
+        else:
+            terminar_guardando(self, exito=False)
+            QMessageBox.warning(
+                self, "Renovación incompleta",
+                f"Se renovaron {len(hechos)} de {total} contratos. El resto no se pudo guardar (SharePoint puede estar "
+                "bloqueando el archivo): vuelve a seleccionarlos y repite la renovación.")
+        if sin_anterior:
+            QMessageBox.warning(
+                self, "Contrato anterior sin actualizar",
+                "Se crearon los contratos nuevos, pero no se pudo marcar como Renovado el contrato anterior de: "
+                + ", ".join(sin_anterior) + ".\nComo el nuevo tiene un N° Contrato mayor ya es el vigente; avisa para corregirlo.")
+        self._entrar_modo_crear_unidad()
+        self._volver_a_bandeja()
+
+    def _on_renovacion_finished(self, agregado, anterior_actualizado, new_data):
+        self.unidad_nueva_form.setEnabled(True)
+        if not agregado:
+            terminar_guardando(self, exito=False)
+            QMessageBox.warning(self, "Error", "No se pudo guardar el contrato nuevo. No se cambió nada. Intenta de nuevo.")
+            return
+        renovacion = getattr(self, '_unidad_nueva_renovacion', None) or {}
+        dm = self.legacy.data_manager
+        if not dm.df_master.empty:
+            dm.df_master = comercial_services.agregar_fila(dm.df_master, new_data)
+            if anterior_actualizado and renovacion.get('id'):
+                dm.df_master = comercial_services.aplicar_cambios_pendientes(
+                    dm.df_master, {renovacion['vin']: {'VIN': renovacion['vin'], 'ID': renovacion['id'],
+                                                      'cambios': renovacion['cambios']}})
+            dm.data_ready.emit()
+        terminar_guardando(self, texto_exito="Contrato nuevo creado")
+        if not anterior_actualizado:
+            QMessageBox.warning(
+                self, "Contrato anterior sin actualizar",
+                "El contrato nuevo se guardó, pero no se pudo marcar el anterior como Renovado. "
+                "Como el nuevo tiene un N° Contrato mayor ya es el vigente; avisa para corregir el estado del anterior.")
+        self._entrar_modo_crear_unidad()
+        self._volver_a_bandeja()
 
     def _on_unidad_nueva_creada_finished(self, success, new_data):
         self.unidad_nueva_form.setEnabled(True)
@@ -2941,7 +3123,7 @@ class ComercialModule(QWidget):
             )
             self.legacy.data_manager.load_data_async()
         else:
-            QMessageBox.critical(self, "Error", "No se pudo escribir el lote importado en RM_CONTRATOS. No se realizó ningún cambio.")
+            QMessageBox.critical(self, "Error", "No se pudo escribir el lote importado en RM_JAVI. No se realizó ningún cambio.")
         self._entrar_modo_crear_unidad()
         if success:
             self.new_ui_subtabs.setCurrentIndex(2)
@@ -3080,7 +3262,6 @@ class ComercialModule(QWidget):
         # el ancho); aparece sobre selector, KPIs y tabla solo con alguna fila
         # seleccionada. Cuelga del módulo para llegar hasta el borde superior
         self._panel_acciones = self._build_new_ui_acciones_rapidas()
-        self._panel_acciones.setParent(self)
         estilo_com.crear_sombra_panel(self._panel_acciones)
         self._panel_acciones.hide()
         self._panel_acciones_abierto = False
@@ -3105,7 +3286,7 @@ class ComercialModule(QWidget):
         self._panel_acciones_abierto = False
         combo_periodo = getattr(self, 'combo_periodo_interno', None)
         if combo_periodo is not None:
-            combo_periodo.set_compacto(False)
+            combo_periodo.set_compacto(True)
         self._panel_acciones.hide()
         self._ajustar_barra_bajo_panel()
 
@@ -3119,7 +3300,7 @@ class ComercialModule(QWidget):
         self._panel_acciones_abierto = mostrar
         combo_periodo = getattr(self, 'combo_periodo_interno', None)
         if combo_periodo is not None:
-            combo_periodo.set_compacto(mostrar)
+            combo_periodo.set_compacto(True)
         anim = self._anim_panel_acciones
         anim.stop()
         if mostrar:
@@ -3380,6 +3561,37 @@ class ComercialModule(QWidget):
         self._new_ui_kpi_filtro_por_subtab[subtab] = None if (key == 'total' or actual == key) else key
         self._refresh_new_ui_data()
 
+    def _ajustar_anchos_al_viewport(self):
+        """Reacomoda las columnas cuando cambia el ancho útil de la tabla: sin
+        scroll horizontal, la última columna quedaba cortada si el espacio se
+        achicaba. En la vista agrupada se repite el reparto por pesos; en la
+        de unidades solo se comprime lo que sobra."""
+        tabla = self.new_ui_table
+        if tabla._ajustando_anchos_new_ui:
+            return
+        header = tabla.horizontalHeader()
+        n = header.count()
+        disponible = tabla.viewport().width()
+        if n < 2 or disponible <= 0:
+            return
+        if getattr(self, '_new_ui_en_grupos', False):
+            columnas = [self.new_ui_model.headerData(i, Qt.Orientation.Horizontal) for i in range(n)]
+            if all(columnas):
+                _aplicar_anchos_columnas_new_ui(tabla, columnas, anchos_fijos=self._anchos_vista_grupos(columnas))
+            return
+        otras = [i for i in range(n - 1) if not header.isSectionHidden(i)]
+        total_otras = sum(header.sectionSize(i) for i in otras)
+        maximo = disponible - NEW_UI_COL_WIDTH_MINIMO
+        if not otras or total_otras <= maximo:
+            return
+        objetivo = max(maximo, len(otras) * NEW_UI_COL_WIDTH_MINIMO)
+        tabla._ajustando_anchos_new_ui = True
+        try:
+            for i in otras:
+                header.resizeSection(i, max(NEW_UI_COL_WIDTH_MINIMO, int(header.sectionSize(i) * objetivo / total_otras)))
+        finally:
+            tabla._ajustando_anchos_new_ui = False
+
     def _on_new_ui_header_resized(self, logical_index, old_size, new_size):
         """Reparte el ancho entre las columnas de new_ui_table para que la
         suma total nunca supere el ancho visible del panel (30-09-2026,
@@ -3464,7 +3676,7 @@ class ComercialModule(QWidget):
         contenedor_barra.setStyleSheet(
             "QFrame#barraBandejaComercial { background-color: #1B2B4E; border: none; border-radius: 14px; }")
         barra = QHBoxLayout(contenedor_barra)
-        barra.setContentsMargins(15, 12, 15, 12)
+        barra.setContentsMargins(15, 7, 15, 7)
         barra.setSpacing(8)
         self._barra_bandeja = contenedor_barra
         layout_externo.addWidget(contenedor_barra)
@@ -3472,7 +3684,8 @@ class ComercialModule(QWidget):
         lay_origen = self.legacy.controls_frame.layout()
         botones_derecha = (
             self.legacy.btn_export_excel, self.legacy.btn_alerta_etapa,
-            self.legacy.btn_revisar_inconsistencias_forma_contrato, self.legacy.btn_reload,
+            self.legacy.btn_revisar_inconsistencias_forma_contrato, self.legacy.btn_revisar_fechas_contrato,
+            self.legacy.btn_reload,
         )
         for btn in (self.legacy.btn_notas_venta_bi,) + botones_derecha:
             lay_origen.removeWidget(btn)
@@ -3489,11 +3702,17 @@ class ComercialModule(QWidget):
         self.btn_arreglar_inconsistencias_barra.setIcon(ThemeManager.icon('fa5s.magic', color=TEXT_SECONDARY))
         self.btn_arreglar_inconsistencias_barra.clicked.connect(self._on_arreglar_inconsistencias_clicked)
         self.btn_arreglar_inconsistencias_barra.hide()
+        self.btn_arreglar_fechas_barra = QPushButton(" Arreglar fechas (0)")
+        self.btn_arreglar_fechas_barra.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_arreglar_fechas_barra.setIcon(ThemeManager.icon('fa5s.magic', color=TEXT_SECONDARY))
+        self.btn_arreglar_fechas_barra.clicked.connect(self._on_arreglar_fechas_clicked)
+        self.btn_arreglar_fechas_barra.hide()
         self.legacy.btn_notas_venta_bi.setMinimumSize(0, 0)
         self.legacy.btn_notas_venta_bi.setMaximumSize(16777215, 16777215)
         self.legacy.btn_notas_venta_bi.setIcon(ThemeManager.icon('fa5s.chart-bar', color='white'))
         self.legacy.btn_export_excel.setIcon(ThemeManager.icon('fa5s.file-excel', color='white'))
-        for btn in (self.legacy.btn_revisar_inconsistencias_forma_contrato, self.legacy.btn_reload):
+        for btn in (self.legacy.btn_revisar_inconsistencias_forma_contrato, self.legacy.btn_revisar_fechas_contrato,
+                    self.legacy.btn_reload):
             estilo_com.aplicar_estilo_boton_barra(btn, 'neutro')
 
         # "Ampliar": oculta las tarjetas KPI para darle más alto a la tabla
@@ -3534,8 +3753,17 @@ class ComercialModule(QWidget):
 
         # Filtro por PERIODO INTERNO: afecta KPIs, contadores y bandeja
         self.combo_periodo_interno = estilo_com.SelectorFiltroPopup("Periodo interno", self._TEXTO_TODOS_PERIODOS)
-        self.combo_periodo_interno.cambiado.connect(self._on_periodo_interno_cambiado)
+        self.combo_periodo_interno.cambiado.connect(lambda _v: self._on_periodo_interno_cambiado(self.combo_periodo_interno))
+        self.combo_periodo_interno.set_compacto(True)
         self._periodo_interno_df = (None, None, None)
+        # Filtros por columna: solo icono, el valor elegido va en la ayuda
+        self._filtros_columna = {}
+        self._orden_filtros = []
+        for columna, titulo, icono in self._FILTROS_COLUMNA:
+            selector = estilo_com.SelectorFiltroPopup(titulo, f"Todas ({titulo.lower()})", icono)
+            selector.set_compacto(True)
+            selector.cambiado.connect(lambda _v, s=selector: self._on_periodo_interno_cambiado(s))
+            self._filtros_columna[columna] = selector
 
         barra.addWidget(self.btn_volver_grupos)
         capsula_bi = QFrame()
@@ -3548,26 +3776,43 @@ class ComercialModule(QWidget):
         barra.addWidget(separador)
         barra.addWidget(bloque_titulo)
         barra.addStretch()
-        barra.addWidget(self.combo_periodo_interno)
-        capsula = QFrame()
-        capsula.setStyleSheet("QFrame { background: rgba(255,255,255,0.08); border-radius: 14px; }")
-        lay_capsula = QHBoxLayout(capsula)
-        lay_capsula.setContentsMargins(5, 5, 5, 5)
-        lay_capsula.setSpacing(4)
-        for btn in (self.legacy.btn_export_excel, self.btn_marcar_vencidos_barra,
-                    self.btn_arreglar_inconsistencias_barra,
-                    self.legacy.btn_revisar_inconsistencias_forma_contrato,
-                    self.btn_ampliar_bandeja, self.legacy.btn_reload):
-            lay_capsula.addWidget(btn)
-            estilo_com.preparar_boton_capsula(btn)
-        barra.addWidget(capsula)
+        # Tres grupos con encabezado: filtros, acciones y generales
+        grupo_filtros, lay_filtros = PantallaIngresosBase._crear_grupo_barra("Filtros")
+        grupo_revision, lay_revision = PantallaIngresosBase._crear_grupo_barra("Revisión")
+        grupo_acciones, lay_acciones = PantallaIngresosBase._crear_grupo_barra("Acciones")
+        grupo_generales, lay_generales = PantallaIngresosBase._crear_grupo_barra("Generales")
+        self.btn_limpiar_filtros = QPushButton()
+        self.btn_limpiar_filtros.setFixedWidth(44)
+        self.btn_limpiar_filtros.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_limpiar_filtros.setIcon(ThemeManager.icon('fa5s.trash-alt', color=TEXT_SECONDARY))
+        self.btn_limpiar_filtros.setToolTip("Quitar los filtros")
+        self.btn_limpiar_filtros.clicked.connect(self._limpiar_filtros)
+        lay_filtros.addWidget(self.btn_limpiar_filtros)
+        estilo_com.preparar_boton_capsula(self.btn_limpiar_filtros)
+        self.btn_limpiar_filtros.hide()
+        lay_filtros.addWidget(self.combo_periodo_interno)
+        for selector in self._filtros_columna.values():
+            lay_filtros.addWidget(selector)
+        for lay_destino, botones in (
+                (lay_revision, (self.legacy.btn_revisar_inconsistencias_forma_contrato,
+                                self.legacy.btn_revisar_fechas_contrato)),
+                (lay_acciones, (self.btn_marcar_vencidos_barra, self.btn_arreglar_inconsistencias_barra,
+                                self.btn_arreglar_fechas_barra)),
+                (lay_generales, (self.legacy.btn_export_excel, self.btn_ampliar_bandeja, self.legacy.btn_reload))):
+            for btn in botones:
+                lay_destino.addWidget(btn)
+                estilo_com.preparar_boton_capsula(btn)
+        for grupo in (grupo_filtros, grupo_revision, grupo_acciones, grupo_generales):
+            barra.addWidget(grupo)
+            grupo.show()
         self.legacy.btn_revisar_inconsistencias_forma_contrato.toggled.connect(self._on_aviso_bandeja_toggled)
+        self.legacy.btn_revisar_fechas_contrato.toggled.connect(self._on_aviso_bandeja_toggled)
 
         # Mismo componente de tabla que usan el resto de las pantallas
-        # (AppTableWidget + PandasTableModel), en vez de un QTableWidget
+        # (VolvoTableWidget + PandasTableModel), en vez de un QTableWidget
         # aparte: así se hereda el mismo look (sombra, filas alternadas,
         # badges de color por estado) sin duplicar estilos a mano.
-        self.new_ui_table = AppTableWidget()
+        self.new_ui_table = VolvoTableWidget()
         qss_tabla = estilo_com.QSS_TABLA + (
             "QHeaderView::section { background: #F7F8FC; color: #6B7A90; border-bottom: 1px solid #E3E8F0; }"
             "QTableView { alternate-background-color: #FFFFFF; }"
@@ -3597,15 +3842,15 @@ class ComercialModule(QWidget):
         # RAZÓN SOCIAL completa sin tener que ensanchar la columna a mano
         # (23-09-2026, a pedido explícito): ajuste de línea + fila más alta
         # (COMERCIAL_NEW_UI_ROW_HEIGHT) en vez del alto/elide estándar de
-        # AppTableWidget. ElideNone es necesario porque _setup_style()
+        # VolvoTableWidget. ElideNone es necesario porque _setup_style()
         # deja ElideRight por defecto (trunca con "..." en una sola línea),
         # lo que impedía el ajuste de línea aunque wordWrap estuviera activo.
-        # Se aplica a la instancia (no a la clase AppTableWidget), así que
+        # Se aplica a la instancia (no a la clase VolvoTableWidget), así que
         # el resto de la app conserva el alto/elide estándar de 38px.
         self.new_ui_table.setWordWrap(True)
         self.new_ui_table.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.new_ui_table.verticalHeader().setDefaultSectionSize(COMERCIAL_NEW_UI_ROW_HEIGHT)
-        # frozen_view (columna fijada, ver AppTableWidget._setup_frozen_view)
+        # frozen_view (columna fijada, ver VolvoTableWidget._setup_frozen_view)
         # es una QTableView aparte con su propio verticalHeader -- sin este
         # ajuste, fijar una columna desalinearía sus filas contra las de la
         # vista principal en cuanto RAZÓN SOCIAL ocupara más de una línea.
@@ -3619,7 +3864,7 @@ class ComercialModule(QWidget):
         self.new_ui_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.new_ui_table.horizontalHeader().setStretchLastSection(True)
         # Encabezado y celdas centrados + sin scroll lateral (28-09-2026, a
-        # pedido explícito), solo en esta tabla (no en AppTableWidget en
+        # pedido explícito), solo en esta tabla (no en VolvoTableWidget en
         # general, que sigue alineada a la izquierda para el resto de la
         # app). Los anchos por columna (ver _aplicar_anchos_columnas_new_ui,
         # llamado desde _refresh_new_ui_data) se ajustan al texto de cada
@@ -3646,13 +3891,15 @@ class ComercialModule(QWidget):
         # recibe la tabla, no el módulo.
         self.new_ui_table._ajustando_anchos_new_ui = False
         self.new_ui_table.horizontalHeader().sectionResized.connect(self._on_new_ui_header_resized)
+        self.new_ui_table._filtro_ancho_viewport = _FiltroAnchoViewport(self.new_ui_table, self._ajustar_anchos_al_viewport)
+        self.new_ui_table.viewport().installEventFilter(self.new_ui_table._filtro_ancho_viewport)
         # Selección por fila completa: la bandeja es de solo lectura, y
         # "Revisión CM" necesita saber si hay una fila seleccionada para
         # habilitar/deshabilitar sus acciones rápidas (ver
         # _actualizar_estado_acciones_rapidas).
         self.new_ui_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         # El estado de orden ("Ordenar A -> Z" del menú de encabezado) vive en
-        # la propia AppTableWidget y no se aplica solo: cada pantalla debe
+        # la propia VolvoTableWidget y no se aplica solo: cada pantalla debe
         # reaccionar a sort_changed y llamar a table.apply_sort() antes de
         # set_data() (mismo contrato que _ComercialModuleLegacy.filter_table()
         # con self.table). Sin esta conexión, elegir un orden no hacía nada.
@@ -3672,7 +3919,7 @@ class ComercialModule(QWidget):
         self.new_ui_table.selectionModel().selectionChanged.connect(self._actualizar_estado_acciones_rapidas)
         self.new_ui_table.clicked.connect(self._on_new_ui_fila_clicada)
         # VIN no se muestra en ninguna de las 4 sub-pestañas (NEW_UI_SUBTAB_
-        # COLUMNS), así que "Copiar VIN" del menú contextual (AppTableWidget.
+        # COLUMNS), así que "Copiar VIN" del menú contextual (VolvoTableWidget.
         # _get_vin_for_row) necesita este resolver para no mostrar
         # "Desconocido" -- misma fuente y mismo criterio de orden que
         # _obtener_vins_seleccionados.
@@ -3683,6 +3930,7 @@ class ComercialModule(QWidget):
         for btn, tip in ((self.legacy.btn_notas_venta_bi, "Abrir Notas de Venta en Power BI"),
                          (self.legacy.btn_export_excel, "Exportar a Excel"),
                          (self.legacy.btn_revisar_inconsistencias_forma_contrato, None),
+                         (self.legacy.btn_revisar_fechas_contrato, None),
                          (self.legacy.btn_reload, "Recargar"), (self.btn_ampliar_bandeja, None)):
             if tip:
                 btn.setToolTip(tip)
@@ -3729,7 +3977,9 @@ class ComercialModule(QWidget):
         return lbl
 
     def _build_new_ui_acciones_rapidas(self):
-        frame = QFrame()
+        # Nace colgado del módulo: armarlo suelto y moverlo después le
+        # reaplicaba los estilos a todo el panel
+        frame = QFrame(self)
         frame.setObjectName("accionesRapidasComercial")
         frame.setStyleSheet(estilo_com.QSS_PANEL_FLOTANTE)
         marco = QVBoxLayout(frame)
@@ -3771,13 +4021,18 @@ class ComercialModule(QWidget):
         self.acciones_rapidas_vencidos = self._build_new_ui_acciones_rapidas_solo_vencidos()
         self.acciones_rapidas_vigentes = self._build_new_ui_acciones_rapidas_solo_vigentes()
         self.acciones_rapidas_inconsistencias = self._build_new_ui_acciones_rapidas_solo_inconsistencias()
+        self.acciones_rapidas_fechas = self._build_new_ui_acciones_rapidas_solo_fechas()
+        layout.addWidget(self.acciones_rapidas_fechas)
+        self.acciones_rapidas_fechas.hide()
         layout.addWidget(self.acciones_rapidas_comunes)
         layout.addWidget(self.acciones_rapidas_cm)
         layout.addWidget(self.acciones_rapidas_vencidos)
-        layout.addWidget(self.acciones_rapidas_vigentes)
         layout.addWidget(self.acciones_rapidas_inconsistencias)
         self.acciones_rapidas_papelera = self._build_new_ui_acciones_rapidas_solo_papelera()
         layout.addWidget(self.acciones_rapidas_papelera)
+        self.acciones_rapidas_conversion = self._build_new_ui_acciones_rapidas_solo_conversion()
+        layout.addWidget(self.acciones_rapidas_conversion)
+        self.acciones_rapidas_conversion.hide()
         self.acciones_rapidas_cm.hide()
         self.acciones_rapidas_vencidos.hide()
         self.acciones_rapidas_vigentes.hide()
@@ -4113,8 +4368,9 @@ class ComercialModule(QWidget):
         operaciones" todavía no tiene lógica conectada (fase siguiente).
         Todas se habilitan/deshabilitan según selección (ver
         _actualizar_estado_acciones_rapidas)."""
-        widget = QWidget()
-        layout = estilo_com.GrillaAcciones(widget)
+        widget = estilo_com.PanelAcciones(maestro=True)
+        layout = estilo_com.GrillaAcciones(widget, impar_largo=True)
+        self._grilla_maestra = layout
 
         self.btn_accion_cm_enviar_correo = self._build_new_ui_accion_button(
             "fa5s.envelope", "Enviar correo", "Contactar al cliente", color=estilo_com.AZUL
@@ -4174,8 +4430,8 @@ class ComercialModule(QWidget):
         ORIGEN_CASO = AUSENCIA_3PC (ver _actualizar_estado_acciones_rapidas):
         para ESTADO_EXPIRED el equipo tampoco decide eso, solo avisa -- de
         ahí "Exportar lista"."""
-        widget = QWidget()
-        layout = estilo_com.GrillaAcciones(widget)
+        widget = estilo_com.PanelAcciones()
+        layout = estilo_com.GrillaAcciones(widget, maestra=self._grilla_maestra)
 
         self.btn_accion_cm_exportar_lista = self._build_new_ui_accion_button(
             "fa5s.file-export", "Exportar lista", "Guardar la bandeja visible en el Escritorio", color=estilo_com.PIZARRA
@@ -4200,8 +4456,8 @@ class ComercialModule(QWidget):
         COMERCIAL todavía no dice "Vencido" (ver
         _on_accion_marcar_vencido_clicked/_actualizar_boton_marcar_vencido).
         Modifica datos reales en PruebasFM.xlsx."""
-        widget = QWidget()
-        layout = estilo_com.GrillaAcciones(widget)
+        widget = estilo_com.PanelAcciones()
+        layout = estilo_com.GrillaAcciones(widget, maestra=self._grilla_maestra)
 
         self.btn_accion_marcar_vencido = self._build_new_ui_accion_button(
             "fa5s.calendar-times", "Marcar como Vencido", "Corrige el estado desactualizado", color=estilo_com.ROJO
@@ -4210,13 +4466,23 @@ class ComercialModule(QWidget):
         self.btn_accion_marcar_vencido.clicked.connect(self._on_accion_marcar_vencido_clicked)
 
         self.btn_accion_renovar = self._build_new_ui_accion_button(
-            "fa5s.redo-alt", "Renovar contrato", "Extiende los meses del contrato", color=estilo_com.VERDE
+            "fa5s.redo-alt", "Extender duración", "Extiende los meses del contrato", color=estilo_com.VERDE
         )
         self.btn_accion_renovar.setEnabled(False)
         self.btn_accion_renovar.clicked.connect(self._on_accion_renovar_clicked)
 
+        self.btn_accion_renovar_nuevo = self._build_new_ui_accion_button(
+            "fa5s.file-contract", "Renovar contrato",
+            "Reemplaza este contrato por uno nuevo (ej. Provisión a Conversión); el actual queda como Renovado",
+            color=estilo_com.AZUL
+        )
+        self.btn_accion_renovar_nuevo.setEnabled(False)
+        self.btn_accion_renovar_nuevo.clicked.connect(self._on_accion_renovar_nuevo_clicked)
+
         layout.agregar(self.btn_accion_marcar_vencido)
         layout.agregar(self.btn_accion_renovar)
+        layout.agregar(self.btn_accion_renovar_nuevo)
+        self._grilla_acciones_vencidos = layout
 
         return widget
 
@@ -4224,8 +4490,8 @@ class ComercialModule(QWidget):
         """Acción exclusiva de "Nuevas oportunidades": envía a la papelera
         contratos "SIN VC" (unidades que no quisieron o no respondieron al
         servicio). Ver _on_accion_papelera_clicked."""
-        widget = QWidget()
-        layout = estilo_com.GrillaAcciones(widget)
+        widget = estilo_com.PanelAcciones()
+        layout = estilo_com.GrillaAcciones(widget, maestra=self._grilla_maestra)
 
         self.btn_accion_papelera = self._build_new_ui_accion_button(
             "fa5s.trash-alt", "Enviar a papelera", "Solo contratos SIN VC", color=estilo_com.ROJO
@@ -4234,6 +4500,76 @@ class ComercialModule(QWidget):
         self.btn_accion_papelera.clicked.connect(self._on_accion_papelera_clicked)
         layout.agregar(self.btn_accion_papelera)
         return widget
+
+    def _build_new_ui_acciones_rapidas_solo_conversion(self):
+        """Acción de "Recuperar clientes" y "Renovar contratos": pasa varias unidades de Provisión a
+        Conversión con facturación manual (ver _on_accion_a_conversion_clicked)."""
+        widget = estilo_com.PanelAcciones()
+        layout = estilo_com.GrillaAcciones(widget, maestra=self._grilla_maestra)
+        self.btn_accion_a_conversion = self._build_new_ui_accion_button(
+            "fa5s.exchange-alt", "A Facturación Manual", "Pasar unidades de Provisión a Facturación Manual", color=estilo_com.VERDE
+        )
+        self.btn_accion_a_conversion.setEnabled(False)
+        self.btn_accion_a_conversion.clicked.connect(self._on_accion_a_conversion_clicked)
+        layout.agregar(self.btn_accion_a_conversion)
+        return widget
+
+    def _actualizar_boton_a_conversion(self, vins, filas):
+        habilitado = bool(vins) and all(comercial_services.es_forma_provision(filas[v]) for v in vins)
+        self.btn_accion_a_conversion.setEnabled(habilitado)
+        self.btn_accion_a_conversion.setToolTip(
+            "Pasa las unidades seleccionadas a Facturación Manual (Conversión), Vigente y Conectado." if habilitado
+            else "Solo se pueden pasar unidades cuya forma de contrato sea Provisión.")
+
+    def _on_accion_a_conversion_clicked(self):
+        """Pasa de una vez las unidades seleccionadas de Provisión a Conversión: Facturación
+        Manual, Vigente y Conectado (Comercial, sin pasar por Operaciones), inicio el día 1 del
+        mes actual, duración mensual ("-") y sin fecha de baja. Mismo guardado que "Marcar como
+        Vigente" (SaveExcelThread, con su backup)."""
+        vins, filas = self._obtener_vins_seleccionados()
+        if not vins or not all(comercial_services.es_forma_provision(filas[v]) for v in vins):
+            return
+        inicio = datetime.now().replace(day=1).strftime("%d-%m-%Y")
+        confirmar = QMessageBox.question(
+            self, "Pasar a Facturación Manual",
+            f"Se pasarán {len(vins)} unidad(es) de Provisión a:\n\n"
+            "• Forma de contrato: Conversion\n"
+            "• Tipo de facturación: Facturación Manual\n"
+            "• Estado comercial: Vigente y estado de activación: Conectado (quedan en Comercial)\n"
+            f"• Inicio del contrato: {inicio}\n"
+            "• Duración: mensual (\"-\")\n"
+            "• Se borra la fecha de baja\n\n"
+            "Se guarda con copia de seguridad.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirmar != QMessageBox.StandardButton.Yes:
+            return
+        valid = comercial_services.cambios_provision_a_conversion(filas, self.legacy.df_base)
+        self.btn_accion_a_conversion.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        mostrar_guardando(self, "Pasando unidades a Conversión…")
+        self._a_conversion_thread = SaveExcelThread(self.legacy.writer, valid, module_name="Comercial")
+        self._a_conversion_thread.finished_signal.connect(lambda success: self._on_a_conversion_finished(success, valid))
+        self._a_conversion_thread.logs_actualizados_signal.connect(self.legacy.data_manager.set_logs_df)
+        self._a_conversion_thread.start()
+
+    def _on_a_conversion_finished(self, success, valid):
+        QApplication.restoreOverrideCursor()
+        self._actualizar_estado_acciones_rapidas()
+        if not success:
+            terminar_guardando(self, exito=False)
+            DialogoAccionCm.error(
+                self, "No se pudo guardar el cambio a Conversión. SharePoint puede estar bloqueando el archivo. Intenta de nuevo."
+            ).exec()
+            return
+        guardado_listo(self)
+        dm = self.legacy.data_manager
+        if not dm.df_master.empty:
+            dm.df_master = comercial_services.aplicar_cambios_pendientes(dm.df_master, valid)
+            dm.data_ready.emit()
+        self.legacy.df_base = comercial_services.preparar_df_base_comercial(dm.get_comercial_df())
+        self._refresh_new_ui_data()
+        terminar_guardando(self)
 
     def _vins_sin_vc_seleccionados(self):
         """VIN de la selección, solo si TODOS son SIN VC (forma de contrato
@@ -4303,10 +4639,10 @@ class ComercialModule(QWidget):
         ESTADO DE ACTIVACIÓN ACTUAL = "Conectado" (ver
         _on_accion_marcar_vigente_clicked/_actualizar_boton_marcar_vigente).
         Modifica datos reales en PruebasFM.xlsx."""
-        widget = QWidget()
-        layout = estilo_com.GrillaAcciones(widget)
+        widget = self.acciones_rapidas_vencidos
+        layout = self._grilla_acciones_vencidos
 
-        self.btn_accion_marcar_vigente = self._build_new_ui_accion_button(
+        self.btn_accion_marcar_vigente =self._build_new_ui_accion_button(
             "fa5s.check-circle", "Marcar como Vigente", "Corrige el estado desactualizado", color=estilo_com.VERDE
         )
         self.btn_accion_marcar_vigente.setEnabled(False)
@@ -4320,8 +4656,8 @@ class ComercialModule(QWidget):
         """Acción exclusiva del modo "Revisar inconsistencias": corrige el
         TIPO DE FACTURACION de la selección (una o varias unidades) cuando
         la matriz de forma de contrato tiene una única opción válida."""
-        widget = QWidget()
-        layout = estilo_com.GrillaAcciones(widget)
+        widget = estilo_com.PanelAcciones()
+        layout = estilo_com.GrillaAcciones(widget, maestra=self._grilla_maestra)
 
         self.btn_accion_arreglar_tipo_fact = self._build_new_ui_accion_button(
             "fa5s.magic", "Arreglar tipo de facturación", "Corrige el tipo de facturación según la forma de contrato",
@@ -4334,9 +4670,23 @@ class ComercialModule(QWidget):
 
         return widget
 
+    def _build_new_ui_acciones_rapidas_solo_fechas(self):
+        """Acción exclusiva de "Revisar fechas": graba el término calculado de
+        la selección (una o varias unidades)."""
+        widget = estilo_com.PanelAcciones()
+        layout = estilo_com.GrillaAcciones(widget, maestra=self._grilla_maestra)
+        self.btn_accion_fecha_real = self._build_new_ui_accion_button(
+            "fa5s.calendar-check", "Fecha real", "Graba en el archivo el término calculado (inicio + duración)",
+            color=estilo_com.AZUL
+        )
+        self.btn_accion_fecha_real.setEnabled(False)
+        self.btn_accion_fecha_real.clicked.connect(self._on_fecha_real_seleccion_clicked)
+        layout.agregar(self.btn_accion_fecha_real)
+        return widget
+
     def _resolver_vin_por_fila_new_ui(self, row_idx):
         """VIN de una fila de new_ui_table por índice, para el resolver de
-        AppTableWidget._get_vin_for_row (menú contextual "Copiar VIN").
+        VolvoTableWidget._get_vin_for_row (menú contextual "Copiar VIN").
         Misma fuente/orden que _obtener_vins_seleccionados, pero para una
         sola fila en vez de la selección completa."""
         if self._new_ui_en_grupos:
@@ -4396,7 +4746,7 @@ class ComercialModule(QWidget):
         haciendo MailDialog, no se duplica aquí (ver
         mail_dialog.MailDialog._preseleccionar_vins).
 
-        Si algún VIN seleccionado no está en Correo.xlsx (la base quedó
+        Si algún VIN seleccionado no está en Correos.csv (la base quedó
         desactualizada respecto a Comercial, ver mail_sync_service.
         cruzar_correos_maestro: toda fila de Comercial siempre queda en el
         cruce, tenga o no correo), no se abre el diálogo preseleccionado:
@@ -4405,11 +4755,11 @@ class ComercialModule(QWidget):
         manualmente con "Sincronizar BBDD Correos" -- esa sincronización
         nunca se dispara sola desde acá.
 
-        "Gestionar CM" mantiene la plantilla "Aviso de Vencimiento"
-        preseleccionada (comportamiento original de esta sub-pestaña); las
-        otras 3 abren MailDialog sin ninguna plantilla preseleccionada,
-        para que el usuario la elija manualmente (ver conversación con el
-        usuario, Fase 2)."""
+        Plantilla preseleccionada según la sub-pestaña (ver
+        _PLANTILLA_CORREO_POR_SUBTAB): "Aviso de Vencimiento" en Gestionar
+        CM, "Reactivación" en Recuperar clientes y "Conoce Volvo Connect" en
+        Nuevas oportunidades. Renovar contratos abre sin plantilla. El
+        usuario puede cambiarla en el diálogo."""
         vins_ordenados, _ = self._obtener_vins_seleccionados()
         if not vins_ordenados:
             return
@@ -4421,8 +4771,7 @@ class ComercialModule(QWidget):
                 MailDialog(parent=self).exec()
             return
 
-        es_revision_cm = getattr(self, '_new_ui_active_subtab', 0) == self._NEW_UI_SUBTAB_REVISION_CM
-        plantilla_inicial = mail_service.PLANTILLA_AVISO_VENCIMIENTO if es_revision_cm else None
+        plantilla_inicial = self._PLANTILLA_CORREO_POR_SUBTAB.get(getattr(self, '_new_ui_active_subtab', 0))
         dialogo = MailDialog(parent=self, vins_preseleccionados=vins_ordenados, plantilla_inicial=plantilla_inicial)
         dialogo.exec()
 
@@ -4489,11 +4838,11 @@ class ComercialModule(QWidget):
         df = self.df_base
         if df.empty or 'VIN' not in df.columns:
             return False
-        coincidencias = df[df['VIN'].astype(str).str.strip() == str(vin).strip()]
+        coincidencias = df[df['VIN'].astype(str).str.strip().str.upper() == str(vin).strip().upper()]
         if coincidencias.empty:
             return False
         fila = coincidencias.iloc[0]
-        forma = str(fila.get(COL_FORMA_CONTRATO, '')).strip().upper()
+        forma =str(fila.get(COL_FORMA_CONTRATO, '')).strip().upper()
         tipo_fact = str(fila.get(COL_TIPO_FACTURACION, '')).strip().upper()
         return forma == 'SIN CONTRATO' and tipo_fact == VALOR_TIPO_FACT_SIN_REGISTRO
 
@@ -4539,9 +4888,15 @@ class ComercialModule(QWidget):
             0, vins_ordenados[0], desde_por_gestionar=desde_por_gestionar,
             forzar_activacion_pendiente=forzar_activacion_pendiente, desde_vigentes=desde_vigentes,
         )
+        form = getattr(self, 'unidad_nueva_form', None)
+        combo_forma = form.inputs.get('FORMA DE CONTRATO') if form is not None else None
+        if combo_forma is not None:
+            bloquear_forma = idx_activo == self._NEW_UI_SUBTAB_RENOVAR_CLIENTES
+            if bloquear_forma:
+                combo_forma.setEnabled(False)
+            combo_forma.setToolTip("Para cambiar la forma de contrato usa \"Renovar contrato\"." if bloquear_forma else "")
         # Con el CDB comercial distinto al de la empresa, el formulario abre posado en ese campo
         cdb, razon_social = self._resolver_cdb_razon_social(vins_ordenados[0])
-        form = getattr(self, 'unidad_nueva_form', None)
         if form is not None and comercial_services.cdb_discrepante(cdb, razon_social, self._cdb_referencia_actual()):
             campo = form.inputs.get('CDB')
             if campo is not None and campo.isEnabled():
@@ -4604,7 +4959,7 @@ class ComercialModule(QWidget):
         lo que se les envía manualmente (ver docs/07, sección CM).
 
         Reutiliza ExportExcelThread (mismo usado por
-        AppTableWidget.export_to_excel) en vez de reimplementar la
+        VolvoTableWidget.export_to_excel) en vez de reimplementar la
         escritura del Excel -- ya sabe reconvertir "PAGO CM" de texto
         formateado a número nativo."""
         df_visible = self.new_ui_model.get_df()
@@ -4641,11 +4996,9 @@ class ComercialModule(QWidget):
     def _on_accion_cm_confirmar_baja_clicked(self):
         """Confirma la baja del CM de TODOS los casos seleccionados en
         "Gestionar CM" (selección múltiple habilitada solo en esta
-        sub-pestaña, ver _toggle_acciones_rapidas_panel): misma regla de
-        negocio que la edición manual de ESTADO DEL CM a 'Terminated' en
-        Contratos CM / Vista Completa (ver
-        comercial_services.aplica_regla_terminated_cm), aplicada aquí de
-        forma explícita en vez de por edición de grilla, y para todos los
+        sub-pestaña, ver _toggle_acciones_rapidas_panel): ESTADO DEL CM pasa
+        a 'Terminated' (sin borrar los datos del CM) y el contrato a BAJA para
+        que Operaciones desconecte la unidad, para todos los
         VIN elegidos a la vez -- una sola escritura a PruebasFM (un solo
         SaveExcelThread con todos los cambios) y, si tiene éxito, una sola
         lectura/escritura de CasosBajaCM.csv (ver
@@ -4657,10 +5010,29 @@ class ComercialModule(QWidget):
         if not vins_ordenados:
             return
 
-        cambios_por_vin = comercial_services.aplica_regla_terminated_cm('ESTADO DEL CM', 'Terminated')
-        cambios_por_vin = {'ESTADO DEL CM': 'Terminated', **cambios_por_vin}
-        valid = comercial_services.agregar_id_a_cambios(
-            {vin: {'VIN': vin, 'cambios': dict(cambios_por_vin)} for vin in vins_ordenados}, self.legacy.df_base)
+        # La baja del CM no borra sus datos (quedan como historial del contrato):
+        # el contrato pasa a BAJA y Operaciones desconecta la unidad.
+        df_base = self.legacy.df_base
+        lookup_por_vin = {}
+        if not df_base.empty and 'VIN' in df_base.columns:
+            df_lookup = df_base.drop_duplicates('VIN', keep='last').copy()
+            df_lookup.index = df_lookup['VIN'].astype(str).str.strip().str.upper()
+            lookup_por_vin = df_lookup.to_dict('index')
+        cambios_por_vin = {}
+        for vin in vins_ordenados:
+            fila_actual = lookup_por_vin.get(str(vin).strip().upper(), {})
+            nueva_etapa = DataFrameFormatter.calcular_etapa_gestion_esperada({
+                COL_ESTADO_COMERCIAL: VALOR_ESTADO_COMERCIAL_BAJA,
+                COL_ESTADO_ACTIVACION: fila_actual.get(COL_ESTADO_ACTIVACION, ''),
+                COL_TIPO_FACTURACION: fila_actual.get(COL_TIPO_FACTURACION, ''),
+                COL_ETAPA_GESTION: fila_actual.get(COL_ETAPA_GESTION, ''),
+            })
+            cambios_por_vin[vin] = {'VIN': vin, 'cambios': {
+                'ESTADO DEL CM': 'Terminated',
+                COL_ESTADO_COMERCIAL: VALOR_ESTADO_COMERCIAL_BAJA,
+                COL_ETAPA_GESTION: nueva_etapa,
+            }}
+        valid = comercial_services.agregar_id_a_cambios(cambios_por_vin, df_base)
         caso_ids = []
         for vin in vins_ordenados:
             caso_id = casos_por_vin[vin].get('CASO_ID')
@@ -4699,6 +5071,7 @@ class ComercialModule(QWidget):
             df_m_copy = dm.df_master.copy()
             df_m_copy = comercial_services.aplicar_cambios_pendientes(df_m_copy, valid)
             dm.df_master = df_m_copy
+            dm.data_ready.emit()
 
         try:
             cm_bajas_service.procesar_confirmacion_baja_cm_multiple(
@@ -4860,7 +5233,7 @@ class ComercialModule(QWidget):
 
     def _actualizar_boton_marcar_vencidos_barra(self):
         """Contador del botón de la barra: unidades con término pasado y
-        estado sin actualizar. Naranja con 1 o más; neutro con 0."""
+        estado sin actualizar. Rojo con 1 o más; neutro con 0."""
         btn = getattr(self, 'btn_marcar_vencidos_barra', None)
         if btn is None:
             return
@@ -4868,8 +5241,8 @@ class ComercialModule(QWidget):
         cantidad = 0 if df is None or df.empty else len(self._unidades_pendientes_marcar_vencido(df))
         btn.setText(f" {cantidad}")
         if cantidad:
-            btn.setIcon(ThemeManager.icon('fa5s.calendar-times', color=estilo_com.AMBAR))
-            estilo_com.aplicar_estilo_boton_barra(btn, 'naranja')
+            btn.setIcon(ThemeManager.icon('fa5s.calendar-times', color=estilo_com.ROJO))
+            estilo_com.aplicar_estilo_boton_barra(btn, 'rojo')
             btn.setToolTip(
                 f"{cantidad} unidad(es) con la fecha de término pasada siguen Vigente o en Activación Pendiente. "
                 "Clic para marcarlas como Vencido.")
@@ -4955,7 +5328,7 @@ class ComercialModule(QWidget):
     def _on_accion_marcar_vigente_clicked(self):
         """"Marcar como Vigente" (sub-pestaña Vigentes, 24-09-2026, a pedido
         explícito): mismo mecanismo que "Marcar como Vencido" pero para el
-        caso inverso -- la unidad ya está "Conectado" en Servicios Conectados
+        caso inverso -- la unidad ya está "Conectado" en Volvo Connect
         (ESTADO DE ACTIVACIÓN ACTUAL, dato externo que manda) pero ESTADO
         COMERCIAL quedó atrás en "Activación Pendiente" por error humano. NO
         usa la selección de la tabla: actúa sobre TODOS los vehículos de la
@@ -4968,15 +5341,9 @@ class ComercialModule(QWidget):
             return
 
         df_bandeja = getattr(self, '_new_ui_bandeja_actual_df', None)
-        if df_bandeja is None or df_bandeja.empty or \
-           COL_ESTADO_COMERCIAL not in df_bandeja.columns or COL_ESTADO_ACTIVACION not in df_bandeja.columns:
+        if df_bandeja is None:
             return
-
-        estado_com = df_bandeja[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
-        estado_act = df_bandeja[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
-        df_pendientes = df_bandeja[
-            (estado_com == VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE) & (estado_act == ESTADO_CONECTADO)
-        ]
+        df_pendientes = comercial_services.pendientes_marcar_vigente(df_bandeja)
 
         vins_ordenados = []
         vistos = set()
@@ -5028,7 +5395,7 @@ class ComercialModule(QWidget):
     def _build_new_ui_accion_button(self, icon_name, titulo, subtitulo, color=None):
         color = color or estilo_com.AZUL
         # Fondo/borde animados al pasar el mouse (ver BotonAccionRapida)
-        btn = estilo_com.BotonAccionRapida(color)
+        btn = estilo_com.BotonAccionRapida(color, ocultar_si_bloqueado=True)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         # Estilo neutro al que vuelve "Agregar contacto" (ver _aplicar_estilo_agregar_contacto)
         btn._qss_por_defecto = estilo_com.QSS_ACCION_RAPIDA_TRANSPARENTE
@@ -5066,7 +5433,8 @@ class ComercialModule(QWidget):
         # Elegir una sub-pestaña cierra el aviso que estuviera abierto
         fotos = self._fotos_para_transicion_subtab()
         if self._avisos_activos():
-            for btn in (self.legacy.btn_alerta_etapa, self.legacy.btn_revisar_inconsistencias_forma_contrato):
+            for btn in (self.legacy.btn_alerta_etapa, self.legacy.btn_revisar_inconsistencias_forma_contrato,
+                        self.legacy.btn_revisar_fechas_contrato):
                 btn.setChecked(False)
         self._new_ui_active_subtab = index
         self._new_ui_grupo_abierto.clear()
@@ -5093,12 +5461,14 @@ class ComercialModule(QWidget):
     def _on_new_ui_subtab_clicked(self, index):
         # Clic en la sub-pestaña ya marcada: currentChanged no se emite
         if index == self.new_ui_subtabs.currentIndex() and self._avisos_activos():
-            for btn in (self.legacy.btn_alerta_etapa, self.legacy.btn_revisar_inconsistencias_forma_contrato):
+            for btn in (self.legacy.btn_alerta_etapa, self.legacy.btn_revisar_inconsistencias_forma_contrato,
+                        self.legacy.btn_revisar_fechas_contrato):
                 btn.setChecked(False)
 
     def _avisos_activos(self):
         return bool(getattr(self.legacy, '_filtro_contradicciones_etapa_activo', False)
-                    or getattr(self.legacy, '_filtro_inconsistencias_forma_contrato_activo', False))
+                    or getattr(self.legacy, '_filtro_inconsistencias_forma_contrato_activo', False)
+                    or getattr(self.legacy, '_filtro_fechas_contrato_activo', False))
 
     def _on_aviso_bandeja_toggled(self, _checked=False):
         if self._avisos_activos():
@@ -5108,6 +5478,88 @@ class ComercialModule(QWidget):
         self._toggle_acciones_rapidas_panel(self._new_ui_active_subtab)
         self._refresh_new_ui_data()
         self._actualizar_boton_arreglar_inconsistencias()
+        self._actualizar_boton_arreglar_fechas()
+
+    def _actualizar_boton_arreglar_fechas(self):
+        """Visible solo con "Revisar fechas" activo; cuenta los contratos que se corrigen."""
+        activo = bool(getattr(self.legacy, '_filtro_fechas_contrato_activo', False))
+        self.btn_arreglar_fechas_barra.setVisible(activo)
+        if not activo:
+            return
+        cantidad = len(comercial_services.construir_correcciones_termino(
+            self.legacy._df_fechas_contrato, self.legacy.df_base))
+        self.btn_arreglar_fechas_barra.setText(f" Arreglar fechas ({cantidad})")
+        self.btn_arreglar_fechas_barra.setEnabled(cantidad > 0)
+        self.btn_arreglar_fechas_barra.setToolTip(
+            f"Graba en el archivo el término calculado (inicio + duración) de {cantidad} contrato(s).")
+
+    def _actualizar_boton_fecha_real(self):
+        btn = getattr(self, 'btn_accion_fecha_real', None)
+        if btn is None or not self.acciones_rapidas_fechas.isVisibleTo(self._panel_acciones):
+            return
+        vins, _ = self._obtener_vins_seleccionados()
+        btn.setEnabled(bool(vins))
+        btn.setToolTip("Graba en el archivo el término calculado de las unidades seleccionadas"
+                       if vins else "Selecciona una o varias unidades")
+
+    def _on_fecha_real_seleccion_clicked(self):
+        vins, _ = self._obtener_vins_seleccionados()
+        if vins:
+            self._arreglar_fechas(vins)
+
+    def _on_arreglar_fechas_clicked(self):
+        self._arreglar_fechas(None)
+
+    def _arreglar_fechas(self, vins):
+        correcciones = comercial_services.construir_correcciones_termino(
+            self.legacy._df_fechas_contrato, self.legacy.df_base, vins)
+        if not correcciones:
+            return
+        if len(correcciones) > 1:
+            dialogo = DialogoAccion(
+                self, " Arreglar fechas", icon_name="fa5s.magic", icon_color=PRIMARY, icon_bg_color="#EFF6FF",
+                titulo="Arreglar fechas", subtitulo=f"{len(correcciones)} contrato(s) se corregirán",
+                descripcion="Se graba en el archivo el término calculado con INICIO CONTRATO + DURACIÓN (MESES). "
+                            "No cambia ninguna otra columna.",
+                botones=[{'texto': 'Cancelar', 'clase': 'secondary', 'rol': 'reject'},
+                         {'texto': 'Aceptar', 'clase': 'primary', 'rol': 'accept'}])
+            if dialogo.exec() != QDialog.DialogCode.Accepted:
+                return
+        self.btn_arreglar_fechas_barra.setEnabled(False)
+        self.btn_accion_fecha_real.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        mostrar_guardando(self, "Corrigiendo fechas…")
+        self._arreglar_fechas_thread = SaveExcelThread(self.legacy.writer, correcciones, module_name="Comercial")
+        self._arreglar_fechas_thread.finished_signal.connect(
+            lambda success: self._on_arreglar_fechas_finished(success, correcciones))
+        self._arreglar_fechas_thread.logs_actualizados_signal.connect(self.legacy.data_manager.set_logs_df)
+        self._arreglar_fechas_thread.start()
+
+    def _on_arreglar_fechas_finished(self, success, correcciones):
+        QApplication.restoreOverrideCursor()
+        if not success:
+            terminar_guardando(self, exito=False)
+            self._actualizar_boton_arreglar_fechas()
+            self._actualizar_boton_fecha_real()
+            DialogoAccionCm.error(
+                self, "No se pudo guardar la corrección. SharePoint puede estar bloqueando el archivo. Intenta de nuevo."
+            ).exec()
+            return
+        guardado_listo(self)
+        dm = self.legacy.data_manager
+        for vin, data in correcciones.items():
+            dm.termino_distinto_de_duracion.pop(
+                comercial_services._clave_contrato(vin, data.get('ID', '')), None)
+        self.legacy._df_fechas_contrato = comercial_services.filtrar_termino_distinto_de_duracion(
+            self.legacy.df_base, dm.termino_distinto_de_duracion)
+        self.legacy._actualizar_tooltip_fechas_contrato()
+        if self.legacy._df_fechas_contrato.empty:
+            self.legacy.btn_revisar_fechas_contrato.setChecked(False)
+        else:
+            self._refresh_new_ui_data()
+        self._actualizar_boton_arreglar_fechas()
+        self._actualizar_estado_acciones_rapidas()
+        terminar_guardando(self)
 
     def _actualizar_boton_arreglar_inconsistencias(self):
         """Visible solo con "Revisar inconsistencias" activo; muestra cuántas
@@ -5273,10 +5725,20 @@ class ComercialModule(QWidget):
         solo_inconsistencias = (getattr(self.legacy, '_filtro_inconsistencias_forma_contrato_activo', False)
                                 and not getattr(self.legacy, '_filtro_contradicciones_etapa_activo', False))
         columnas = self._COLUMNAS_BANDEJA_INCONSISTENCIAS if solo_inconsistencias else self._COLUMNAS_BANDEJA_AVISOS
+        solo_fechas = bool(getattr(self.legacy, '_filtro_fechas_contrato_activo', False))
+        if solo_fechas:
+            columnas = self._COLUMNAS_BANDEJA_FECHAS
         self._salir_vista_agrupada()
         df = getattr(self.legacy, 'df_base', None)
         if df is None or df.empty:
             df = pd.DataFrame(columns=columnas)
+        elif solo_fechas:
+            df = self.legacy._df_fechas_contrato
+            search_text = self.new_ui_search_input.text().strip().lower()
+            if search_text and not df.empty:
+                df = df[comercial_services.construir_mascara_busqueda(
+                    df, search_text, COLUMNAS_BUSQUEDA_COMERCIAL, COLUMNAS_BUSQUEDA_EXACTAS_COMERCIAL)]
+            df = self.new_ui_table.apply_sort(df)
         else:
             if getattr(self.legacy, '_filtro_contradicciones_etapa_activo', False):
                 df = comercial_services.detectar_contradicciones_etapa_gestion(df)
@@ -5289,7 +5751,7 @@ class ComercialModule(QWidget):
             df = self.new_ui_table.apply_sort(df)
 
         self._new_ui_bandeja_actual_df = df
-        self.lbl_grupo_abierto.setText(f"{len(df)} unidades")
+        self.lbl_grupo_abierto.setText(self._con_periodo(f"{len(df)} unidades"))
         cols_presentes = [c for c in columnas if c in df.columns]
         self.new_ui_model.set_data(df[cols_presentes])
         # "Avisos" no es una de las 6 sub-pestañas regulares (no tiene índice
@@ -5324,9 +5786,14 @@ class ComercialModule(QWidget):
         self.acciones_rapidas_vencidos.setVisible(es_vencidos)
         self.acciones_rapidas_vigentes.setVisible(es_vigentes)
         self.acciones_rapidas_papelera.setVisible(index == self._NEW_UI_SUBTAB_POR_GESTIONAR)
+        self.acciones_rapidas_conversion.setVisible(
+            index in (self._NEW_UI_SUBTAB_OFRECER_REACTIVAR, self._NEW_UI_SUBTAB_RENOVAR_CLIENTES))
         self.acciones_rapidas_inconsistencias.setVisible(
             index == self._NEW_UI_SUBTAB_AVISOS
             and bool(getattr(self.legacy, '_filtro_inconsistencias_forma_contrato_activo', False)))
+        self.acciones_rapidas_fechas.setVisible(
+            index == self._NEW_UI_SUBTAB_AVISOS
+            and bool(getattr(self.legacy, '_filtro_fechas_contrato_activo', False)))
         self.new_ui_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
     def _actualizar_estado_acciones_rapidas(self):
@@ -5389,6 +5856,7 @@ class ComercialModule(QWidget):
         self.btn_accion_enviar_operaciones.setVisible(not activa_ofrecer_reactivar)
 
         vins_seleccion, casos_seleccion = self._obtener_vins_seleccionados() if n_seleccionadas >= 1 else ([], {})
+        self._actualizar_boton_a_conversion(vins_seleccion, casos_seleccion)
         self._actualizar_acciones_contrato_cerrado(vins_seleccion if n_seleccionadas == 1 else [])
         self._actualizar_ficha_unidad(vins_seleccion)
         self._mostrar_panel_acciones(n_seleccionadas >= 1)
@@ -5416,6 +5884,7 @@ class ComercialModule(QWidget):
         self._actualizar_boton_renovar()
         self._actualizar_boton_papelera()
         self._actualizar_boton_arreglar_tipo_fact()
+        self._actualizar_boton_fecha_real()
         self._renovar_actualizar_seleccion()
 
     def _estados_contrato_actual(self, vin):
@@ -5478,12 +5947,69 @@ class ComercialModule(QWidget):
 
     def _actualizar_boton_renovar(self):
         self.btn_accion_renovar.setEnabled(bool(self._filas_renovables_seleccionadas()))
+        self.btn_accion_renovar_nuevo.setEnabled(
+            self._vin_para_renovar_con_nuevo_contrato() is not None or bool(self._vins_para_renovar_multiple()))
+
+    def _vins_para_renovar_multiple(self):
+        """VIN de la selección (2 o más) en "Renovar contratos" si todos se pueden reemplazar por
+        un contrato nuevo; lista vacía en otro caso."""
+        if getattr(self, '_new_ui_active_subtab', 0) != self._NEW_UI_SUBTAB_RENOVAR_CLIENTES:
+            return []
+        vins, _ = self._obtener_vins_seleccionados()
+        if len(vins) < 2:
+            return []
+        for vin in vins:
+            estado, activacion = self._estados_contrato_actual(vin)
+            if not comercial_services.puede_renovar_con_nuevo_contrato(estado, activacion):
+                return []
+        return vins
+
+    def _iniciar_renovacion_multiple(self, vins):
+        df = self.legacy.df_base
+        datos_por_vin = {}
+        for vin in vins:
+            fila = df[df['VIN'].astype(str).str.strip().str.upper() == vin.strip().upper()].iloc[0]
+            datos_por_vin[vin.strip().upper()] = {col: ('' if pd.isna(val) else str(val)) for col, val in fila.items()}
+        primero = next(iter(datos_por_vin.values()))
+        self._iniciar_nuevo_contrato(primero, renovacion={
+            'datos_por_vin': datos_por_vin, 'prototipo': dict(primero)})
+
+    def _vin_para_renovar_con_nuevo_contrato(self):
+        """VIN de la única unidad seleccionada en "Renovar contratos" cuyo
+        contrato es Vigente o Vencido (o está en Revisar y Conectada); None en cualquier otro caso."""
+        if getattr(self, '_new_ui_active_subtab', 0) != self._NEW_UI_SUBTAB_RENOVAR_CLIENTES:
+            return None
+        vins, _ = self._obtener_vins_seleccionados()
+        if len(vins) != 1:
+            return None
+        estado, activacion = self._estados_contrato_actual(vins[0])
+        return vins[0] if comercial_services.puede_renovar_con_nuevo_contrato(estado, activacion) else None
+
+    def _on_accion_renovar_nuevo_clicked(self):
+        """"Nuevo contrato": abre el formulario de contrato nuevo precargado con
+        la unidad (ver ComercialUnidadFormWidget.cargar_para_nuevo_contrato,
+        modo renovación). Al guardar, el contrato actual pasa a Renovado."""
+        multiples = self._vins_para_renovar_multiple()
+        if multiples:
+            self._iniciar_renovacion_multiple(multiples)
+            return
+        vin = self._vin_para_renovar_con_nuevo_contrato()
+        if vin is None:
+            return
+        df = self.legacy.df_base
+        fila = df[df['VIN'].astype(str).str.strip().str.upper() == vin.strip().upper()].iloc[0]
+        datos = {col: ('' if pd.isna(val) else str(val)) for col, val in fila.items()}
+        self._iniciar_nuevo_contrato(datos, renovacion={
+            'vin': vin.strip().upper(), 'id': str(datos.get('ID', '')).strip(),
+            'cambios': comercial_services.cambios_contrato_renovado(datos)})
 
     def _on_accion_renovar_clicked(self):
         """"Renovar contrato": el panel derecho pasa a un formulario (meses y
         contratos a renovar) en vez de abrir una ventana aparte."""
         if not self._filas_renovables_seleccionadas():
             return
+        self.chk_renovar_inicio.setChecked(False)
+        self.selector_renovar_inicio.setDate(QDate.currentDate())
         self._set_modo_renovar(True)
         self._renovar_actualizar_seleccion()
 
@@ -5495,7 +6021,8 @@ class ComercialModule(QWidget):
         if activo:
             for w in (self.acciones_rapidas_cm, self.acciones_rapidas_vencidos,
                       self.acciones_rapidas_vigentes, self.acciones_rapidas_papelera,
-                      self.acciones_rapidas_inconsistencias):
+                      self.acciones_rapidas_conversion,
+                      self.acciones_rapidas_inconsistencias, self.acciones_rapidas_fechas):
                 w.hide()
         else:
             self._ficha_contenedor.show()
@@ -5522,7 +6049,7 @@ class ComercialModule(QWidget):
         self.btn_renovar_volver.setToolTip("Volver a las acciones rápidas")
         self.btn_renovar_volver.setStyleSheet(estilo_com.QSS_BOTON_CERRAR_PANEL)
         self.btn_renovar_volver.clicked.connect(self._salir_modo_renovar)
-        self.lbl_renovar_titulo = QLabel("Renovar contrato")
+        self.lbl_renovar_titulo = QLabel("Extender duración")
         self.lbl_renovar_titulo.setStyleSheet(f"color: {estilo_com.TINTA}; font-size: 14px; font-weight: 800;")
         cabecera.addWidget(self.btn_renovar_volver)
         cabecera.addWidget(self.lbl_renovar_titulo)
@@ -5581,6 +6108,24 @@ class ComercialModule(QWidget):
             self._chips_renovar[meses] = chip
         fila_atajos.addStretch()
         lay_meses.addLayout(fila_atajos)
+
+        lay_inicio = QHBoxLayout()
+        lay_inicio.setSpacing(8)
+        self.chk_renovar_inicio = QCheckBox("Cambiar inicio")
+        self.chk_renovar_inicio.setStyleSheet(
+            f"QCheckBox {{ color: {estilo_com.TINTA}; font-weight: 700; font-size: 12px; background: transparent; spacing: 8px; }}"
+            f"QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {estilo_com.APAGADO}; "
+            f"border-radius: 4px; background: {estilo_com.SUPERFICIE}; }}"
+            f"QCheckBox::indicator:checked {{ background: {estilo_com.PRIMARIO}; border: 1px solid {estilo_com.PRIMARIO}; }}")
+        self.selector_renovar_inicio = SelectorFecha(QDate.currentDate())
+        self.selector_renovar_inicio.setEnabled(False)
+        self.chk_renovar_inicio.toggled.connect(self.selector_renovar_inicio.setEnabled)
+        self.chk_renovar_inicio.toggled.connect(self._renovar_actualizar_vista)
+        self.selector_renovar_inicio.dateChanged.connect(self._renovar_actualizar_vista)
+        lay_inicio.addWidget(self.chk_renovar_inicio)
+        lay_inicio.addStretch()
+        lay_inicio.addWidget(self.selector_renovar_inicio)
+        lay_meses.addLayout(lay_inicio)
         lay.addWidget(tarjeta_meses)
 
         self.tarjeta_renovar_cambios = QFrame()
@@ -5624,7 +6169,7 @@ class ComercialModule(QWidget):
             "font-size: 11px; font-weight: 600;")
         lay.addWidget(self.lbl_renovar_omitidos)
 
-        self.btn_renovar_confirmar = QPushButton("Renovar contrato")
+        self.btn_renovar_confirmar = QPushButton("Extender duración")
         self.btn_renovar_confirmar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_renovar_confirmar.setMinimumHeight(40)
         self.btn_renovar_confirmar.setStyleSheet(estilo_com.QSS_BOTON_GUARDAR)
@@ -5648,9 +6193,15 @@ class ComercialModule(QWidget):
         texto = '' if valor is None else str(valor).strip()
         return '-' if texto.upper() in ('', 'NAN', 'NONE', 'NAT') else texto
 
+    def _renovar_nuevo_inicio(self):
+        """Fecha de inicio elegida para todos los contratos, o None si no se cambia."""
+        if not self.chk_renovar_inicio.isChecked():
+            return None
+        return self.selector_renovar_inicio.date().toPyDate()
+
     def _renovar_cambio_de_fila(self, fila, meses):
         """(duración, término, estado) antes y después de renovar `fila`."""
-        cambios = comercial_services.calcular_renovacion(fila, meses) or {}
+        cambios = comercial_services.calcular_renovacion(fila, meses, self._renovar_nuevo_inicio()) or {}
         estado = self._texto_renovar(fila.get(COL_ESTADO_COMERCIAL)).capitalize()
         return (
             (self._texto_renovar(fila.get('DURACIÓN (MESES)')), cambios.get('DURACIÓN (MESES)', '-')),
@@ -5682,8 +6233,8 @@ class ComercialModule(QWidget):
         self.lista_renovar.blockSignals(False)
 
         varios = len(renovables) > 1
-        self._ficha_contenedor.setVisible(len(vins) == 1)
-        self.lbl_renovar_titulo.setText("Renovar contratos" if varios else "Renovar contrato")
+        self._ficha_contenedor.setVisible(False)
+        self.lbl_renovar_titulo.setText("Extender duración")
         self.lbl_renovar_cambios_titulo.setText("Contratos a renovar" if varios else "Lo que va a cambiar")
         self.chk_renovar_todas.setVisible(varios)
         self.lista_renovar.setVisible(varios)
@@ -5723,22 +6274,34 @@ class ComercialModule(QWidget):
         self.chk_renovar_todas.setChecked(marcados == total)
         self.chk_renovar_todas.blockSignals(False)
 
+        nuevo_inicio = self._renovar_nuevo_inicio()
         if total == 1:
+            fila_unica = next(iter(self._renovar_filas.values()))
             (dur_antes, dur_despues), (ter_antes, ter_despues), (est_antes, est_despues) = \
-                self._renovar_cambio_de_fila(next(iter(self._renovar_filas.values())), meses)
+                self._renovar_cambio_de_fila(fila_unica, meses)
             tachado = f"color:{estilo_com.APAGADO}; text-decoration:line-through;"
+            fila_inicio = ""
+            if nuevo_inicio is not None:
+                fila_inicio = (f"<tr><td style='color:{estilo_com.APAGADO}'>Inicio</td><td><span style='{tachado}'>"
+                               f"{self._texto_renovar(fila_unica.get('INICIO CONTRATO'))}</span> → "
+                               f"<b>{nuevo_inicio.strftime('%d-%m-%Y')}</b></td></tr>")
             self.lbl_renovar_detalle.setText(
-                "<table cellspacing='4'>"
+                f"<b>{self._texto_renovar(fila_unica.get(COL_RAZON_SOCIAL))}</b> · {self._texto_renovar(fila_unica.get(COL_CHASIS))}"
+                "<table cellspacing='4'>" + fila_inicio +
+                ""
                 f"<tr><td style='color:{estilo_com.APAGADO}'>Duración</td><td><span style='{tachado}'>{dur_antes} meses</span> → <b>{dur_despues} meses</b></td></tr>"
                 f"<tr><td style='color:{estilo_com.APAGADO}'>Término</td><td><span style='{tachado}'>{ter_antes}</span> → <b>{ter_despues}</b></td></tr>"
                 f"<tr><td style='color:{estilo_com.APAGADO}'>Estado</td><td><span style='{tachado}'>{est_antes}</span> → <b>{est_despues}</b></td></tr>"
                 "</table>")
         else:
-            self.lbl_renovar_detalle.setText(f"Se suman {meses} meses a {marcados} de {total} contratos.")
+            texto = f"Se suman {meses} meses a {marcados} de {total} contratos."
+            if nuevo_inicio is not None:
+                texto += f" El inicio pasa a {nuevo_inicio.strftime('%d-%m-%Y')} en todos."
+            self.lbl_renovar_detalle.setText(texto)
         if total == 1:
-            self.btn_renovar_confirmar.setText("Renovar contrato")
+            self.btn_renovar_confirmar.setText("Extender duración")
         else:
-            self.btn_renovar_confirmar.setText(f"Renovar {marcados} contrato(s)")
+            self.btn_renovar_confirmar.setText(f"Extender {marcados} contrato(s)")
         self.btn_renovar_confirmar.setEnabled(marcados >= 1)
 
     def _renovar_item_cambiado(self, _item):
@@ -5764,10 +6327,11 @@ class ComercialModule(QWidget):
     def _ejecutar_renovacion(self, filas, meses):
         """Suma `meses` a DURACIÓN (MESES) de los contratos elegidos; el
         término se recalcula y el contrato conserva su ID."""
+        nuevo_inicio = self._renovar_nuevo_inicio()
         self._salir_modo_renovar()
         valid = {}
         for vin, fila in filas.items():
-            cambios = comercial_services.calcular_renovacion(fila, meses)
+            cambios = comercial_services.calcular_renovacion(fila, meses, nuevo_inicio)
             if cambios.get(COL_ESTADO_COMERCIAL):
                 row_para_matriz = {
                     COL_ESTADO_COMERCIAL: cambios[COL_ESTADO_COMERCIAL].capitalize(),
@@ -5815,11 +6379,7 @@ class ComercialModule(QWidget):
             return df_bandeja.iloc[0:0] if df_bandeja is not None else pd.DataFrame()
         estado = df_bandeja[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
         en_vencidos = df_bandeja.index.isin(comercial_services.filtrar_vencidos(df_bandeja).index)
-        es_provision_mas = pd.Series(False, index=df_bandeja.index)
-        for col in (COL_TIPO_FACTURACION, COL_FORMA_CONTRATO):
-            if col in df_bandeja.columns:
-                es_provision_mas |= df_bandeja[col].astype(str).str.strip().str.upper() == 'PROVISION +'
-        return df_bandeja[estado.isin(ESTADOS_COMERCIAL_CORREGIBLES_A_VENCIDO) & en_vencidos & ~es_provision_mas]
+        return df_bandeja[estado.isin(ESTADOS_COMERCIAL_CORREGIBLES_A_VENCIDO) & en_vencidos]
 
     def _pendientes_marcar_vencido_seleccionados(self):
         """Subconjunto de las filas seleccionadas que se pueden marcar como
@@ -5870,13 +6430,8 @@ class ComercialModule(QWidget):
         hay_pendientes = False
         if activa_vigentes:
             df_bandeja = getattr(self, '_new_ui_bandeja_actual_df', None)
-            if df_bandeja is not None and not df_bandeja.empty and \
-               COL_ESTADO_COMERCIAL in df_bandeja.columns and COL_ESTADO_ACTIVACION in df_bandeja.columns:
-                estado_com = df_bandeja[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
-                estado_act = df_bandeja[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
-                hay_pendientes = bool((
-                    (estado_com == VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE) & (estado_act == ESTADO_CONECTADO)
-                ).any())
+            if df_bandeja is not None:
+                hay_pendientes = not comercial_services.pendientes_marcar_vigente(df_bandeja).empty
         self.btn_accion_marcar_vigente.setEnabled(activa_vigentes and hay_pendientes)
 
     def _construir_df_revision_cm(self):
@@ -5887,7 +6442,7 @@ class ComercialModule(QWidget):
         'Expired' (ESTADO_EXPIRED). No incluye REAPARECIDO (el caso ya se
         resolvió solo: el VIN reapareció en el 3PC, o el contrato dejó de
         estar Expired), MANTENIDO ni CONFIRMADA_BAJA (decisiones ya tomadas
-        por la contraparte comercial: se respetan y no vuelven a esta bandeja).
+        por Javiera: se respetan y no vuelven a esta bandeja).
 
         Agrega "MOTIVO" (texto amigable de ORIGEN_CASO, ver
         cm_bajas_service.ORIGEN_CASO_MOTIVO_MAP) para que la pestaña
@@ -5904,6 +6459,11 @@ class ComercialModule(QWidget):
         return df_pendientes
 
     _TEXTO_TODOS_PERIODOS = "Todos los periodos"
+    _FILTROS_COLUMNA = (
+        ('FORMA DE CONTRATO', "Forma de contrato", 'fa5s.file-signature'),
+        ('TIPO DE FACTURACION', "Tipo de facturación", 'fa5s.file-invoice-dollar'),
+        ('TIPO DE SERVICIO', "Tipo de servicio", 'fa5s.concierge-bell'),
+    )
 
     @staticmethod
     def _clave_orden_periodo(texto):
@@ -5922,13 +6482,36 @@ class ComercialModule(QWidget):
             return f"{mes.strip().capitalize()} {anio.strip()}"
         return str(texto).strip().capitalize()
 
+    def _base_de_periodos(self, df_base):
+        """Unidades de la sub-pestaña activa que cumplen los filtros de forma de
+        contrato, facturación y servicio elegidos."""
+        if df_base is None:
+            return None
+        elegidos = tuple(sorted((c, s.valor()) for c, s in self._filtros_columna.items() if s.valor() is not None))
+        subtab = getattr(self, '_new_ui_active_subtab', 0)
+        clave = (elegidos, subtab, datetime.now().date(), len(df_base))
+        cache = self.__dict__.get('_cache_base_periodos')
+        if cache is not None and cache[0] is df_base and cache[1] == clave:
+            return cache[2]
+        base = df_base
+        for columna, valor in elegidos:
+            if columna in base.columns:
+                base = base[base[columna].astype(str).str.strip() == valor]
+        filtro = self._NEW_UI_SUBTAB_FILTERS.get(subtab)
+        if filtro is not None:
+            base = filtro(base)
+        self.__dict__['_cache_base_periodos'] = (df_base, clave, base)
+        return base
+
     def _sincronizar_combo_periodo_interno(self, df_base):
         """Ofrece los PERIODO INTERNO presentes agrupados por año (más reciente
-        primero) y, al final, los valores que no son una fecha."""
-        if df_base is None or 'PERIODO INTERNO' not in df_base.columns:
+        primero) y, al final, los valores que no son una fecha. Solo ofrece los
+        que existen con lo elegido en los otros filtros."""
+        base = self._base_de_periodos(df_base)
+        if base is None or 'PERIODO INTERNO' not in base.columns:
             periodos = []
         else:
-            serie = df_base['PERIODO INTERNO'].dropna().astype(str).str.strip().str.lower()
+            serie = base['PERIODO INTERNO'].dropna().astype(str).str.strip().str.lower()
             periodos = sorted({p for p in serie.unique() if p and p not in ('-', 'nan')},
                               key=self._clave_orden_periodo, reverse=True)
         if periodos == self.__dict__.get('_periodos_combo'):
@@ -5946,23 +6529,94 @@ class ComercialModule(QWidget):
             grupos.append(("Otros", otros))
         self.combo_periodo_interno.set_opciones(grupos)
 
-    def _on_periodo_interno_cambiado(self, _valor):
+    def _on_periodo_interno_cambiado(self, selector=None):
+        if selector is not None:
+            estilo_com.encadenar_filtros(self._orden_filtros, selector)
+        self.btn_limpiar_filtros.setVisible(any(s.valor() is not None for s in self._selectores_filtro()))
         self._refresh_new_ui_data()
+
+    def _selectores_filtro(self):
+        return (self.combo_periodo_interno, *self._filtros_columna.values())
+
+    def _limpiar_filtros(self):
+        for selector in self._selectores_filtro():
+            selector.blockSignals(True)
+            selector.limpiar()
+            selector.blockSignals(False)
+        self._orden_filtros.clear()
+        self._on_periodo_interno_cambiado()
+
+    def _con_periodo(self, texto):
+        """Agrega al subtítulo de la bandeja el periodo interno y los filtros de columna elegidos."""
+        if self.combo_periodo_interno.valor() is not None:
+            texto = f"{texto} · {self.combo_periodo_interno._etiqueta_actual()}"
+        for selector in self._filtros_columna.values():
+            if selector.valor() is not None:
+                texto = f"{texto} · {selector._etiqueta_actual()}"
+        return texto
 
     def _df_base_por_periodo(self, df_base):
         """df_base restringido al periodo elegido; el resultado se reutiliza
         mientras no cambien df_base ni el periodo, para no invalidar la caché
         de filtros por sub-pestaña."""
         self._sincronizar_combo_periodo_interno(df_base)
+        self._sincronizar_filtros_columna(df_base)
         periodo = self.combo_periodo_interno.valor()
-        if df_base is None or periodo is None or 'PERIODO INTERNO' not in df_base.columns:
+        elegidos = {c: s.valor() for c, s in self._filtros_columna.items() if s.valor() is not None}
+        if df_base is None or (periodo is None and not elegidos):
             return df_base
-        origen, periodo_cache, filtrado = self._periodo_interno_df
-        if origen is df_base and periodo_cache == periodo:
+        clave = (periodo, tuple(sorted(elegidos.items())))
+        origen, clave_cache, filtrado = self._periodo_interno_df
+        if origen is df_base and clave_cache == clave:
             return filtrado
-        filtrado = df_base[df_base['PERIODO INTERNO'].astype(str).str.strip().str.lower() == periodo]
-        self._periodo_interno_df = (df_base, periodo, filtrado)
+        filtrado = df_base
+        if periodo is not None and 'PERIODO INTERNO' in df_base.columns:
+            filtrado = filtrado[filtrado['PERIODO INTERNO'].astype(str).str.strip().str.lower() == periodo]
+        for columna, valor in elegidos.items():
+            if columna in filtrado.columns:
+                filtrado = filtrado[filtrado[columna].astype(str).str.strip() == valor]
+        self._periodo_interno_df = (df_base, clave, filtrado)
         return filtrado
+
+    def _base_de_opciones(self, df_base):
+        """Unidades del periodo elegido que pertenecen a la sub-pestaña activa
+        (se recuerda mientras no cambien df_base, periodo ni sub-pestaña)."""
+        if df_base is None:
+            return None
+        periodo = self.combo_periodo_interno.valor()
+        subtab = getattr(self, '_new_ui_active_subtab', 0)
+        clave = (periodo, subtab, datetime.now().date(), len(df_base))
+        cache = self.__dict__.get('_cache_base_opciones')
+        if cache is not None and cache[0] is df_base and cache[1] == clave:
+            return cache[2]
+        base = df_base
+        if periodo is not None and 'PERIODO INTERNO' in base.columns:
+            base = base[base['PERIODO INTERNO'].astype(str).str.strip().str.lower() == periodo]
+        filtro = self._NEW_UI_SUBTAB_FILTERS.get(subtab)
+        if filtro is not None:
+            base = filtro(base)
+        self.__dict__['_cache_base_opciones'] = (df_base, clave, base)
+        return base
+
+    def _sincronizar_filtros_columna(self, df_base):
+        """Ofrece en cada filtro los valores que existen con lo elegido en los
+        demás (periodo incluido) y solo entre las unidades de la sub-pestaña
+        activa, con su cantidad."""
+        df_base = self._base_de_opciones(df_base)
+        self._orden_filtros[:] = [s for s in self._orden_filtros if s.valor() is not None]
+        series = {c: (df_base[c].astype(str).str.strip() if df_base is not None and c in df_base.columns else None)
+                  for c in self._filtros_columna}
+        for columna, selector in self._filtros_columna.items():
+            if series[columna] is None:
+                selector.set_opciones([])
+                continue
+            mascara = pd.Series(True, index=df_base.index)
+            for otra, otro_selector in self._filtros_columna.items():
+                if otra != columna and series[otra] is not None and otro_selector.valor() is not None:
+                    mascara &= series[otra] == otro_selector.valor()
+            conteo = series[columna][mascara].value_counts()
+            items = [(v, f"{v} ({n})") for v, n in sorted(conteo.items()) if v and v.lower() not in ('-', 'nan')]
+            selector.set_opciones([(None, items)])
 
     def _filtrar_subtab_con_cache(self, subtab, df_base):
         """Filtro de negocio de la sub-pestaña, recordado mientras df_base sea
@@ -6107,6 +6761,8 @@ class ComercialModule(QWidget):
             return
 
         df_bandeja = self._filtrar_subtab_con_cache(active_subtab, df_base)
+        if active_subtab == self._NEW_UI_SUBTAB_RENOVAR_CLIENTES:
+            self.__dict__['_bandeja_renovar_completa'] = df_bandeja
 
         # Filtro por tarjeta KPI clicada (28-09-2026, a pedido explícito,
         # reemplaza el antiguo filtro de botones "Todos/Vigente/Vencido/
@@ -6119,6 +6775,8 @@ class ComercialModule(QWidget):
         if active_subtab in (1, 2):
             kwargs_extra_kpi['razones_contactadas'] = self._razones_contactadas_por_correo()
         mask_func = self._NEW_UI_KPI_MASK_FUNCS.get(active_subtab)
+        if active_subtab == self._NEW_UI_SUBTAB_RENOVAR_CLIENTES:
+            mask_func = lambda d, **_kw: self._masks_renovar(d)
         filtro_key = self._new_ui_kpi_filtro_por_subtab.get(active_subtab)
         if mask_func is not None and filtro_key and filtro_key != 'total':
             masks = mask_func(df_bandeja, **kwargs_extra_kpi)
@@ -6138,8 +6796,11 @@ class ComercialModule(QWidget):
         # comercial_services.py, sección "KPI POR SUB-PESTAÑA") en vez de
         # calcular_kpis_vigencia para todas -- esta última no tiene sentido
         # fuera de "Renovaciones"/"Vencidos".
-        kpi_func = self._NEW_UI_KPI_FUNCS.get(active_subtab, comercial_services.calcular_kpis_vigencia)
-        kpis = kpi_func(df_bandeja, **kwargs_extra_kpi)
+        if active_subtab == self._NEW_UI_SUBTAB_RENOVAR_CLIENTES:
+            kpis = comercial_services.calcular_kpis_renovar_clientes(df_bandeja, masks=self._masks_renovar(df_bandeja))
+        else:
+            kpi_func = self._NEW_UI_KPI_FUNCS.get(active_subtab, comercial_services.calcular_kpis_vigencia)
+            kpis = kpi_func(df_bandeja, **kwargs_extra_kpi)
         for key, lbl in self.new_ui_kpi_labels.items():
             lbl.setText(str(kpis.get(key, 0)))
         self._actualizar_barras_kpi(kpis)
@@ -6150,7 +6811,7 @@ class ComercialModule(QWidget):
             df_bandeja["DÍAS RESTANTES"] = clasif["dias_restantes"].apply(comercial_services.formatear_dias_restantes)
 
             # Orden por defecto (config aprobada con el usuario) mientras no
-            # haya un orden manual activo (ver AppTableWidget.
+            # haya un orden manual activo (ver VolvoTableWidget.
             # has_active_sort/apply_sort, más abajo). El bloque de "por
             # vencer" (no vencido) siempre va primero, ordenado por el que
             # vence más pronto. El bloque de "ya vencido" va al final,
@@ -6159,7 +6820,7 @@ class ComercialModule(QWidget):
             # sub-pestaña "Vencimientos"). Un clic en "Ordenar A -> Z" del
             # encabezado reemplaza todo esto por el orden genérico numérico
             # ascendente (ver comercial_services.parsear_dias_restantes y
-            # AppTableWidget._parse_number_like).
+            # VolvoTableWidget._parse_number_like).
             if not self.new_ui_table.has_active_sort():
                 mask_vencido = clasif['vencido']
                 recientes_primero = active_subtab in self._NEW_UI_VENCIDOS_RECIENTES_PRIMERO
@@ -6194,6 +6855,19 @@ class ComercialModule(QWidget):
             anchos_fijos=self._anchos_vista_grupos(cols_presentes) if en_grupos else NEW_UI_SUBTAB_COLUMN_WIDTHS.get(active_subtab),
         )
         self._actualizar_estado_acciones_rapidas()
+
+    def _masks_renovar(self, df):
+        """Máscaras de "Renovar contratos" recortadas a `df`. Cada una depende
+        solo de su fila, así que se calculan una vez sobre la sub-pestaña
+        completa (mientras su filtro siga en caché) y no en cada repintado."""
+        completa = self.__dict__.get('_bandeja_renovar_completa')
+        if completa is None or not completa.index.is_unique or not df.index.isin(completa.index).all():
+            return comercial_services.obtener_masks_kpi_renovar_clientes(df)
+        cache = self.__dict__.get('_cache_masks_renovar')
+        if cache is None or cache[0] is not completa:
+            cache = (completa, comercial_services.obtener_masks_kpi_renovar_clientes(completa))
+            self.__dict__['_cache_masks_renovar'] = cache
+        return {clave: mascara.loc[df.index] for clave, mascara in cache[1].items()}
 
     def _cdbs_por_razon_actual(self):
         """CDB comerciales distintos de cada RAZÓN SOCIAL sobre toda la base;
@@ -6288,7 +6962,7 @@ class ComercialModule(QWidget):
         if clave not in df.columns:
             self._actualizar_barra_grupo(None)
             self._new_ui_en_grupos = False
-            self.lbl_grupo_abierto.setText(f"{len(df)} unidades")
+            self.lbl_grupo_abierto.setText(self._con_periodo(f"{len(df)} unidades"))
             return df, columnas, False
 
         sin_dato = self._NEW_UI_VALOR_SIN_GRUPO
@@ -6300,7 +6974,7 @@ class ComercialModule(QWidget):
             self._new_ui_en_grupos = False
             self.new_ui_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
             df_grupo = df[serie == abierto]
-            self.lbl_grupo_abierto.setText(f"{len(df_grupo)} unidades · {clave}: {abierto}")
+            self.lbl_grupo_abierto.setText(self._con_periodo(f"{len(df_grupo)} unidades · {clave}: {abierto}"))
             return df_grupo, columnas, False
 
         self._actualizar_barra_grupo(None)
@@ -6310,11 +6984,11 @@ class ComercialModule(QWidget):
         grupos = df.assign(_grupo=serie).groupby('_grupo', sort=True)
         resumen = pd.DataFrame({clave: grupos.size().index, col_unidades: grupos.size().values})
         sustantivo = "clientes" if clave == 'RAZÓN SOCIAL' else "flotas"
-        self.lbl_grupo_abierto.setText(f"{len(df)} unidades en {len(resumen)} {sustantivo}")
+        self.lbl_grupo_abierto.setText(self._con_periodo(f"{len(df)} unidades en {len(resumen)} {sustantivo}"))
         columnas_vista = [clave]
         if subtab == self._NEW_UI_SUBTAB_RENOVAR_CLIENTES:
             idx = df.index
-            masks = comercial_services.obtener_masks_kpi_renovar_clientes(df)
+            masks = self._masks_renovar(df)
             conteos = pd.DataFrame({
                 '_g': serie.values,
                 'VENCEN EN 30 DÍAS': masks['por_vencer'].values,
@@ -6327,24 +7001,34 @@ class ComercialModule(QWidget):
             orden = [clave, 'UNIDADES VENCIDAS', 'VENCEN EN 30 DÍAS', 'VIGENTES', 'TOTAL UNIDADES']
             return resumen[orden], orden, True
         if clave != 'RAZÓN SOCIAL' and 'RAZÓN SOCIAL' in df.columns:
-            def _razon(s):
-                valores = {str(v).strip() for v in s if str(v).strip() and str(v).strip().upper() != 'NAN'}
+            razones = self._valores_distintos_por_grupo(serie, df['RAZÓN SOCIAL'], ('', 'NAN'))
+            def _razon(valores):
                 return next(iter(valores)) if len(valores) == 1 else (f"Varios clientes ({len(valores)})" if valores else sin_dato)
-            resumen['RAZÓN SOCIAL'] = grupos['RAZÓN SOCIAL'].agg(_razon).values
+            resumen['RAZÓN SOCIAL'] = [_razon(razones.get(g, {})) for g in resumen[clave]]
             columnas_vista.append('RAZÓN SOCIAL')
         if subtab == self._NEW_UI_SUBTAB_POR_GESTIONAR:
             # Todos los CDB comerciales del cliente (no solo los de la bandeja)
             if 'RUT' in df.columns:
-                def _ruts(s):
-                    valores = list(dict.fromkeys(str(v).strip() for v in s if str(v).strip().upper() not in ('', 'NAN', 'NONE', '-')))
-                    return ", ".join(valores) or "-"
-                resumen['RUT'] = grupos['RUT'].agg(_ruts).values
+                ruts = self._valores_distintos_por_grupo(serie, df['RUT'], ('', 'NAN', 'NONE', '-'))
+                resumen['RUT'] = [", ".join(ruts.get(g, {})) or "-" for g in resumen[clave]]
                 columnas_vista.append('RUT')
             cdbs = self._cdbs_por_razon_actual()
             resumen['CDB COMERCIAL'] = [", ".join(cdbs.get(r, [])) or "-" for r in resumen[clave]]
             columnas_vista.append('CDB COMERCIAL')
         columnas_vista.append(col_unidades)
         return resumen, columnas_vista, True
+
+    @staticmethod
+    def _valores_distintos_por_grupo(grupos, valores, excluir):
+        """{grupo: valores distintos en orden de aparición} con el texto sin
+        espacios, sin los que en mayúsculas estén en `excluir`. Una sola pasada:
+        un agg de Python por grupo costaba ~100 ms con miles de flotas."""
+        por_grupo = {}
+        for grupo, valor in zip(grupos, valores):
+            valor = str(valor).strip()
+            if valor.upper() not in excluir:
+                por_grupo.setdefault(grupo, {})[valor] = None
+        return por_grupo
 
     def _anchos_vista_grupos(self, columnas):
         # Reparte el ancho visible: la columna clave (y RAZÓN SOCIAL si está)
@@ -6373,10 +7057,12 @@ class ComercialModule(QWidget):
         if fila < 0 or fila >= len(self._new_ui_grupos_df) or clave not in self._new_ui_grupos_df.columns:
             return
         self._new_ui_grupo_abierto[subtab] = str(self._new_ui_grupos_df.iloc[fila][clave])
+        animar_sobre_tabla(self.new_ui_table, 350)
         self._refresh_new_ui_data()
 
     def _on_volver_a_grupos_clicked(self):
         self._new_ui_grupo_abierto.pop(getattr(self, '_new_ui_active_subtab', 0), None)
+        animar_sobre_tabla(self.new_ui_table, 350)
         self._refresh_new_ui_data()
 
     def __getattr__(self, name):

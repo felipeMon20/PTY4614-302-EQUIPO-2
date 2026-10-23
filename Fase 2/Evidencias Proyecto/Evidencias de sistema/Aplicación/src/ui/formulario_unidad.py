@@ -3,7 +3,7 @@ de Ingresos y Conciliación: JustTime, Contratos (CM) y Facturación Manual.
 Siempre en modo edición y con la pestaña Operaciones de solo lectura."""
 import pandas as pd
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox
+from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox, QVBoxLayout
 
 from src.core.constants import COL_VIN, COL_FLOTA_VC, DROPDOWN_OPTIONS_UNIDAD
 from src.services import comercial_services
@@ -24,33 +24,46 @@ def datos_unidad(df_master, vin):
 
 
 def editar_unidad(parent, df_master, vin, pestana=PESTANA_JUSTTIME_CM):
-    """Abre el formulario de Comercial para `vin` (VIN bloqueado, Operaciones
-    de solo lectura, sin forzar valores) en la pestaña cuyo nombre contiene
+    """Abre el formulario de Comercial para `vin` (VIN bloqueado, sin la pestaña
+    Operaciones, sin forzar valores) en la pestaña cuyo nombre contiene
     `pestana`. Devuelve el dict de campos modificados ({} si no cambió nada)
     o None si se canceló o la unidad no existe."""
-    from src.ui.comercial_agregar import ComercialAgregarDialog
+    from src.ui.comercial_agregar import ComercialUnidadFormWidget
     datos = datos_unidad(df_master, vin)
     if datos is None:
         QMessageBox.warning(parent, "Unidad no encontrada", f"No se encontró la unidad con VIN {vin}.")
         return None
     flotas = sorted({v for v in df_master.get(COL_FLOTA_VC, pd.Series(dtype=str)).astype(str).str.strip()
                      if v and v != 'nan'})
+    resultado = {}
     QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
     try:
-        dialog = ComercialAgregarDialog(
-            flotas, {k: list(v) for k, v in DROPDOWN_OPTIONS_UNIDAD.items()}, df_master, parent,
-            datos_iniciales=datos, modo_edicion=True, restringir_activacion=True,
+        # Mismo formulario y mismas reglas que la edición en Comercial (sin
+        # el paso Operaciones), dentro de una ventana propia
+        ventana = QDialog(parent)
+        ventana.setWindowTitle("Editar unidad")
+        lay = QVBoxLayout(ventana)
+        lay.setContentsMargins(0, 0, 0, 0)
+        formulario = ComercialUnidadFormWidget(
+            flotas, {k: list(v) for k, v in DROPDOWN_OPTIONS_UNIDAD.items()}, df_master, ventana,
+            datos_iniciales=datos, modo_edicion=True,
         )
-        dialog.inputs['VIN'].setEnabled(False)
-        for i in range(dialog.tabs.count()):
-            if pestana in dialog.tabs.tabText(i):
-                dialog.tabs.setCurrentIndex(i)
+        formulario.cargar_para_editar(datos)
+        formulario.inputs['VIN'].setEnabled(False)
+        lay.addWidget(formulario)
+        formulario.formulario_confirmado.connect(lambda d: (resultado.update(d), ventana.accept()))
+        formulario.formulario_cancelado.connect(ventana.reject)
+        for i in range(formulario.tabs.count()):
+            if pestana in formulario.tabs.tabText(i):
+                formulario.tabs.setCurrentIndex(i)
                 break
+        pantalla = QApplication.primaryScreen().availableGeometry()
+        ventana.resize(min(1180, pantalla.width() - 80), min(780, pantalla.height() - 80))
     finally:
         QApplication.restoreOverrideCursor()
-    if dialog.exec() != QDialog.DialogCode.Accepted:
+    if ventana.exec() != QDialog.DialogCode.Accepted:
         return None
-    return diferencias(datos, dialog.get_data())
+    return diferencias(datos, resultado)
 
 
 def _es_vacio(valor):

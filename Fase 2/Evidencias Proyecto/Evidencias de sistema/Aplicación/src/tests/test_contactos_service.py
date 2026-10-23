@@ -67,32 +67,32 @@ class TestMigrarFavoritosLegacy(unittest.TestCase):
             'ID': ['1', '2'],
             'CDB': ['1001', '1002'],
             'Nombre': ['Juan', 'Ana'],
-            'Correo electrónico': ['juan@x.example', 'ana@x.example'],
+            'Correo electrónico': ['juan@x.cl', 'ana@x.cl'],
         })
 
     def test_sin_favoritos_no_migra(self):
         self.assertIsNone(migrar_favoritos_legacy([], self.df))
 
     def test_tabla_vacia_no_migra(self):
-        self.assertIsNone(migrar_favoritos_legacy(['1001_Juan_juan@x.example'], pd.DataFrame()))
+        self.assertIsNone(migrar_favoritos_legacy(['1001_Juan_juan@x.cl'], pd.DataFrame()))
 
     def test_sin_columna_id_no_migra(self):
         df_sin_id = self.df.drop(columns=['ID'])
-        self.assertIsNone(migrar_favoritos_legacy(['1001_Juan_juan@x.example'], df_sin_id))
+        self.assertIsNone(migrar_favoritos_legacy(['1001_Juan_juan@x.cl'], df_sin_id))
 
     def test_favoritos_ya_migrados_no_hace_nada(self):
         self.assertIsNone(migrar_favoritos_legacy(['1', '2'], self.df))
 
     def test_migra_clave_compuesta_a_id_fisico(self):
-        resultado = migrar_favoritos_legacy(['1001_Juan_juan@x.example'], self.df)
+        resultado = migrar_favoritos_legacy(['1001_Juan_juan@x.cl'], self.df)
         self.assertEqual(resultado, ['1'])
 
     def test_clave_compuesta_sin_match_unico_se_descarta(self):
-        resultado = migrar_favoritos_legacy(['9999_Nadie_nadie@x.example'], self.df)
+        resultado = migrar_favoritos_legacy(['9999_Nadie_nadie@x.cl'], self.df)
         self.assertEqual(resultado, [])
 
     def test_mezcla_ids_nuevos_y_claves_antiguas(self):
-        resultado = migrar_favoritos_legacy(['2', '1001_Juan_juan@x.example'], self.df)
+        resultado = migrar_favoritos_legacy(['2', '1001_Juan_juan@x.cl'], self.df)
         self.assertEqual(resultado, ['2', '1'])
 
 

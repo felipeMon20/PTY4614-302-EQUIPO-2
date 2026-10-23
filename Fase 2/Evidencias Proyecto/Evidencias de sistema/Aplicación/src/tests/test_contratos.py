@@ -16,10 +16,10 @@ from src.services.cm_bajas_service import (
 
 
 class TestContratosNoLimpiaAutomaticamenteVinAusente(unittest.TestCase):
-    """Regresion critica (regla confirmada con la contraparte comercial): que un VIN
+    """Regresion critica (regla confirmada con Javiera): que un VIN
     desaparezca del Excel mensual de CM NO debe limpiar automaticamente sus
     datos CM en PruebasFM. Antes de esta correccion,
-    ContratosModule.importar_excel_reporte() ponia '-'/0.0 en los campos CM
+    ContratosModule.importar_excel_javiera() ponia '-'/0.0 en los campos CM
     de cualquier VIN de PruebasFM que no apareciera en el archivo importado,
     sin ninguna revision. Este test cubre exactamente ese camino."""
 
@@ -88,7 +88,7 @@ class TestContratosNoLimpiaAutomaticamenteVinAusente(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_vin_ausente_genera_caso_pendiente_de_baja_cm(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
 
         df_casos = leer_casos_baja_cm(self.casos_baja_cm_path)
         self.assertEqual(len(df_casos), 1, "Fallo: el VIN ausente con datos CM debía generar un caso PENDIENTE.")
@@ -96,13 +96,13 @@ class TestContratosNoLimpiaAutomaticamenteVinAusente(unittest.TestCase):
         self.assertEqual(df_casos.iloc[0]['ESTADO_CASO'], ESTADO_CASO_PENDIENTE)
 
     def test_vin_presente_no_genera_caso_de_baja_cm(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
 
         df_casos = leer_casos_baja_cm(self.casos_baja_cm_path)
         self.assertNotIn('VIN_PRESENTE', df_casos['VIN'].tolist())
 
     def test_vin_ausente_no_entra_en_los_cambios_a_aplicar(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
 
         self.assertNotIn(
             "VIN_AUSENTE", self.modulo.import_changes,
@@ -111,14 +111,14 @@ class TestContratosNoLimpiaAutomaticamenteVinAusente(unittest.TestCase):
         self.assertIn("VIN_PRESENTE", self.modulo.import_changes)
 
     def test_vin_presente_se_actualiza_normalmente(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
 
         cambios = self.modulo.import_changes["VIN_PRESENTE"]["cambios"]
         self.assertEqual(cambios["N CONTRATO 3PC"], "3PC-999")
         self.assertEqual(cambios["ESTADO DEL CM"], "Running")
 
     def test_datos_cm_del_vin_ausente_quedan_intactos_tras_inyectar_en_ram(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
         self.modulo._on_import_finished(True)
 
         fila = self.modulo.data_manager.df_master.set_index("VIN").loc["VIN_AUSENTE"]
@@ -130,7 +130,7 @@ class TestContratosNoLimpiaAutomaticamenteVinAusente(unittest.TestCase):
         self.assertEqual(fila["PAGO CM"], 18000)
 
     def test_vin_ausente_nunca_se_elimina_de_pruebasfm(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
         self.modulo._on_import_finished(True)
 
         vins_finales = self.modulo.data_manager.df_master["VIN"].tolist()
@@ -140,11 +140,8 @@ class TestContratosNoLimpiaAutomaticamenteVinAusente(unittest.TestCase):
 class TestContratosReglaTerminatedCm(unittest.TestCase):
     """Misma regla que TestReglaTerminatedCm en test_comercial.py, pero para
     la edición manual de ESTADO DEL CM en Contratos CM
-    (ContratosModule.on_item_edited): al elegir 'Terminated' se limpian a
-    '-' N CONTRATO 3PC, FECHA INICIO CM, FECHA TERMINO CM, TIPO DE CM y
-    PAGO CM. No debe confundirse con la detección automática de
-    cm_bajas_service.py (ausencia del VIN en el 3PC mensual): esta regla es
-    manual y limpia los campos de inmediato al guardar."""
+    (ContratosModule.on_item_edited): al elegir 'Terminated' solo cambia ese
+    campo y los datos del CM se conservan como historial."""
 
     @classmethod
     def setUpClass(cls):
@@ -170,39 +167,18 @@ class TestContratosReglaTerminatedCm(unittest.TestCase):
         self.modulo.data_manager.df_master = self.df_master.copy()
         self.modulo.load_data()
 
-    def test_running_a_terminated_limpia_cinco_campos(self):
+    def test_running_a_terminated_conserva_datos_del_cm(self):
         self.modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
 
         cambios = self.modulo.pending_changes['VIN_TERMINATED_TEST']['cambios']
-        self.assertEqual(cambios.get('N CONTRATO 3PC'), '-')
-        self.assertEqual(cambios.get('FECHA INICIO CM'), '-')
-        self.assertEqual(cambios.get('FECHA TERMINO CM'), '-')
-        self.assertEqual(cambios.get('TIPO DE CM'), '-')
-        self.assertEqual(cambios.get('PAGO CM'), '-')
         self.assertEqual(cambios.get('ESTADO DEL CM'), 'Terminated')
+        for col in ('N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM'):
+            self.assertNotIn(col, cambios, f"{col} no debe limpiarse al poner Terminated.")
 
         df_actual = self.modulo.model.get_df()
         fila = df_actual[df_actual['VIN'].astype(str).str.strip().str.upper() == 'VIN_TERMINATED_TEST'].iloc[0]
-        self.assertEqual(fila['N CONTRATO 3PC'], '-')
-        self.assertEqual(fila['FECHA INICIO CM'], '-')
-        self.assertEqual(fila['FECHA TERMINO CM'], '-')
-        self.assertEqual(fila['TIPO DE CM'], '-')
-        self.assertEqual(fila['PAGO CM'], '-')
-
-    def test_terminated_a_otro_valor_no_restaura_datos(self):
-        self.modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
-
-        # El usuario vuelve a cambiar ESTADO DEL CM a otro valor: NO debe
-        # existir regla inversa que reconstruya los 5 campos.
-        self.modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Running')
-
-        cambios = self.modulo.pending_changes['VIN_TERMINATED_TEST']['cambios']
-        self.assertEqual(cambios.get('ESTADO DEL CM'), 'Running')
-        self.assertEqual(cambios.get('N CONTRATO 3PC'), '-')
-        self.assertEqual(cambios.get('FECHA INICIO CM'), '-')
-        self.assertEqual(cambios.get('FECHA TERMINO CM'), '-')
-        self.assertEqual(cambios.get('TIPO DE CM'), '-')
-        self.assertEqual(cambios.get('PAGO CM'), '-')
+        self.assertEqual(fila['N CONTRATO 3PC'], '3PC-1')
+        self.assertEqual(fila['TIPO DE CM'], 'Gold')
 
     def test_columna_n_contrato_3pc_no_genera_columna_duplicada(self):
         """Regresión: contratos.py ya no renombra 'N CONTRATO 3PC' a
@@ -352,7 +328,7 @@ class TestContratosReconciliacionEstadoExpiredAlImportar(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_importar_3pc_con_estado_expired_genera_caso_en_revision_cm(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
         self.modulo._on_import_finished(True)
 
         df_casos = leer_casos_baja_cm(self.casos_path)
@@ -492,7 +468,7 @@ class TestContratosEdicionManualFlujoReal(unittest.TestCase):
             self.modulo.on_item_edited(row=self._fila_de('VIN_B'), col_name='TIPO DE CM', new_value='Platinum')
             self.modulo.on_item_edited(row=self._fila_de('VIN_B'), col_name='FECHA TERMINO CM', new_value='15-08-2027')
 
-            # VIN_C: Terminated dispara la limpieza de 5 columnas + el propio ESTADO DEL CM = 6 cambios reales.
+            # VIN_C: Terminated cambia solo ESTADO DEL CM = 1 cambio real (los datos del CM se conservan).
             self.modulo.on_item_edited(row=self._fila_de('VIN_C'), col_name='ESTADO DEL CM', new_value='Terminated')
 
             # VIN_D: no se toca.
@@ -508,20 +484,21 @@ class TestContratosEdicionManualFlujoReal(unittest.TestCase):
         self.assertEqual(self._leer_celda_excel('VIN_B', 'FECHA TERMINO CM'), '15-08-2027')
 
         self.assertEqual(self._leer_celda_excel('VIN_C', 'ESTADO DEL CM'), 'Terminated')
-        for col in ('N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM'):
-            self.assertEqual(self._leer_celda_excel('VIN_C', col), '-', f"Fallo: {col} no quedó limpio en VIN_C.")
+        self.assertEqual(self._leer_celda_excel('VIN_C', 'N CONTRATO 3PC'), '3PC-C')
+        self.assertEqual(self._leer_celda_excel('VIN_C', 'TIPO DE CM'), 'Basico')
+        self.assertEqual(self._leer_celda_excel('VIN_C', 'PAGO CM'), 10000)
 
         # VIN_D no seleccionado: intacto.
         self.assertEqual(self._leer_celda_excel('VIN_D', 'ESTADO DEL CM'), 'Running')
         self.assertEqual(self._leer_celda_excel('VIN_D', 'PAGO CM'), 99999)
 
         df_log = self._leer_log()
-        self.assertEqual(len(df_log), 9, "Fallo: 1 (VIN_A) + 2 (VIN_B) + 6 (VIN_C) = 9 líneas de log.")
+        self.assertEqual(len(df_log), 4, "Fallo: 1 (VIN_A) + 2 (VIN_B) + 1 (VIN_C) = 4 líneas de log.")
         self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == 'VIN_A']), 1)
         self.assertNotIn('TIPO DE CM', df_log[df_log['IDENTIFICADOR'] == 'VIN_A']['CAMPO MODIFICADO'].tolist(),
                           "Fallo: TIPO DE CM de VIN_A no cambió de valor real y no debía generar log.")
         self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == 'VIN_B']), 2)
-        self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == 'VIN_C']), 6)
+        self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == 'VIN_C']), 1)
         self.assertNotIn('VIN_D', df_log['IDENTIFICADOR'].tolist())
 
     @patch('PyQt6.QtWidgets.QMessageBox.information')
@@ -554,7 +531,7 @@ class TestContratosEdicionManualFlujoReal(unittest.TestCase):
 
 class TestContratosImportacionMasivaFlujoReal(unittest.TestCase):
     """Ejercita el flujo real de la importación mensual 3PC
-    (ContratosModule.importar_excel_reporte) hasta ExcelWriter.update_cells()
+    (ContratosModule.importar_excel_javiera) hasta ExcelWriter.update_cells()
     real, contra un .xlsx y un LogApp.csv temporales -- sin mockear
     ExcelWriter ni la escritura real. Complementa
     TestContratosNoLimpiaAutomaticamenteVinAusente (que sí mockea
@@ -652,7 +629,7 @@ class TestContratosImportacionMasivaFlujoReal(unittest.TestCase):
         return pd.read_csv(self.log_path, dtype=str, encoding='utf-8-sig')
 
     def test_importacion_masiva_flujo_real_escribe_excel_y_loguea(self):
-        self.modulo.importar_excel_reporte()
+        self.modulo.importar_excel_javiera()
 
         self.assertEqual(self._leer_celda_excel('VIN_IMPORT_1', 'N CONTRATO 3PC'), '3PC-NEW-1')
         self.assertEqual(self._leer_celda_excel('VIN_IMPORT_1', 'FECHA INICIO CM'), '01-01-2026')

@@ -5,7 +5,7 @@ Un caso de Revision CM puede originarse por dos motivos independientes
 (ver ORIGEN_CASO), cada uno con su propia condicion de deteccion y cierre:
 
   - AUSENCIA_3PC: un VIN que tenia datos CM desaparece del Excel mensual
-    de 3PC. Regla de negocio confirmada con la contraparte comercial: esto NO confirma una
+    de 3PC. Regla de negocio confirmada con Javiera: esto NO confirma una
     baja. Se cierra (REAPARECIDO) cuando el VIN vuelve a aparecer en el
     3PC (ver actualizar_casos_baja_cm).
   - ESTADO_EXPIRED: el contrato CM de un VIN queda en ESTADO DEL CM =
@@ -24,7 +24,9 @@ etapa posterior, todavia no implementada aqui.
 
 import functools
 import os
+import tempfile
 import threading
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -44,7 +46,7 @@ def _con_lock_casos(funcion):
 
 # Estados posibles de un caso. En esta etapa solo se generan/transicionan
 # PENDIENTE y REAPARECIDO: MANTENIDO y CONFIRMADA_BAJA quedan definidos para
-# la etapa de revision de la contraparte comercial (aun no implementada), para no tener que
+# la etapa de revision de Javiera (aun no implementada), para no tener que
 # migrar el esquema de CasosBajaCM.csv despues.
 ESTADO_CASO_PENDIENTE = 'PENDIENTE'
 ESTADO_CASO_REAPARECIDO = 'REAPARECIDO'
@@ -183,6 +185,9 @@ def detectar_posibles_bajas_cm(df_pruebas_antes, vins_en_nuevo_listado, periodo_
         if vin_norm in vins_nuevo_norm:
             continue
         if _contrato_finalizado_inactivo(row):
+            continue
+        # CM ya dado de baja: conserva sus datos como historial y no vuelve a ser caso
+        if str(row.get('ESTADO DEL CM', '')).strip().upper() == 'TERMINATED':
             continue
 
         deteccion = {'VIN': vin_norm, 'ID CONTRATO': str(row.get('ID', '')).strip()}
@@ -340,14 +345,11 @@ def reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual,
          cuyo VIN YA NO este en `vins_expired_actual` (paso a Running o a
          Terminated) se marca REAPARECIDO -- deja de aparecer en Revision
          CM. No se crea un caso nuevo por este cierre, y no se toca
-         ESTADO DEL CM ni ningun campo de PruebasFM (si el nuevo valor es
-         Terminated, la limpieza de campos ya la aplica
-         comercial_services.aplica_regla_terminated_cm en el momento de la
-         edicion, no esta funcion).
+         ESTADO DEL CM ni ningun campo de PruebasFM.
       2. Para cada VIN detectado como Expired ahora (`detecciones`): si ya
-         existe un caso ESTADO_EXPIRED PENDIENTE abierto para ese VIN, solo
-         se refresca FECHA_DETECCION (mismo caso, no se duplica); si no
-         existe, se crea uno nuevo con CASO_ID nuevo.
+         existe un caso ESTADO_EXPIRED PENDIENTE abierto para ese VIN no se
+         toca (conserva su FECHA_DETECCION original, así el archivo no cambia
+         en cada carga); si no existe, se crea uno nuevo con CASO_ID nuevo.
 
     No toca PruebasFM. Devuelve un DataFrame nuevo (no muta `df_casos`)."""
     if hoy is None:
@@ -376,10 +378,7 @@ def reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual,
             (df_casos['ORIGEN_CASO'] == ORIGEN_CASO_ESTADO_EXPIRED) &
             (df_casos['VIN'].astype(str).str.strip().str.upper() == vin_norm)
         )
-        if mask_abierto.any():
-            idx = df_casos[mask_abierto].index[0]
-            df_casos.at[idx, 'FECHA_DETECCION'] = deteccion['FECHA_DETECCION']
-        else:
+        if not mask_abierto.any():
             nueva_fila = {col: deteccion.get(col, '') for col in CASOS_BAJA_CM_COLUMNS}
             nueva_fila['CASO_ID'] = str(siguiente_id)
             nueva_fila['ESTADO_CASO'] = ESTADO_CASO_PENDIENTE
@@ -416,7 +415,31 @@ def guardar_casos_baja_cm(df_casos, path):
     directorio = os.path.dirname(path)
     if directorio:
         os.makedirs(directorio, exist_ok=True)
-    df_casos.to_csv(path, index=False)
+    # Archivo temporal en la misma carpeta y reemplazo: otro PC o OneDrive
+    # nunca ven el CSV a medio escribir.
+    fd, temporal = tempfile.mkstemp(suffix='.tmp', dir=directorio or None)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8', newline='') as archivo:
+            df_casos.to_csv(archivo, index=False)
+        os.replace(temporal, path)
+    except Exception:
+        if os.path.exists(temporal):
+            os.remove(temporal)
+        raise
+
+
+ESPERA_ARCHIVO_AUSENTE_S = 2
+
+
+def _esperar_si_archivo_ausente(path):
+    """Si CasosBajaCM.csv no existe pero su carpeta ya tiene archivos (carpeta
+    compartida en uso), espera un momento antes de leerlo: OneDrive puede estar
+    reemplazándolo, y leerlo como vacío haría crear uno nuevo desde el caso 1."""
+    if not path or os.path.exists(path):
+        return
+    directorio = os.path.dirname(path)
+    if directorio and os.path.isdir(directorio) and os.listdir(directorio):
+        time.sleep(ESPERA_ARCHIVO_AUSENTE_S)
 
 
 @_con_lock_casos
@@ -426,7 +449,7 @@ def procesar_deteccion_baja_cm(df_pruebas_antes, vins_en_nuevo_listado, periodo_
     listado, actualiza/crea los casos correspondientes (sin duplicar,
     marcando reapariciones) y persiste el resultado. Nunca toca PruebasFM ni
     decide una baja: solo detecta y registra el caso para revision
-    posterior de la contraparte comercial."""
+    posterior de Javiera."""
     df_pruebas_antes = _solo_contratos_actuales(df_pruebas_antes)
     df_casos = cerrar_casos_de_contratos_terminados(leer_casos_baja_cm(casos_path), df_pruebas_antes)
     detecciones = detectar_posibles_bajas_cm(df_pruebas_antes, vins_en_nuevo_listado, periodo_deteccion, hoy=hoy)
@@ -507,7 +530,9 @@ def procesar_reconciliacion_estado_expired(df_pruebas_actual, periodo_deteccion,
     Revision CM con ORIGEN_CASO=ESTADO_EXPIRED. Nunca toca PruebasFM ni los
     casos ORIGEN_CASO=AUSENCIA_3PC (ver reconciliar_casos_estado_expired)."""
     df_pruebas_actual = _solo_contratos_actuales(df_pruebas_actual)
-    df_casos = cerrar_casos_de_contratos_terminados(leer_casos_baja_cm(casos_path), df_pruebas_actual)
+    _esperar_si_archivo_ausente(casos_path)
+    df_leido = leer_casos_baja_cm(casos_path)
+    df_casos = cerrar_casos_de_contratos_terminados(df_leido, df_pruebas_actual)
     detecciones = detectar_casos_expired_actuales(df_pruebas_actual, periodo_deteccion, hoy=hoy)
 
     vins_expired_actual = []
@@ -516,5 +541,9 @@ def procesar_reconciliacion_estado_expired(df_pruebas_actual, periodo_deteccion,
         vins_expired_actual = df_pruebas_actual.loc[mask, 'VIN'].astype(str).str.strip().str.upper().tolist()
 
     df_casos_actualizado = reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual, hoy=hoy)
-    guardar_casos_baja_cm(df_casos_actualizado, casos_path)
+    existe = bool(casos_path) and os.path.exists(casos_path)
+    sin_cambios = existe and df_casos_actualizado.reset_index(drop=True).astype(str).equals(
+        df_leido.reset_index(drop=True).astype(str))
+    if not sin_cambios:
+        guardar_casos_baja_cm(df_casos_actualizado, casos_path)
     return df_casos_actualizado

@@ -189,8 +189,8 @@ class PanelNotificaciones(QWidget):
         pie = QLabel("Archivos vigilados: " + " · ".join(archivos_vigilados) if archivos_vigilados else "")
         pie.setWordWrap(True)
         pie.setStyleSheet("color: #66748D; font-size: 11px; background-color: #F7F9FC; border-top: 1px solid #E3E8F0; padding: 9px 14px;")
-        pie.setVisible(bool(archivos_vigilados))
         raiz.addWidget(pie)
+        pie.setVisible(bool(archivos_vigilados))
         self._repintar()
 
     def mousePressEvent(self, event):

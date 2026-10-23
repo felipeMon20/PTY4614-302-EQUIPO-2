@@ -7,10 +7,10 @@ import time
 
 # clave de app_config.json -> (etiqueta visible, nombre estándar, obligatorio)
 ARCHIVOS_DE_DATOS = {
-    "EXCEL_PATH": ("Registro Maestro (RM_CONTRATOS)", "RM_CONTRATOS.csv", True),
+    "EXCEL_PATH": ("Registro Maestro", "Registro Maestro.csv", True),
     "LOG_CSV_PATH": ("Historial de cambios", "LogApp.csv", True),
     "DELETED_LOG_EXCEL_PATH": ("Papelera", "RegistroEliminado.xlsx", True),
-    "PROVISION_EXCEL_PATH": ("Provisiones", "provisionContratos.xlsx", True),
+    "PROVISION_EXCEL_PATH": ("Provisiones", "provisionFelipe.xlsx", True),
     "INSTALACIONES_PATH": ("Instalaciones", "Instalaciones.xlsx", True),
     "CONTACTOS_EXCEL_PATH": ("Administradores de flota (contactos)", "contactos.xlsx", True),
     "CORREOS_EXCEL_PATH": ("Correos", "Correos.csv", True),
@@ -18,18 +18,41 @@ ARCHIVOS_DE_DATOS = {
     "POWERBI_EXCEL_PATH": ("BBDD Clientes CM", "BBDD CLIENTES CM.xlsx", True),
     "FACTURACION_MANUAL_PATH": ("Facturación manual", "facturacionManual.xlsx", False),
     "EJECUTIVOS_PATH": ("Directorio de ejecutivos", "Ejecutivos_VC.csv", False),
+    "METAS_VC_PATH": ("Metas de Volvo Connect", "MetasVC.csv", False),
     # Suele vivir en otra carpeta del equipo: se busca, pero no se deriva a ciegas
-    "RM_REPORTE_PATH": ("RM Reporte", "RM_REPORTE_CONECTADOS.xlsx", False),
+    "RM_JAVI_PATH": ("RM Javiera", "RM_JAVI_VOLVO CONNECT.xlsx", False),
 }
 
 # Claves que se derivan de la carpeta de datos cuando están vacías
 # Se elige a mano en Configuración > Avanzado (modo programador), no se lista en Archivos
-CLAVES_SOLO_PROGRAMADOR = ("RM_REPORTE_PATH",)
+CLAVES_SOLO_PROGRAMADOR = ("RM_JAVI_PATH",)
 
-CLAVES_DERIVABLES =tuple(k for k in ARCHIVOS_DE_DATOS if k != "RM_REPORTE_PATH")
+CLAVES_DERIVABLES =tuple(k for k in ARCHIVOS_DE_DATOS if k != "RM_JAVI_PATH")
 
 # Claves de versiones anteriores que nada lee y se eliminan al guardar
 CLAVES_OBSOLETAS = ("CUSTOMER_EXCEL_PATH", "POWERBI_URL")
+
+# Nombres anteriores de un archivo (20-10-2026: RM_JAVI.csv pasó a llamarse
+# Registro Maestro.csv). Se aceptan ambos mientras convivan en las carpetas.
+NOMBRES_ANTERIORES = {"EXCEL_PATH": ("RM_JAVI.csv",)}
+
+
+def nombres_aceptados(clave):
+    """Nombres con que puede llamarse el archivo de `clave`, el estándar primero."""
+    return (ARCHIVOS_DE_DATOS[clave][1],) + NOMBRES_ANTERIORES.get(clave, ())
+
+
+def resolver_nombre_anterior(clave, ruta):
+    """Si `ruta` no existe pero el mismo archivo existe en su carpeta con otro
+    nombre aceptado, devuelve esa ruta; si no, devuelve `ruta` sin cambios."""
+    if not ruta or os.path.exists(ruta) or clave not in ARCHIVOS_DE_DATOS:
+        return ruta
+    carpeta = os.path.dirname(ruta)
+    for nombre in nombres_aceptados(clave):
+        candidata = os.path.join(carpeta, nombre)
+        if os.path.exists(candidata):
+            return candidata
+    return ruta
 
 # Carpetas que nunca se recorren al buscar (copias de respaldo, cachés, etc.)
 _CARPETAS_IGNORADAS = ("backup", "backups", "backup_auto", "__pycache__", "node_modules", "appdata", "$recycle.bin")
@@ -43,7 +66,7 @@ def completar_rutas(config):
         return config
     for clave in CLAVES_DERIVABLES:
         if not config.get(clave):
-            config[clave] = os.path.join(carpeta, ARCHIVOS_DE_DATOS[clave][1])
+            config[clave] = resolver_nombre_anterior(clave, os.path.join(carpeta, ARCHIVOS_DE_DATOS[clave][1]))
     return config
 
 
@@ -78,7 +101,7 @@ def _recorrer(raiz, profundidad):
 def descubrir_archivos(carpeta_base, subir=1, profundidad=2):
     """Busca cada archivo estándar dentro de `carpeta_base` (y hasta
     `profundidad` niveles hacia abajo) y, si no aparece, también en las
-    `subir` carpetas superiores (para el RM de la contraparte comercial y otros que viven en
+    `subir` carpetas superiores (para el RM de Javiera y otros que viven en
     carpetas hermanas). Devuelve {clave: ruta} solo con los encontrados; si
     hay varias copias gana la más cercana a `carpeta_base`."""
     if not carpeta_base or not os.path.isdir(carpeta_base):
@@ -89,7 +112,7 @@ def descubrir_archivos(carpeta_base, subir=1, profundidad=2):
         if padre and padre != raices[-1]:
             raices.append(padre)
 
-    pendientes = {clave: nombre.lower() for clave, (_e, nombre, _o) in ARCHIVOS_DE_DATOS.items()}
+    pendientes = {clave: [n.lower() for n in nombres_aceptados(clave)] for clave in ARCHIVOS_DE_DATOS}
     encontrados = {}
     for indice, raiz in enumerate(raices):
         # La raíz superior se recorre con más profundidad para llegar a carpetas hermanas
@@ -98,10 +121,12 @@ def descubrir_archivos(carpeta_base, subir=1, profundidad=2):
                 nombres = {n.lower(): n for n in os.listdir(carpeta)}
             except OSError:
                 continue
-            for clave, nombre in list(pendientes.items()):
-                if nombre in nombres:
-                    encontrados[clave] = os.path.join(carpeta, nombres[nombre])
-                    del pendientes[clave]
+            for clave, candidatos in list(pendientes.items()):
+                for nombre in candidatos:
+                    if nombre in nombres:
+                        encontrados[clave] = os.path.join(carpeta, nombres[nombre])
+                        del pendientes[clave]
+                        break
         if not pendientes:
             break
     return encontrados
@@ -111,13 +136,13 @@ def buscar_carpeta_de_datos(inicio, profundidad=4, limite_seg=10.0):
     """Busca desde `inicio` (normalmente la carpeta del usuario) la carpeta que
     contiene el Registro Maestro con su nombre estándar. Devuelve su ruta o
     None. Corta a los `limite_seg` segundos para no dejar la app esperando."""
-    marcador = ARCHIVOS_DE_DATOS["EXCEL_PATH"][1].lower()
+    marcadores = {n.lower() for n in nombres_aceptados("EXCEL_PATH")}
     limite = time.monotonic() + limite_seg
     for carpeta in _recorrer(inicio, profundidad):
         if time.monotonic() > limite:
             return None
         try:
-            if marcador in (n.lower() for n in os.listdir(carpeta)):
+            if marcadores & {n.lower() for n in os.listdir(carpeta)}:
                 return carpeta
         except OSError:
             continue

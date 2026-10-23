@@ -13,7 +13,8 @@ from PyQt6.QtGui import QGuiApplication, QColor, QFont, QPainter, QPen
 from src.core.constants import COL_VIN, COL_CHASIS, COL_RAZON_SOCIAL
 from src.ui import comercial_estilo as estilo_com
 from src.ui.transiciones import TransicionFundidoSubida
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.esqueleto_carga import animar_sobre_tabla
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.theme.theme_manager import ThemeManager
 from src.theme.colors import *
 
@@ -26,6 +27,7 @@ class ModeloTablaIngresos(PandasTableModel):
     def __init__(self, *args, resolver=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.resolver = resolver
+        self.fila_resuelta = 0
         self.destacar_columnas_cliente()
 
     def flags(self, index):
@@ -33,10 +35,17 @@ class ModeloTablaIngresos(PandasTableModel):
             return Qt.ItemFlag.NoItemFlags
         return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
+    def valor_fila_resuelta(self, columna):
+        """Valor de otra columna en la fila cuya celda está resolviendo el color."""
+        if columna not in self._df.columns:
+            return None
+        return self._df.iat[self.fila_resuelta, self._df.columns.get_loc(columna)]
+
     def _data_claro(self, index, role):
         if self.resolver is not None and index.isValid() and role in (
                 Qt.ItemDataRole.BackgroundRole, Qt.ItemDataRole.ForegroundRole):
             valor = self._df.iat[index.row(), index.column()]
+            self.fila_resuelta = index.row()
             color = self.resolver(self._df.columns[index.column()], "" if pd.isna(valor) else valor,
                                   role == Qt.ItemDataRole.BackgroundRole)
             if color is not None:
@@ -67,7 +76,14 @@ class ComboFiltroBarra(estilo_com.ComboTarjeta):
         self._compacto = False
         self._ancho_normal = 0
         self._pix = None
+        self._en_capsula = False
         self.currentIndexChanged.connect(lambda _i: self._actualizar_tooltip())
+
+    def set_en_capsula(self, valor):
+        """Dentro de la cápsula de la barra se dibuja como sus botones: sin marco,
+        solo un resalte al pasar el mouse."""
+        self._en_capsula = valor
+        self.update()
 
     def set_compacto(self, compacto):
         if compacto == self._compacto:
@@ -91,8 +107,12 @@ class ComboFiltroBarra(estilo_com.ComboTarjeta):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         marco = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        p.setBrush(QColor(255, 255, 255, 46 if self.underMouse() else 26))
-        p.setPen(QPen(QColor(255, 255, 255, 46), 1))
+        if self._en_capsula:
+            p.setBrush(QColor(255, 255, 255, 38 if self.underMouse() else 0))
+            p.setPen(Qt.PenStyle.NoPen)
+        else:
+            p.setBrush(QColor(255, 255, 255, 46 if self.underMouse() else 26))
+            p.setPen(QPen(QColor(255, 255, 255, 46), 1))
         p.drawRoundedRect(marco, 10, 10)
         if self._pix is None:
             self._pix = ThemeManager.icon_pixmap(self._icono, color='white', size=16)
@@ -115,7 +135,7 @@ def estilo_combo_barra():
 
 
 def aplicar_estilo_tabla_lectura(tabla, alto_fila=42, extra_qss=""):
-    """Deja una AppTableWidget con el aspecto de la tabla de Comercial,
+    """Deja una VolvoTableWidget con el aspecto de la tabla de Comercial,
     de solo lectura y sin las acciones de columna (fijar, mover)."""
     qss = estilo_com.QSS_TABLA + (
         "QHeaderView::section { background: #F7F8FC; color: #6B7A90; border-bottom: 1px solid #E3E8F0; }"
@@ -208,7 +228,6 @@ class PantallaIngresosBase(QWidget):
 
         # Panel flotante fuera del layout: aparece con unidades seleccionadas
         self._panel_detalle = self._build_detalle_card()
-        self._panel_detalle.setParent(self)
         estilo_com.crear_sombra_panel(self._panel_detalle)
         self._panel_detalle.hide()
         self._panel_abierto = False
@@ -239,7 +258,7 @@ class PantallaIngresosBase(QWidget):
         barra.setObjectName("barraBandejaComercial")
         barra.setStyleSheet("QFrame#barraBandejaComercial { background-color: #1B2B4E; border: none; border-radius: 14px; }")
         fila = QHBoxLayout(barra)
-        fila.setContentsMargins(15, 12, 15, 12)
+        fila.setContentsMargins(15, 7, 15, 7)
         fila.setSpacing(8)
         self._barra_bandeja = barra
         layout_externo.addWidget(barra)
@@ -271,18 +290,19 @@ class PantallaIngresosBase(QWidget):
         self._zona_filtros.setSpacing(8)
         self._zona_blancos = QHBoxLayout()
         self._zona_blancos.setSpacing(8)
-        self._capsula = QFrame()
-        self._capsula.setStyleSheet("QFrame { background: rgba(255,255,255,0.08); border-radius: 14px; }")
-        self._lay_capsula = QHBoxLayout(self._capsula)
-        self._lay_capsula.setContentsMargins(5, 5, 5, 5)
-        self._lay_capsula.setSpacing(4)
+        # Tres grupos con encabezado: filtros, acciones de la pantalla y generales
+        self._grupo_filtros, self._lay_filtros = self._crear_grupo_barra("Filtros")
+        self._grupo_acciones, self._lay_capsula = self._crear_grupo_barra("Acciones")
+        self._grupo_generales, self._lay_generales = self._crear_grupo_barra("Generales")
 
         fila.addWidget(self.btn_volver)
         fila.addWidget(bloque_titulo)
         fila.addStretch()
         fila.addLayout(self._zona_filtros)
         fila.addLayout(self._zona_blancos)
-        fila.addWidget(self._capsula)
+        fila.addWidget(self._grupo_filtros)
+        fila.addWidget(self._grupo_acciones)
+        fila.addWidget(self._grupo_generales)
 
         # Mostrar u ocultar las tarjetas KPI (el "Ampliar" de Comercial)
         self.btn_ampliar = None
@@ -309,9 +329,30 @@ class PantallaIngresosBase(QWidget):
         capas.addWidget(self.lbl_sin_resultados)
         return externo
 
+    @staticmethod
+    def _crear_grupo_barra(titulo):
+        """Cápsula de botones con su encabezado arriba; queda oculta hasta tener botones."""
+        grupo = QWidget()
+        grupo.setStyleSheet("background: transparent;")
+        vertical = QVBoxLayout(grupo)
+        vertical.setContentsMargins(0, 0, 0, 0)
+        vertical.setSpacing(1)
+        etiqueta = QLabel(titulo.upper())
+        etiqueta.setStyleSheet("color: #8FA0BD; font-size: 8px; font-weight: 700; letter-spacing: 1px; "
+                               "background: transparent; padding-left: 6px;")
+        capsula = QFrame()
+        capsula.setStyleSheet("QFrame { background: rgba(255,255,255,0.08); border-radius: 14px; }")
+        lay = QHBoxLayout(capsula)
+        lay.setContentsMargins(4, 3, 4, 3)
+        lay.setSpacing(4)
+        vertical.addWidget(etiqueta)
+        vertical.addWidget(capsula)
+        grupo.hide()
+        return grupo, lay
+
     def _crear_tabla(self, tabla_extra_qss):
         # Mismo componente y estilo de tabla que la bandeja de Comercial
-        tabla = AppTableWidget()
+        tabla = VolvoTableWidget()
         aplicar_estilo_tabla_lectura(tabla, self.ALTO_FILA, tabla_extra_qss)
         tabla.horizontalHeader().sectionClicked.connect(self._on_encabezado_clicado)
         tabla.sort_changed.connect(self._pintar_tabla)
@@ -330,23 +371,39 @@ class PantallaIngresosBase(QWidget):
     def agregar_filtro(self, widget):
         self._zona_filtros.addWidget(widget)
 
+    def agregar_filtro_compacto(self, combo):
+        """Filtro de solo ícono dentro de la cápsula, antes de los botones; el
+        valor elegido va en la ayuda emergente y un punto ámbar marca un filtro activo."""
+        combo.set_compacto(True)
+        combo.set_en_capsula(True)
+        self._lay_filtros.addWidget(combo)
+        self._grupo_filtros.show()
+
     def agregar_blanco(self, boton):
-        """Los antiguos botones blancos ahora van en la cápsula azul, con el
-        mismo estilo que el resto de los botones de la barra."""
+        """Acción propia de la pantalla (mismo estilo que el resto de la barra)."""
         self.agregar_capsula(boton)
 
     def agregar_capsula(self, boton):
+        """Acción propia de la pantalla, en el grupo Acciones."""
         self._lay_capsula.addWidget(boton)
+        self._grupo_acciones.show()
+        estilo_com.preparar_boton_capsula(boton)
+
+    def agregar_general(self, boton):
+        """Botón común a todas las pantallas (Excel, Recargar), en el grupo Generales."""
+        self._lay_generales.addWidget(boton)
+        self._grupo_generales.show()
         estilo_com.preparar_boton_capsula(boton)
         self._ubicar_boton_ampliar()
 
     def _ubicar_boton_ampliar(self):
-        """"Ampliar" queda siempre penúltimo en la cápsula, como en Comercial
+        """"Ampliar" queda siempre penúltimo en Generales, como en Comercial
         (el último es Recargar)."""
         if getattr(self, 'btn_ampliar', None) is None:
             return
-        self._lay_capsula.removeWidget(self.btn_ampliar)
-        self._lay_capsula.insertWidget(max(0, self._lay_capsula.count() - 1), self.btn_ampliar)
+        self._lay_generales.removeWidget(self.btn_ampliar)
+        self._lay_generales.insertWidget(max(0, self._lay_generales.count() - 1), self.btn_ampliar)
+        self._grupo_generales.show()
 
     def aplicar_visibilidad_kpi(self, ocultar_ademas=False):
         """Las tarjetas se ven si la pantalla las define, la persona no las
@@ -468,7 +525,8 @@ class PantallaIngresosBase(QWidget):
         return lbl
 
     def _build_detalle_card(self):
-        frame = QFrame()
+        # Con su padre desde el inicio: reparentarlo ya armado re-aplicaba los estilos a todo el panel
+        frame = QFrame(self)
         frame.setObjectName("accionesRapidasComercial")
         frame.setStyleSheet(estilo_com.QSS_PANEL_FLOTANTE)
         marco = QVBoxLayout(frame)
@@ -514,11 +572,22 @@ class PantallaIngresosBase(QWidget):
             self._detalle_labels[columna] = lbl_valor
         layout.addLayout(grilla)
 
-        self._lbl_aviso_panel = QLabel("")
-        self._lbl_aviso_panel.setWordWrap(True)
+        self._lbl_aviso_panel = QFrame()
+        self._lbl_aviso_panel.setObjectName("avisoPanel")
         self._lbl_aviso_panel.setStyleSheet(
-            "background-color: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; border-radius: 10px;"
-            " padding: 8px 10px; font-size: 11px; font-weight: 600;")
+            "QFrame#avisoPanel { background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; }"
+            " QFrame#avisoPanel QLabel { background: transparent; border: none; color: #B91C1C;"
+            " font-size: 11px; font-weight: 600; }")
+        lay_aviso = QHBoxLayout(self._lbl_aviso_panel)
+        lay_aviso.setContentsMargins(10, 8, 10, 8)
+        lay_aviso.setSpacing(8)
+        icono_aviso = QLabel()
+        icono_aviso.setPixmap(ThemeManager.icon('fa5s.exclamation-triangle', color='#DC2626').pixmap(14, 14))
+        icono_aviso.setFixedWidth(16)
+        lay_aviso.addWidget(icono_aviso, alignment=Qt.AlignmentFlag.AlignTop)
+        self._txt_aviso_panel = QLabel("")
+        self._txt_aviso_panel.setWordWrap(True)
+        lay_aviso.addWidget(self._txt_aviso_panel, stretch=1)
         self._lbl_aviso_panel.hide()
         layout.addWidget(self._lbl_aviso_panel)
 
@@ -599,7 +668,7 @@ class PantallaIngresosBase(QWidget):
         self._ficha_vin.setText(f"VIN {fila.get(COL_VIN, '')}")
         self._ficha_vin.setVisible(self.MOSTRAR_VIN_FICHA and self.COL_COPIA != COL_VIN)
         if aviso:
-            self._lbl_aviso_panel.setText(aviso)
+            self._txt_aviso_panel.setText(aviso.lstrip("⚠️  "))
             self._lbl_aviso_panel.show()
         else:
             self._lbl_aviso_panel.hide()
@@ -669,6 +738,7 @@ class PantallaIngresosBase(QWidget):
                 self._historial_idx = len(self._historial) - 1
         self.actualizar_titulo()
         self._animar_cambio_nivel()
+        animar_sobre_tabla(self.tabla, 350)
 
     def _animar_cambio_nivel(self):
         """Fundido entre la lista de empresas y el detalle de una empresa."""

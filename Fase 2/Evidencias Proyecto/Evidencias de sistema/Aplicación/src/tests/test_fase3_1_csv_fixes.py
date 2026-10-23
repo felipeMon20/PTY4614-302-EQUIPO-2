@@ -26,10 +26,10 @@ COLUMNAS_COMERCIAL = [
 ]
 
 FILAS_COMERCIAL = [
-    ['YV2AAA0000000001', 'E000001', 'FH540', 'FLOTA A', '-', 'JUAN PEREZ', '31455522-3', '9990001',
+    ['YV2AAA0000000001', 'E000001', 'FH540', 'FLOTA A', '-', 'JUAN PEREZ', '76123456-7', '9990001',
      'ARRIENDO', 'FULL', 'Vigente', 'Activo', '01-01-2025', '12', '01-01-2026', 'MENSUAL',
      'SI', '01-01-2025', '01-06-2025', '-', '-', '-', 'EMPRESA UNO SPA'],
-    ['YV2BBB0000000002', 'E000002', 'FMX500', 'FLOTA B', '-', 'ANA SOTO', '31851472-2', '9990002',
+    ['YV2BBB0000000002', 'E000002', 'FMX500', 'FLOTA B', '-', 'ANA SOTO', '77654321-K', '9990002',
      'ARRIENDO', 'BASICO', 'Vigente', 'Activo', '15-03-2024', '-', 'MENSUAL', 'MENSUAL',
      'SI', '-', '-', '-', '-', '-', 'EMPRESA DOS LTDA'],
 ]
@@ -235,7 +235,7 @@ class TestGetSystemHealthBackupCount(unittest.TestCase):
         mock_listdir.return_value = [
             'PruebasFM_backup_1.xlsx', 'PruebasFM_backup_2.csv', 'PruebasFM_backup_3.csv', 'notas.txt',
         ]
-        with patch.object(config.settings, 'EXCEL_PATH', 'C:/ruta/ficticia/RM_CONTRATOS.csv'):
+        with patch.object(config.settings, 'EXCEL_PATH', 'C:/ruta/ficticia/RM_JAVI.csv'):
             health = self.dm.get_system_health()
         self.assertEqual(health['backups_count'], 2)
 

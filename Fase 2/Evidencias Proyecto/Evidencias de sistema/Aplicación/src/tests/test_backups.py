@@ -97,7 +97,7 @@ class TestBackups(unittest.TestCase):
 
     def test_backups_de_archivos_distintos_no_interfieren_entre_si(self):
         origen_a = os.path.join(self.temp_dir.name, "PruebasFM_Test.xlsx")
-        origen_b = os.path.join(self.temp_dir.name, "provisionContratos_Test.xlsx")
+        origen_b = os.path.join(self.temp_dir.name, "provisionFelipe_Test.xlsx")
         self._crear_excel_simple(origen_a)
         self._crear_excel_simple(origen_b)
 
@@ -109,7 +109,7 @@ class TestBackups(unittest.TestCase):
         self.writer._crear_backup(origen_b)
 
         backups_a = [f for f in os.listdir(self.writer.backup_dir) if f.startswith("PruebasFM_Test_backup_")]
-        backups_b = [f for f in os.listdir(self.writer.backup_dir) if f.startswith("provisionContratos_Test_backup_")]
+        backups_b = [f for f in os.listdir(self.writer.backup_dir) if f.startswith("provisionFelipe_Test_backup_")]
         self.assertEqual(len(backups_a), 10, "Fallo: la poda de PruebasFM no debe verse afectada por Provisiones.")
         self.assertEqual(len(backups_b), 1, "Fallo: el backup de Provisiones no debio ser podado ni afectado por el de PruebasFM.")
 
@@ -343,7 +343,7 @@ class TestLogDeletedSeparaPorModuloYEsquema(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_modulos_distintos_generan_hojas_separadas_con_su_propio_esquema(self):
-        self.writer._log_deleted(["ID", "Nombre", "Correo electrónico"], ["458", "Ana", "ana@x.example"], "Contactos")
+        self.writer._log_deleted(["ID", "Nombre", "Correo electrónico"], ["458", "Ana", "ana@x.cl"], "Contactos")
         self.writer._log_deleted(["VIN", "MODELO", "CDB"], ["YV2ABC0001", "FM", "999"], "Comercial")
 
         wb = openpyxl.load_workbook(self.writer.deleted_filepath)
@@ -488,13 +488,16 @@ class TestRestoreBackupValidation(unittest.TestCase):
              patch('src.ui.configuracion.QMessageBox.information') as mock_info, \
              patch('src.core.excel_writer.ExcelWriter._crear_backup', new=backup_exitoso), \
              patch('src.ui.configuracion.shutil.copy2') as mock_copy, \
-             patch('src.ui.configuracion.QProcess'), \
-             patch('src.ui.configuracion.QApplication.quit'):
+             patch('src.ui.configuracion.QProcess') as mock_proceso, \
+             patch('src.ui.configuracion.QApplication.quit') as mock_quit:
             self.module._restore_backup()
 
         mock_critical.assert_not_called()
         mock_copy.assert_called_once_with(backup_correcto, EXCEL_PATH_EN_USO)
-        mock_info.assert_called_once()
+        # Sin diálogo de éxito: tras restaurar la app se reinicia sola
+        mock_info.assert_not_called()
+        mock_proceso.startDetached.assert_called_once()
+        mock_quit.assert_called_once()
 
     def test_backup_del_estado_actual_ocurre_antes_de_restaurar(self):
         from src.ui.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO

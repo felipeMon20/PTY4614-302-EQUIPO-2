@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Auditor automatico y reutilizable de la suite de tests de Gestor SSCC App.
+"""Auditor automatico y reutilizable de la suite de tests de Volvo Dashboard App.
 
 Uso:
     python src/tests/auditor/run_auditor.py
@@ -294,7 +294,7 @@ def write_log_report(path: str, data: dict):
 
     add("=" * 60)
     add("AUDITORÍA AUTOMÁTICA DE TESTS")
-    add("GESTOR SSCC APP")
+    add("VOLVO DASHBOARD APP")
     add("=" * 60)
     add("")
 
@@ -612,7 +612,7 @@ def main():
 
     metadata = {
         "generated_at": run_started_at.isoformat(timespec="seconds"),
-        "generator": "empresa_dashboard_app.auditor",
+        "generator": "volvo_dashboard_app.auditor",
         "generator_version": "1.0",
         "python_version": sys.version.split()[0],
         "framework": "unittest",

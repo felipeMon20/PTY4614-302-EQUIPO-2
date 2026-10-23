@@ -1,6 +1,6 @@
 # Gestor SSCC — Documentación
 
-Este es el Vault de Obsidian con la documentación técnica y funcional de **Gestor SSCC** (antes Gestor SSCC; la carpeta del proyecto sigue llamándose `empresa_dashboard_app`), una aplicación de escritorio en PyQt6 que centraliza la gestión de la flota comercial (contratos, provisiones financieras, contactos, instalaciones, contratos de mantenimiento y correos) sobre archivos Excel como fuente de datos.
+Este es el Vault de Obsidian con la documentación técnica y funcional de **Gestor SSCC** (antes Volvo Dashboard; la carpeta del proyecto sigue llamándose `volvo_dashboard_app`), una aplicación de escritorio en PyQt6 que centraliza la gestión de la flota comercial (contratos, provisiones financieras, contactos, instalaciones, contratos de mantenimiento y correos) sobre archivos Excel como fuente de datos.
 
 Este README es solo un mapa de navegación. No repite conocimiento técnico — cada tema vive en un único documento; si necesitas el detalle, entra al documento correspondiente en vez de buscarlo aquí.
 
@@ -22,7 +22,7 @@ El código (`main.py`, `config/`, `src/`) es siempre la fuente de verdad sobre e
 - [[04. Arquitectura y Patrones del Sistema]] — síntesis arquitectónica (patrones, capas, deuda técnica)
 
 **Flujos y reglas**
-- [[05. Flujos de Datos y Sincronización]] — carga/escritura, ETLs internos, SharePoint, RM_CONTRATOS, Instalaciones, Correos
+- [[05. Flujos de Datos y Sincronización]] — carga/escritura, ETLs internos, SharePoint, RM_JAVI, Instalaciones, Correos
 - [[06. Seguridad, Integridad y Resiliencia de Datos]] — backups, archivos temporales, watchdog, tolerancia a fallos
 - [[07. Procesos y Reglas de Negocio]] — reglas y cálculos por módulo
 
@@ -33,7 +33,7 @@ El código (`main.py`, `config/`, `src/`) es siempre la fuente de verdad sobre e
 - [[11. Pruebas y Auditoría de Tests]] — estructura de `src/tests/`, cómo se ejecutan y el auditor automático (`src/tests/auditor/`); su lista de archivos/conteos se desactualiza con cada test nuevo, ver advertencia en §1
 - [[12. Rendimiento y Optimizaciones de Interfaz]] — historial técnico de la auditoría de rendimiento de UI (debounce, cachés, `GeneralDataPrepThread`, render diferido) y de las optimizaciones anteriores a ella
 - [[13. Matriz de Requerimientos y Trazabilidad]] — lista de requerimientos de negocio y matriz de trazabilidad código↔requerimiento (RG-01 a RG-43)
-- [[14. Guía de General, Comercial y Operaciones]] — qué hace cada una de las tres pantallas centrales, quién las usa y cómo se trabaja (en Operaciones, primero Servicios Conectados y luego el registro en la app)
+- [[14. Guía de General, Comercial y Operaciones]] — qué hace cada una de las tres pantallas centrales, quién las usa y cómo se trabaja (en Operaciones, primero Volvo Connect y luego el registro en la app)
 - [[15. Guía de Ingresos y Conciliación]] — qué son Provisiones, Contratos (CM), Facturación Manual y JustTime, quién las usa y cómo se trabaja
 
 [[ARCHITECTURE]] (documento previo del 29-08-2026, movido a esta carpeta el 13-10-2026) es más general y está parcialmente desactualizado; en caso de conflicto, el resto de este Vault prevalece por ser la auditoría más reciente.

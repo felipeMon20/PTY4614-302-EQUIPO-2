@@ -328,7 +328,7 @@ class TestContactos(unittest.TestCase):
             'fila_que_no_existe': {
                 'keys': {
                     'CDB': 'CDB_INEXISTENTE',
-                    'Correo electrónico': 'nadie@inexistente.example',
+                    'Correo electrónico': 'nadie@inexistente.cl',
                     'Nombre': 'Nadie',
                 },
                 'cambios': {'Nombre': 'No Debe Guardarse'},

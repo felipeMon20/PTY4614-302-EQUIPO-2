@@ -27,13 +27,13 @@ def generar_excels_prueba(base_dir=None):
     data_comercial = {col: [] for col in columnas_comercial}
     
     # Camión 1: Activo y Conectado
-    data_comercial['VIN'].append('YV2TEST0000900054')
-    data_comercial['CHASIS'].append('0900054')
+    data_comercial['VIN'].append('YV2TEST0000000001')
+    data_comercial['CHASIS'].append('0000001')
     data_comercial['MODELO'].append('FH')
     data_comercial['FLOTA VC'].append('EMPRESA PRUEBA S.A.')
     data_comercial['EJECUTIVO'].append('JUAN PEREZ')
     data_comercial['RAZÓN SOCIAL'].append('EMPRESA PRUEBA S.A.')
-    data_comercial['RUT'].append('31.708.930-0')
+    data_comercial['RUT'].append('77.777.777-7')
     data_comercial['CDB'].append('10001')
     data_comercial['INDUSTRIA'].append('Minería')
     data_comercial['FORMA DE CONTRATO'].append('CMG')
@@ -51,13 +51,13 @@ def generar_excels_prueba(base_dir=None):
     data_comercial['PAGO CM'].append(150000)
 
     # Camión 2: Vencido y Desconectado
-    data_comercial['VIN'].append('YV2TEST0000900055')
-    data_comercial['CHASIS'].append('0900055')
+    data_comercial['VIN'].append('YV2TEST0000000002')
+    data_comercial['CHASIS'].append('0000002')
     data_comercial['MODELO'].append('FMX')
     data_comercial['FLOTA VC'].append('TRANSPORTES TEST')
     data_comercial['EJECUTIVO'].append('MARIA GOMEZ')
     data_comercial['RAZÓN SOCIAL'].append('TRANSPORTES TEST')
-    data_comercial['RUT'].append('32.287.017-8')
+    data_comercial['RUT'].append('88.888.888-8')
     data_comercial['CDB'].append('10002')
     data_comercial['INDUSTRIA'].append('Construcción')
     data_comercial['FORMA DE CONTRATO'].append('CMB')
@@ -81,11 +81,11 @@ def generar_excels_prueba(base_dir=None):
     df_comercial = pd.DataFrame(data_comercial)
 
     # ========================================================
-    # 2. PROVISIONES (provisionContratos) - 3 hojas estrictas
+    # 2. PROVISIONES (provisionFelipe) - 3 hojas estrictas
     # ========================================================
     df_prov = pd.DataFrame({
         'AÑO - MES': ['2026 - Agosto', '2026 - Agosto'],
-        'VIN': ['YV2TEST0000900054', 'YV2TEST0000900055'],
+        'VIN': ['YV2TEST0000000001', 'YV2TEST0000000002'],
         'CLIENTE': ['EMPRESA PRUEBA S.A.', 'TRANSPORTES TEST'],
         'EJECUTIVO': ['JUAN PEREZ', 'MARIA GOMEZ'],
         'OBSERVACIONES': ['', 'Vencido'],
@@ -112,7 +112,7 @@ def generar_excels_prueba(base_dir=None):
         'Flota': ['EMPRESA PRUEBA S.A.', 'TRANSPORTES TEST'],
         'Nombre': ['Pedro', 'Ana'],
         'Apellidos': ['Prueba', 'Test'],
-        'Correo electrónico': ['pedro@prueba.example', 'ana@test.example'],
+        'Correo electrónico': ['pedro@prueba.cl', 'ana@test.cl'],
         'Número móvil': ['+56 9 1111 1111', '+56 9 2222 2222'],
         'Rol': ['Administrador de flota', 'Administrador de flota'],
         'Fecha de extracción': ['24-08-2026 10:00:00', '24-08-2026 10:00:00']
@@ -122,15 +122,15 @@ def generar_excels_prueba(base_dir=None):
     # 4. INSTALACIONES (Instalaciones.xlsx)
     # ========================================================
     df_instalaciones = pd.DataFrame({
-        'RUT': ['31.708.930-0', '32.287.017-8'], 
-        'VIN': ['YV2TEST0000900054', 'YV2TEST0000900055'], 
-        'CHASSIS': ['0900054', '0900055'], 
-        'NOMBRE CONTRATO': ['0900054 EMPRESA PRUEBA S.A.', '0900055 TRANSPORTES TEST'], 
+        'RUT': ['77.777.777-7', '88.888.888-8'], 
+        'VIN': ['YV2TEST0000000001', 'YV2TEST0000000002'], 
+        'CHASSIS': ['0000001', '0000002'], 
+        'NOMBRE CONTRATO': ['0000001 EMPRESA PRUEBA S.A.', '0000002 TRANSPORTES TEST'], 
         'RAZON SOCIAL': ['EMPRESA PRUEBA S.A.', 'TRANSPORTES TEST'], 
         'DIRECCIÓN': ['Av. Falsa 123', 'Calle Verdadera 456'], 
         'COMUNA': ['Santiago', 'Quilicura'], 
         'ADMINISTRADOR DE FLOTA': ['Pedro Prueba', 'Ana Test'], 
-        'CORREO ADMINISTRADOR': ['pedro@prueba.example', 'ana@test.example'], 
+        'CORREO ADMINISTRADOR': ['pedro@prueba.cl', 'ana@test.cl'], 
         'TELÉFONO ADMINISTRADOR': ['+56 9 1111 1111', '+56 9 2222 2222'], 
         'INICIO': ['01-08-2026', '15-08-2025'], 
         'MESES': ['12', '12'], 
@@ -154,7 +154,7 @@ def generar_excels_prueba(base_dir=None):
     with pd.ExcelWriter(os.path.join(base_dir, "PruebasFM_Test.xlsx"), engine='openpyxl') as writer:
         df_comercial.to_excel(writer, sheet_name='BBDD (2)', index=False)
         
-    with pd.ExcelWriter(os.path.join(base_dir, "provisionContratos_Test.xlsx"), engine='openpyxl') as writer:
+    with pd.ExcelWriter(os.path.join(base_dir, "provisionFelipe_Test.xlsx"), engine='openpyxl') as writer:
         df_prov.to_excel(writer, sheet_name='Prov', index=False)
         df_prov_vars.to_excel(writer, sheet_name='Variables', index=False)
         df_prov_planes.to_excel(writer, sheet_name='Planes', index=False)

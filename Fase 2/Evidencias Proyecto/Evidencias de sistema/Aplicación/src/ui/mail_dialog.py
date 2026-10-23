@@ -17,17 +17,18 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QModelInd
 from PyQt6.QtGui import QColor, QCursor, QFont, QKeySequence, QAction, QPixmap, QPainter, QPen
 from PyQt6.QtWidgets import QStyleOptionViewItem
 
+from src.core.constants import COL_FECHA_BAJA
 from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
-from src.core.perf_log import medir
 from src.theme.theme_manager import ThemeManager
 from src.theme.colors import *
 from src.theme import tema
 from config.settings import CORREOS_EXCEL_PATH, POWERBI_EXCEL_PATH, CONTACTOS_EXCEL_PATH
 
-from src.ui.custom_table import PandasTableModel, AppTableWidget
+from src.ui.custom_table import PandasTableModel, VolvoTableWidget
 from src.ui.ingresos_base import ModeloTablaIngresos, aplicar_estilo_tabla_lectura
 from src.ui import admin_estilo
+from src.ui.esqueleto_carga import animar_sobre_tabla
 from src.ui.guardado_overlay import mostrar_guardando, guardado_listo, terminar_guardando, _Spinner
 from src.ui import comercial_estilo as estilo_com
 from src.ui.contactos_agregar import ContactosAddDialog
@@ -87,7 +88,7 @@ class CorreosSyncWorker(QThread):
             cdb_flota = df_comercial['CDB FLOTA'].astype(str).str.strip() if 'CDB FLOTA' in df_comercial.columns else pd.Series(dtype=str)
             con_cdb_flota = int((~cdb_flota.str.upper().isin(['', '-', 'NAN', 'NONE'])).sum())
             if con_cdb_flota == 0:
-                raise Exception("PruebasFM todavía no tiene CDB FLOTA. Sincroniza con RM_CONTRATOS antes de actualizar los correos.")
+                raise Exception("El Registro Maestro todavía no tiene CDB FLOTA. Completa ese dato antes de actualizar los correos.")
             self._paso(1, 'ok', f"{_miles(con_cdb_flota)} camiones con CDB flota")
 
             self._paso(2, 'activo', "Leyendo contactos.xlsx…")
@@ -278,7 +279,7 @@ class SyncCorreosDialog(QDialog):
 
         main_layout.addWidget(tarjeta)
 
-        self.preview_table = AppTableWidget()
+        self.preview_table = VolvoTableWidget()
         self.preview_model = PandasTableModel()
         self.preview_table.setModel(self.preview_model)
         self.preview_table.hide()
@@ -460,6 +461,30 @@ class OutlookSenderThread(QThread):
         else:
             print(f"No se encontró la imagen: {path}")
 
+    @staticmethod
+    def _correo_cuenta_outlook(outlook):
+        """Dirección de la cuenta de Outlook con la que se envía (la
+        predeterminada); '' si no se puede leer. Se usa en el contacto y en
+        los botones "responder" de las plantillas."""
+        def valida(direccion):
+            direccion = str(direccion).strip()
+            return direccion if "@" in direccion else ""
+
+        try:
+            sesion = outlook.Session
+            tienda = sesion.DefaultStore.StoreID
+            for cuenta in sesion.Accounts:
+                if cuenta.DeliveryStore.StoreID == tienda:
+                    return valida(cuenta.SmtpAddress)
+            if sesion.Accounts.Count:
+                return valida(sesion.Accounts.Item(1).SmtpAddress)
+        except Exception:
+            pass
+        try:
+            return valida(outlook.Session.CurrentUser.AddressEntry.GetExchangeUser().PrimarySmtpAddress)
+        except Exception:
+            return ""
+
     def run(self):
         pythoncom.CoInitialize()
         exitos, fallos = 0, 0
@@ -469,6 +494,7 @@ class OutlookSenderThread(QThread):
 
         try:
             outlook = win32com.client.Dispatch('outlook.application')
+            correo_equipo = self._correo_cuenta_outlook(outlook)
             for idx, dest in enumerate(self.destinatarios):
                 if outlook_cerrado:
                     fallos += 1
@@ -497,13 +523,18 @@ class OutlookSenderThread(QThread):
 
                     if self.plantilla == "Personalizado":
                         msg = self.mensaje_base.replace('@FLOTA', str(dest['flota'])).replace('@NOMBRE', str(dest['nombre']).split(' ')[0])
-                        mail.HTMLBody = msg.replace('\n', '<br>')
+                        mail.HTMLBody = mail_service.cuerpo_personalizado(self.asunto, msg)
+                        for filename, cid in mail_service.IMAGENES_PERSONALIZADO:
+                            self._adjuntar_cid(mail, filename, cid)
                     else:
                         config_plantilla = mail_service.obtener_configuracion_plantilla(self.plantilla)
                         if config_plantilla:
+                            dest['correo_equipo'] = correo_equipo
                             mail.HTMLBody = config_plantilla['constructor'](dest)
                             for filename, cid in config_plantilla['imagenes']:
                                 self._adjuntar_cid(mail, filename, cid)
+                            for ruta in mail_service.archivos_adjuntos(config_plantilla.get('adjuntos'), self.assets_dir):
+                                mail.Attachments.Add(ruta)
 
                     mail.Display()
                     exitos += 1
@@ -624,14 +655,14 @@ class RegistroEnviosDialog(QDialog):
             " border-radius: 10px; padding: 0 12px; min-height: 34px; font-size: 12px; }"
             "QLineEdit:focus { border: 1px solid rgba(255,255,255,0.55); }")
         self.search_input.addAction(qta.icon('fa5s.search', color='#B8C2D6'), QLineEdit.ActionPosition.LeadingPosition)
-        self.search_input.textChanged.connect(self._filtrar)
+        self.search_input.textChanged.connect(self._filtrar_animado)
 
         self.btn_actualizar = QPushButton(" Actualizar")
         self.btn_actualizar.setIcon(ThemeManager.icon('fa5s.sync-alt', color='white'))
         self.btn_actualizar.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.btn_actualizar.clicked.connect(self._cargar_registro)
 
-        barra = admin_estilo.barra_opciones('fa5s.history', "", "", mostrar_titulo=False)
+        barra = admin_estilo.barra_opciones('fa5s.history', "", "", mostrar_titulo=False, con_grupos=False)
         barra.zona_filtros.addWidget(self.search_input, 1)
         barra.lay_capsula.addWidget(self.btn_actualizar)
         estilo_com.preparar_boton_capsula(self.btn_actualizar)
@@ -651,7 +682,7 @@ class RegistroEnviosDialog(QDialog):
 
         self.model = ModeloTablaIngresos(resolver=self._resolver_color_estado,
                                          alineacion=Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         aplicar_estilo_tabla_lectura(self.table, 48)
         self.table.set_model_and_delegate(self.model)
         self._delegado = estilo_com.DelegadoCeldasComercial([self.table, self.table.frozen_view])
@@ -703,6 +734,10 @@ class RegistroEnviosDialog(QDialog):
     @staticmethod
     def _partir(texto, separador):
         return [p.strip() for p in str(texto or "").replace(";", ",").split(",") if p.strip()] if separador else []
+
+    def _filtrar_animado(self, texto):
+        animar_sobre_tabla(self.table)
+        self._filtrar(texto)
 
     def _filtrar(self, texto):
         df = self.df_registro.copy()
@@ -926,10 +961,14 @@ class RegistroEnviosDialog(QDialog):
 # =========================================================
 # MODELO DE LA TABLA PRINCIPAL DE MailDialog
 # =========================================================
-def mascara_por_vencer(df):
-    """Contratos con FECHA TERMINO entre hoy y 30 días más (sin los mensuales)."""
+def mascara_por_vencer(df, vins_por_vencer=None):
+    """Por vencer: con `vins_por_vencer` (los que Comercial lista en Por vencer,
+    comercial_services.filtrar_renovaciones) se usa ese mismo conjunto; sin él,
+    contratos con FECHA TERMINO entre hoy y 30 días más (sin los mensuales)."""
     if df.empty or 'FECHA TERMINO' not in df.columns:
         return pd.Series(False, index=df.index)
+    if vins_por_vencer is not None:
+        return df['VIN'].astype(str).str.strip().str.upper().isin(vins_por_vencer)
     hoy = pd.Timestamp(datetime.now().date())
     fechas = pd.to_datetime(df['FECHA TERMINO'], format='%d-%m-%Y', errors='coerce')
     mensual = df['FECHA TERMINO'].astype(str).str.upper() == 'MENSUAL'
@@ -1071,6 +1110,7 @@ class MailDialog(QDialog):
         self._vin_cdb_map = {}  # VIN -> CDB, ver _build_vin_to_cdb_map()
         self._grupo_abierto = None  # razón social abierta en la fase 2
         self._vins_por_clave = {}
+        self._cache_vista_clientes = None  # (df_display, vista, vins_por_clave)
 
         self._setup_ui()
         self._load_correos_file()
@@ -1086,18 +1126,9 @@ class MailDialog(QDialog):
     def _load_correos_file(self):
         if os.path.exists(CORREOS_EXCEL_PATH):
             try:
-                # Instrumentacion temporal (auditoria de rendimiento B-5,
-                # 18-09-2026): separa lectura del CSV (B-5.2, antes Correos.xlsx
-                # via openpyxl), construccion del mapa VIN->CDB y primer render
-                # (via _populate_table). No cambia el comportamiento.
-                # dtype=str + keep_default_na=False: mismo patron que LogApp.csv/
-                # CasosBajaCM.csv en el resto del proyecto, para que VIN/CDB/RUT
-                # no pierdan ceros iniciales ni pandas les infiera un tipo numerico.
-                with medir("B-5 MailDialog > read_csv(Correos.csv)"):
-                    self.df_correos = pd.read_csv(CORREOS_EXCEL_PATH, dtype=str, keep_default_na=False)
-                print(f"[PERF][UI] B-5 MailDialog -> {len(self.df_correos)} filas leidas de Correos.csv")
-                with medir("B-5 MailDialog > _build_vin_to_cdb_map"):
-                    self._vin_cdb_map = self._build_vin_to_cdb_map()
+                self.df_correos = pd.read_csv(CORREOS_EXCEL_PATH, dtype=str, keep_default_na=False)
+                self._vin_cdb_map = self._build_vin_to_cdb_map()
+                self._vins_por_vencer = self._calcular_vins_por_vencer()
 
                 # Poblar combo de planes dinámicamente según la data viva
                 if 'TIPO DE SERVICIO' in self.df_correos.columns:
@@ -1124,6 +1155,18 @@ class MailDialog(QDialog):
         vins = df_comercial['VIN'].astype(str).str.strip()
         cdbs = df_comercial['CDB FLOTA'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\s+', '', regex=True).str.upper()
         return dict(zip(vins, cdbs))
+
+    def _calcular_vins_por_vencer(self):
+        """VIN que Comercial muestra en Por vencer, para que ambas pantallas
+        cuenten lo mismo; None si Comercial no está disponible."""
+        try:
+            df_base = comercial_services.preparar_df_base_comercial(self.data_manager.get_comercial_df())
+            if df_base is None or df_base.empty or 'VIN' not in df_base.columns:
+                return None
+            vencen = comercial_services.filtrar_renovaciones(df_base)
+            return set(vencen['VIN'].astype(str).str.strip().str.upper())
+        except Exception:
+            return None
 
     def _preseleccionar_vins(self, vins):
         """Prefiltra la tabla con los VIN dados (reutiliza el buscador
@@ -1156,8 +1199,7 @@ class MailDialog(QDialog):
 
     # Bandejas del selector superior, en el mismo orden que sus botones
     _BANDEJAS = ("total", "xvencer", "sincorreo", "concorreo")
-    _PLANTILLAS = ["Personalizado (Escribir desde cero)", "Bienvenida", "Crear Cuenta", "Capacitación",
-                   "Activación", "Revisión Periódica", "Aviso de Vencimiento", "Cancelación"]
+    _PLANTILLAS = ["Personalizado (Escribir desde cero)"] + list(mail_service.PLANTILLAS)
     _MAX_DESTINATARIOS_VISIBLES = 40
 
     def _setup_ui(self):
@@ -1189,12 +1231,12 @@ class MailDialog(QDialog):
             " border-radius: 10px; padding: 0 12px; min-height: 34px; font-size: 12px; }"
             "QLineEdit:focus { border: 1px solid rgba(255,255,255,0.55); }")
         self.search_bar.addAction(qta.icon('fa5s.search', color='#B8C2D6'), QLineEdit.ActionPosition.LeadingPosition)
-        self.search_bar.textChanged.connect(self._populate_table)
+        self.search_bar.textChanged.connect(self._populate_table_animado)
 
         self.combo_plan = estilo_com.ComboTarjeta("Plan")
         self.combo_plan.addItem("Todos los Planes")
         admin_estilo.combo_barra(self.combo_plan, 170)
-        self.combo_plan.currentTextChanged.connect(self._populate_table)
+        self.combo_plan.currentTextChanged.connect(self._populate_table_animado)
 
         self.btn_sync = QPushButton(" Sincronizar BBDD Correos")
         self.btn_sync.setIcon(ThemeManager.icon('fa5s.database', color='white'))
@@ -1207,7 +1249,7 @@ class MailDialog(QDialog):
         self.btn_ver_registro.setToolTip("Ver registro de correos enviados")
         self.btn_ver_registro.clicked.connect(self._abrir_registro_envios)
 
-        barra = admin_estilo.barra_opciones('fa5s.envelope', "", "", mostrar_titulo=False)
+        barra = admin_estilo.barra_opciones('fa5s.envelope', "", "", mostrar_titulo=False, con_grupos=False)
         barra.marco.layout().insertWidget(0, self.btn_volver)
         barra.zona_filtros.addWidget(self.search_bar, 1)
         barra.zona_filtros.addWidget(self.combo_plan)
@@ -1254,7 +1296,7 @@ class MailDialog(QDialog):
             self.checked_vins, self._vins_de_clave, resolver=self._resolver_color,
             alineacion=Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
         self.model.dataChanged.connect(self._on_model_data_changed)
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         aplicar_estilo_tabla_lectura(self.table, 44)
         self.table.set_model_and_delegate(self.model)
         self._delegado = _DelegadoCasilla([self.table, self.table.frozen_view])
@@ -1362,34 +1404,12 @@ class MailDialog(QDialog):
             QLineEdit:focus, QTextEdit:focus {{ border: 1px solid {estilo_com.PRIMARIO}; }}
         """
 
-        # combo_plantilla sigue siendo la fuente de verdad (lo usa Gestionar CM
-        # con setCurrentText); los botones solo lo manejan
-        self.combo_plantilla = QComboBox(cuerpo)
-        self.combo_plantilla.addItems(self._PLANTILLAS)
-        self.combo_plantilla.hide()
-        self.combo_plantilla.currentTextChanged.connect(self._on_plantilla_changed)
-        self.combo_plantilla.currentIndexChanged.connect(self._marcar_boton_plantilla)
-
         lay_cuerpo.addWidget(self._etiqueta_panel("Plantilla"))
-        grilla = QGridLayout()
-        grilla.setSpacing(6)
-        self._grupo_plantillas = QButtonGroup(self)
-        self._grupo_plantillas.setExclusive(True)
-        qss_chip = f"""
-            QPushButton {{ background-color: {estilo_com.SUPERFICIE}; border: 1px solid {estilo_com.LINEA}; border-radius: 8px;
-                           padding: 7px 8px; color: {estilo_com.APAGADO}; font-weight: 600; font-size: 11px; }}
-            QPushButton:hover:!checked {{ color: {estilo_com.TINTA}; border: 1px solid #B9C6DA; }}
-            QPushButton:checked {{ background-color: {estilo_com.PRIMARIO_SUAVE}; color: {estilo_com.PRIMARIO}; border: 1px solid {estilo_com.PRIMARIO}; }}
-        """
-        for i, nombre in enumerate(self._PLANTILLAS):
-            btn = QPushButton("Personalizado" if "Personalizado" in nombre else nombre)
-            btn.setCheckable(True)
-            btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            btn.setStyleSheet(qss_chip)
-            self._grupo_plantillas.addButton(btn, i)
-            grilla.addWidget(btn, i // 2, i % 2)
-        self._grupo_plantillas.idClicked.connect(self.combo_plantilla.setCurrentIndex)
-        lay_cuerpo.addLayout(grilla)
+        self.combo_plantilla = estilo_com.ComboTarjeta("Plantilla de correo", cuerpo)
+        self.combo_plantilla.addItems(self._PLANTILLAS)
+        ThemeManager.apply_combo_box(self.combo_plantilla)
+        self.combo_plantilla.currentTextChanged.connect(self._on_plantilla_changed)
+        lay_cuerpo.addWidget(self.combo_plantilla)
         lay_cuerpo.addSpacing(6)
 
         lay_cuerpo.addWidget(self._etiqueta_panel("Asunto"))
@@ -1440,7 +1460,6 @@ class MailDialog(QDialog):
         lay_pie.addWidget(self.btn_send)
         lay.addWidget(pie)
 
-        self._marcar_boton_plantilla(self.combo_plantilla.currentIndex())
         self._on_plantilla_changed(self.combo_plantilla.currentText())
         return panel
 
@@ -1448,11 +1467,6 @@ class MailDialog(QDialog):
         lbl = QLabel(texto.upper())
         lbl.setStyleSheet(estilo_com.QSS_TITULO_SECCION)
         return lbl
-
-    def _marcar_boton_plantilla(self, indice):
-        btn = self._grupo_plantillas.button(indice)
-        if btn is not None:
-            btn.setChecked(True)
 
     def _crear_item_destinatario(self, grupo):
         sin_correo = not grupo['correo']
@@ -1645,6 +1659,10 @@ class MailDialog(QDialog):
 
         self._load_correos_file()
 
+    def _populate_table_animado(self, text=""):
+        animar_sobre_tabla(self.table)
+        self._populate_table(text)
+
     def _populate_table(self, text=""):
         if self.df_correos.empty:
             self.df_display = pd.DataFrame()
@@ -1652,54 +1670,49 @@ class MailDialog(QDialog):
             self._render_table()
             return
 
-        # Instrumentacion temporal (auditoria de rendimiento B-5, 18-09-2026):
-        # mide el costo de la busqueda/filtrado interno, separado de la
-        # lectura del Excel y del render. No cambia el comportamiento.
-        with medir(f"B-5 MailDialog > filtrado interno ({len(self.df_correos)} filas base)"):
-            df_show = self.df_correos.copy()
+        df_show = self.df_correos.copy()
 
-            # Filtro de Plan
-            plan_filter = self.combo_plan.currentText()
-            if plan_filter != "Todos los Planes":
-                df_show = df_show[df_show['TIPO DE SERVICIO'].astype(str).str.strip().str.upper() == plan_filter.upper()]
+        # Filtro de Plan
+        plan_filter = self.combo_plan.currentText()
+        if plan_filter != "Todos los Planes":
+            df_show = df_show[df_show['TIPO DE SERVICIO'].astype(str).str.strip().str.upper() == plan_filter.upper()]
 
-            # Filtro de Buscador (VIN o Razón Social). B-5.3 (auditoria de
-            # rendimiento, 18-09-2026): antes era un loop propio O(terminos x
-            # columnas) -- igual al que ya se reemplazo en general.py para
-            # B-2 -- medido en ~540ms para 50 VINs pegados sobre 12.000 filas.
-            # comercial_services.construir_mascara_busqueda ya resuelve la
-            # MISMA semantica (','=OR entre terminos, espacio=AND dentro de
-            # un termino, substring case-insensitive) con una sola regex de
-            # alternancia por columna para los terminos simples, en vez de un
-            # .str.contains() por termino y columna. Verificado termino a
-            # termino contra el loop anterior antes de reemplazarlo: mismo
-            # resultado para 1 termino, varios VIN con coma, terminos
-            # compuestos con espacio, sin resultados y vacio (este ultimo
-            # caso ni siquiera se alcanza, sigue guardado por el `if
-            # text_search:` de arriba, igual que antes).
-            text_search = self.search_bar.text().strip().lower()
-            if text_search:
-                cols = [c for c in ['VIN', 'RAZÓN SOCIAL', 'RUT'] if c in df_show.columns]
-                mask = comercial_services.construir_mascara_busqueda(df_show, text_search, cols)
-                df_show = df_show[mask]
+        # Filtro de Buscador (VIN o Razón Social). B-5.3 (auditoria de
+        # rendimiento, 18-09-2026): antes era un loop propio O(terminos x
+        # columnas) -- igual al que ya se reemplazo en general.py para
+        # B-2 -- medido en ~540ms para 50 VINs pegados sobre 12.000 filas.
+        # comercial_services.construir_mascara_busqueda ya resuelve la
+        # MISMA semantica (','=OR entre terminos, espacio=AND dentro de
+        # un termino, substring case-insensitive) con una sola regex de
+        # alternancia por columna para los terminos simples, en vez de un
+        # .str.contains() por termino y columna. Verificado termino a
+        # termino contra el loop anterior antes de reemplazarlo: mismo
+        # resultado para 1 termino, varios VIN con coma, terminos
+        # compuestos con espacio, sin resultados y vacio (este ultimo
+        # caso ni siquiera se alcanza, sigue guardado por el `if
+        # text_search:` de arriba, igual que antes).
+        text_search = self.search_bar.text().strip().lower()
+        if text_search:
+            cols = [c for c in ['VIN', 'RAZÓN SOCIAL', 'RUT'] if c in df_show.columns]
+            mask = comercial_services.construir_mascara_busqueda(df_show, text_search, cols)
+            df_show = df_show[mask]
 
-            # Conteos de cada bandeja con el plan y la búsqueda ya aplicados
-            mask_xvencer = mascara_por_vencer(df_show)
-            mask_sin_correo = mascara_sin_correo(df_show)
-            self._actualizar_conteos_bandeja(len(df_show), int(mask_xvencer.sum()), int(mask_sin_correo.sum()))
+        # Conteos de cada bandeja con el plan y la búsqueda ya aplicados
+        mask_xvencer = mascara_por_vencer(df_show, getattr(self, '_vins_por_vencer', None))
+        mask_sin_correo = mascara_sin_correo(df_show)
+        self._actualizar_conteos_bandeja(len(df_show), int(mask_xvencer.sum()), int(mask_sin_correo.sum()))
 
-            if self.current_kpi == "xvencer":
-                df_show = df_show[mask_xvencer]
-            elif self.current_kpi == "sincorreo":
-                df_show = df_show[mask_sin_correo]
-            elif self.current_kpi == "concorreo":
-                df_show = df_show[~mask_sin_correo]
+        if self.current_kpi == "xvencer":
+            df_show = df_show[mask_xvencer]
+        elif self.current_kpi == "sincorreo":
+            df_show = df_show[mask_sin_correo]
+        elif self.current_kpi == "concorreo":
+            df_show = df_show[~mask_sin_correo]
 
-            self.df_display = df_show.reset_index(drop=True)
+        self.df_display = df_show.reset_index(drop=True)
         if self._grupo_abierto is not None and self._grupo_abierto not in set(self._serie_clave(self.df_display)):
             self._grupo_abierto = None
-        with medir(f"B-5 MailDialog > _render_table ({len(self.df_display)} filas)"):
-            self._render_table()
+        self._render_table()
 
     def _actualizar_conteos_bandeja(self, total, por_vencer, sin_correo):
         base = max(1, len(self.df_correos))
@@ -1756,14 +1769,42 @@ class MailDialog(QDialog):
                 "FECHA TÉRMINO": sub['FECHA TERMINO'].astype(str).values if 'FECHA TERMINO' in sub.columns else "",
             })
             return vista, "VIN"
+        # Volver desde un cliente no cambia df_display: se reutiliza la lista ya armada
+        cache = self._cache_vista_clientes
+        if cache is not None and cache[0] is df:
+            self._vins_por_clave = cache[2]
+            return cache[1], "RAZÓN SOCIAL"
+        grupos = pd.Series(range(len(df)), index=df.index).groupby(claves, sort=True)
+        tamanos = grupos.size()
+        orden = list(tamanos.index)
+        posiciones = grupos.indices
+        vins = df['VIN'].astype(str).to_numpy()
+        self._vins_por_clave = {clave: vins[posiciones[clave]].tolist() for clave in orden}
+
+        ruts = [""] * len(orden)
+        if 'RUT' in df.columns:
+            rut = df['RUT'].astype(str)
+            con_rut = rut.str.strip() != ""
+            primer_rut = rut[con_rut].groupby(claves[con_rut], sort=True).first()
+            ruts = [primer_rut.get(clave, "") for clave in orden]
+
+        # Correos distintos por cliente, sin repetir mayúsculas/minúsculas (mismo criterio que _correos_de)
+        n_correos = pd.Series(dtype=int)
+        if 'CORREO ELECTRÓNICO' in df.columns:
+            correos = df['CORREO ELECTRÓNICO'].astype(str).str.split(';').explode().str.strip()
+            correos = correos[correos != ""]
+            distintos = pd.DataFrame({'clave': claves.loc[correos.index].to_numpy(),
+                                      'correo': correos.str.lower().to_numpy()}).drop_duplicates()
+            n_correos = distintos.groupby('clave', sort=True).size()
+
         filas = []
-        for clave, sub in df.assign(_clave=claves).groupby('_clave', sort=True):
-            rut = next((r for r in sub['RUT'].astype(str) if r.strip()), "") if 'RUT' in sub.columns else ""
-            n_correos = len(self._correos_de(sub['CORREO ELECTRÓNICO'])) if 'CORREO ELECTRÓNICO' in sub.columns else 0
-            texto = "Sin correo" if n_correos == 0 else f"{n_correos} correo{'s' if n_correos != 1 else ''}"
-            filas.append(["", clave, rut, texto, len(sub)])
-            self._vins_por_clave[clave] = sub['VIN'].astype(str).tolist()
-        return pd.DataFrame(filas, columns=self._COLUMNAS_CLIENTES), "RAZÓN SOCIAL"
+        for clave, rut, unidades in zip(orden, ruts, tamanos.tolist()):
+            n = int(n_correos.get(clave, 0))
+            texto = "Sin correo" if n == 0 else f"{n} correo{'s' if n != 1 else ''}"
+            filas.append(["", clave, rut, texto, unidades])
+        vista = pd.DataFrame(filas, columns=self._COLUMNAS_CLIENTES)
+        self._cache_vista_clientes = (df, vista, self._vins_por_clave)
+        return vista, "RAZÓN SOCIAL"
 
     def _resolver_color(self, columna, valor, es_fondo):
         if columna == "CORREOS ASOCIADOS" and valor == "Sin correo":
@@ -1814,9 +1855,27 @@ class MailDialog(QDialog):
         def col(nombre):
             return sel[nombre].astype(str) if nombre in sel.columns else pd.Series([""] * len(sel), index=sel.index)
         return [
-            {'vin': v, 'flota': f, 'plan': p, 'correo': c.strip()}
-            for v, f, p, c in zip(col('VIN'), col('RAZÓN SOCIAL'), col('TIPO DE SERVICIO'), col('CORREO ELECTRÓNICO'))
+            {'vin': v, 'flota': f, 'plan': p, 'correo': c.strip(), 'vence': t}
+            for v, f, p, c, t in zip(col('VIN'), col('RAZÓN SOCIAL'), col('TIPO DE SERVICIO'), col('CORREO ELECTRÓNICO'), col('FECHA TERMINO'))
         ]
+
+    def _agregar_fechas_baja(self, filas):
+        """Agrega 'baja' (FECHA DE BAJA del contrato actual en Comercial) a
+        cada fila: Correos.csv no trae esa columna."""
+        df = comercial_services.contratos_actuales(self.data_manager.get_comercial_df())
+        if df.empty or 'VIN' not in df.columns or COL_FECHA_BAJA not in df.columns:
+            return
+        fechas = {str(v).strip().upper(): mail_service.formatear_fecha(f) for v, f in zip(df['VIN'], df[COL_FECHA_BAJA])}
+        for fila in filas:
+            fila['baja'] = fechas.get(str(fila['vin']).strip().upper(), '')
+
+    def _agregar_niveles_anteriores(self, filas):
+        """Agrega 'anterior' (nivel de servicio previo) a cada fila, desde el
+        historial de modificaciones y los contratos anteriores de la unidad."""
+        df_logs = self.data_manager.get_logs_df()
+        df_comercial = self.data_manager.get_comercial_df()
+        for fila in filas:
+            fila['anterior'] = mail_service.nivel_anterior(fila['vin'], fila['plan'], df_logs, df_comercial)
 
     def _update_summary(self):
         # Misma agrupación (razón social + correo) que usa el envío real
@@ -1893,6 +1952,10 @@ class MailDialog(QDialog):
 
         # Se permite enviar aunque falte correo: Outlook se abre igual y el
         # usuario completa el destinatario manualmente.
+        if plantilla == "Confirmación de Baja":
+            self._agregar_fechas_baja(filas_seleccionadas)
+        elif plantilla == "Cambio de Nivel":
+            self._agregar_niveles_anteriores(filas_seleccionadas)
         final_dest_list = mail_service.agrupar_destinatarios(filas_seleccionadas)
 
         self.btn_send.setEnabled(False)

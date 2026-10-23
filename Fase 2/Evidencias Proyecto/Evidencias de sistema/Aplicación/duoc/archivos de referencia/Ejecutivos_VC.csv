@@ -1,8 +1,8 @@
 ﻿id_ejecutivo,nombre,correo,alias,activo
-EJE-001,Andres Muestra Silva,andres.muestra.silva@ejemplo.example,ANDRES MUESTRA SILVA,SI
-EJE-002,Carlos Ficticio Diaz,carlos.ficticio.diaz@ejemplo.example,CARLOS FICTICIO DIAZ,SI
+EJE-001,Andres Muestra Silva,andres.muestra.silva@ejemplo.com,ANDRES MUESTRA SILVA,SI
+EJE-002,Carlos Ficticio Diaz,carlos.ficticio.diaz@ejemplo.com,CARLOS FICTICIO DIAZ,SI
 EJE-003,Claudia Test Fuentes,,CLAUDIA TEST FUENTES,SI
-EJE-004,Juan Prueba Soto,juan.prueba.soto@ejemplo.example,JUAN PRUEBA SOTO,SI
-EJE-005,Maria Demo Rojas,maria.demo.rojas@ejemplo.example,MARIA DEMO ROJAS,SI
-EJE-006,Paula Ejemplo Muñoz,paula.ejemplo.muñoz@ejemplo.example,PAULA EJEMPLO MUÑOZ,SI
-EJE-007,Roberto Antiguo Demo,roberto.antiguo@ejemplo.example,,NO
+EJE-004,Juan Prueba Soto,juan.prueba.soto@ejemplo.com,JUAN PRUEBA SOTO,SI
+EJE-005,Maria Demo Rojas,maria.demo.rojas@ejemplo.com,MARIA DEMO ROJAS,SI
+EJE-006,Paula Ejemplo Muñoz,paula.ejemplo.muñoz@ejemplo.com,PAULA EJEMPLO MUÑOZ,SI
+EJE-007,Roberto Antiguo Demo,roberto.antiguo@ejemplo.com,,NO

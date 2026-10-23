@@ -13,7 +13,6 @@ from config.settings import EXCEL_PATH, WATCH_DIR
 from src.core.data_manager import DataManager
 from src.core.excel_reader import ExcelReader
 from src.core.backup_manager import BackupWorker
-from src.core.perf_log import medir
 from src.services import cm_bajas_service
 from src.ui.transiciones import TransicionFundidoSubida, TransicionCirculo, instalar_transicion_pestanas, ms_restantes_animacion
 from src.ui.boton_tema import BotonTema
@@ -21,7 +20,7 @@ from src.theme.tema import GestorTema, CLARO, OSCURO
 from src.ui import sidebar_estilo
 from src.ui.comercial_estilo import fuente_comercial
 from src.ui import comercial_estilo as estilo_com
-from src.theme.colors import (BACKGROUND, TEXT_PRIMARY, TEXT_SECONDARY, SURFACE, BORDER, BRAND_BLUE,
+from src.theme.colors import (BACKGROUND, TEXT_PRIMARY, TEXT_SECONDARY, SURFACE, BORDER, VOLVO_BLUE,
                                PRIMARY, SECONDARY, MODULE_DISPLAY_NAMES, MODULE_COLORS, DANGER)
 
 # NOTA (imports diferidos): WatchdogThread, los 10 modulos de src.ui.* y
@@ -62,10 +61,38 @@ MAX_TERMINOS_BUSQUEDA_GLOBAL = 200
 # _on_global_search_text_changed/_ejecutar_busqueda_global_pendiente.
 DEBOUNCE_BUSQUEDA_GLOBAL_MS = 250
 
+# Cada cuánto se vuelve a mirar si hay una versión nueva publicada con la app abierta
+INTERVALO_REVISION_ACTUALIZACION_MS = 10 * 60 * 1000
+
 # Espera mínima antes de refrescar un módulo al navegar (valor histórico,
 # se usa cuando no hay transición en curso).
 ESPERA_MINIMA_REFRESCO_MS = 50
 MARGEN_TRAS_TRANSICION_MS = 30
+
+# Pausa entre el armado de un módulo y el siguiente durante la pantalla de carga inicial
+ARRANQUE_ENTRE_MODULOS_MS = 60
+# Espera tras abrir la app antes de armar en segundo plano las pantallas que faltan
+PRECARGA_TRAS_ARRANQUE_MS = 1000
+# Si la persona está usando el mouse o el teclado, la precarga espera (hasta ~10 s) para no dar tirones
+PRECARGA_ESPERA_INACTIVIDAD_MS = 800
+PRECARGA_REINTENTO_MS = 250
+PRECARGA_MAX_APLAZAMIENTOS = 40
+
+
+def _ms_sin_actividad():
+    """Milisegundos desde el último mouse o tecla en todo Windows; muy alto si no se puede saber."""
+    try:
+        import ctypes
+
+        class _UltimaEntrada(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+
+        info = _UltimaEntrada(ctypes.sizeof(_UltimaEntrada), 0)
+        if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+            return 10 ** 9
+        return (ctypes.windll.kernel32.GetTickCount() - info.dwTime) & 0xFFFFFFFF
+    except Exception:
+        return 10 ** 9
 
 
 def _ms_restantes_transiciones(ventana, modulo):
@@ -89,9 +116,15 @@ def _ms_restantes_transiciones(ventana, modulo):
     return max(restantes)
 
 
-def _refrescar_modulo_tras_transicion(ventana, modulo):
+def _refrescar_modulo_tras_transicion(ventana, modulo, token=None):
+    """`token` identifica el último pedido de refresco: si el usuario ya pasó a otra pantalla
+    antes de que corra este, se descarta (el módulo se refresca igual la próxima vez que se abre)."""
     espera = max(ESPERA_MINIMA_REFRESCO_MS, _ms_restantes_transiciones(ventana, modulo) + MARGEN_TRAS_TRANSICION_MS)
-    QTimer.singleShot(espera, lambda: _refrescar_modulo_visible(ventana, modulo))
+
+    def refrescar():
+        if token is None or getattr(ventana, '_token_refresco', token) == token:
+            _refrescar_modulo_visible(ventana, modulo)
+    QTimer.singleShot(espera, refrescar)
 
 
 def _refrescar_modulo_visible(ventana, modulo):
@@ -221,8 +254,20 @@ class CorreccionEstadoComercialThread(QThread):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    _cargando_inicial = False
+    _pantalla_pendiente = None
+
+    # Avance de la carga inicial (0 a 1) y aviso de que todas las pantallas están listas
+    progreso_arranque = pyqtSignal(float)
+    arranque_listo = pyqtSignal()
+
+    def __init__(self, arranque_oculto=False):
+        """Con `arranque_oculto` la ventana se arma invisible e inactiva y se muestra con revelar()
+        cuando todas las pantallas están cargadas (la pantalla de inicio sigue a la vista mientras tanto)."""
         super().__init__()
+        if arranque_oculto:
+            self.setWindowOpacity(0.0)
+            self.setEnabled(False)
         self.setWindowTitle("Gestor SSCC")
         
         self.setWindowFlags(Qt.WindowType.Window | 
@@ -250,6 +295,7 @@ class MainWindow(QMainWindow):
 
         self._setup_sidebar()
         self._setup_content_area()
+        self._cargando_inicial = True
         self._show_loading_screen()
 
         # Fase 6: el banner de bloqueo vive FUERA de self.central_widget a
@@ -270,7 +316,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root_widget)
         GestorTema.instancia().registrar_ventana(self)
 
-        self.settings = QSettings("GestorApp", "Dashboard")
+        self.settings = QSettings("VolvoApp", "Dashboard")
         self._load_settings()
 
         self.data_manager = DataManager()
@@ -327,6 +373,86 @@ class MainWindow(QMainWindow):
         self.config_btn.setIcon(qta.icon('fa5s.cog', color=color_icono))
         if self.btn_tema.isChecked() != (modo == OSCURO):
             self.btn_tema.fijar_sin_animar(modo == OSCURO)
+        self._estilo_contadores(modo)
+
+    @staticmethod
+    def _crear_pill_contador(nombre):
+        pill = QLabel()
+        pill.setObjectName(nombre)
+        pill.setFixedHeight(22)
+        pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pill.hide()
+        return pill
+
+    def _estilo_contadores(self, modo):
+        base = "font-size: 11px; font-weight: 600; border-radius: 11px; padding: 0 10px;"
+        if modo == OSCURO:
+            buscados = f"background: #27303F; color: #C3CEDF; border: 1px solid #3A4558; {base}"
+            seleccion = f"background: #0B3B66; color: #FFFFFF; border: 1px solid #3F6FA3; {base}"
+        else:
+            buscados = f"background: #EEF1F5; color: #003057; border: 1px solid #D5DCE6; {base}"
+            seleccion = f"background: #003057; color: #FFFFFF; border: 1px solid #003057; {base}"
+        self.pill_buscados.setStyleSheet(f"QLabel#pillBuscados {{ {buscados} }}")
+        self.pill_seleccion.setStyleSheet(f"QLabel#pillSeleccion {{ {seleccion} }}")
+
+    def _actualizar_contador_busqueda(self, texto):
+        from src.services import contadores_busqueda as cb
+        lista = cb.terminos(texto)
+        if not lista:
+            self.pill_buscados.hide()
+            return
+        resumen = f"{len(lista)} {cb.etiqueta(lista)}"
+        if cb.son_vins(lista):
+            df = getattr(DataManager(), 'df_master', None)
+            if df is not None:
+                if self._indice_coincidencias is None:
+                    self._indice_coincidencias = cb.IndiceCoincidencias()
+                n = self._indice_coincidencias.contar(df, lista)
+                resumen += f" · {n} encontrado{'' if n == 1 else 's'}"
+        self.pill_buscados.setText(resumen)
+        self.pill_buscados.show()
+
+    def _vigilar_seleccion(self):
+        """Mantiene enganchada la tabla visible de la pantalla activa; el conteo sale de su selectionChanged."""
+        if not self.isVisible() or self._cargando_inicial:
+            return
+        activo = self._get_active_submodule(self.workspace.currentWidget())
+        try:
+            vigente = (self._tabla_sel is not None and self._tabla_sel.isVisible()
+                       and self._tabla_sel.selectionModel() is self._sel_modelo and activo is self._sel_modulo)
+        except RuntimeError:
+            vigente = False
+        if vigente or (self._tabla_sel is None and activo is self._sel_modulo and activo is None):
+            return
+        if self._sel_modelo is not None:
+            try:
+                self._sel_modelo.selectionChanged.disconnect(self._programar_conteo_seleccion)
+            except (TypeError, RuntimeError):
+                pass
+        self._tabla_sel = self._sel_modelo = None
+        self._sel_modulo = activo
+        if activo is not None:
+            from PyQt6.QtWidgets import QAbstractItemView
+            tablas = [t for t in activo.findChildren(QAbstractItemView) if t.isVisible() and t.selectionModel() is not None]
+            if tablas:
+                self._tabla_sel = max(tablas, key=lambda t: t.viewport().width() * t.viewport().height())
+                self._sel_modelo = self._tabla_sel.selectionModel()
+                self._sel_modelo.selectionChanged.connect(self._programar_conteo_seleccion)
+        self._actualizar_contador_seleccion()
+
+    def _programar_conteo_seleccion(self, *_):
+        self._timer_conteo_sel.start()
+
+    def _actualizar_contador_seleccion(self):
+        try:
+            n = len(self._sel_modelo.selectedRows()) if self._sel_modelo is not None else 0
+        except RuntimeError:
+            n = 0
+        if n:
+            self.pill_seleccion.setText(f"{n} seleccionado{'' if n == 1 else 's'}")
+            self.pill_seleccion.show()
+        else:
+            self.pill_seleccion.hide()
 
     def _show_loading_screen(self):
         from src.ui.guardado_overlay import crear_tarjeta_carga
@@ -341,19 +467,12 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.loading_page)
 
     def _on_data_loaded_success(self):
-        # Medicion Fase 0 (auditoria de rendimiento, 17-09-2026): tiempo de
-        # este handler -- ver src/core/perf_log.py. Desde la Fase 2
-        # (17-09-2026) esta medicion YA NO incluye la construccion de Vista
-        # General: eso se difiere con QTimer.singleShot(0, ...) para no
-        # bloquear la aparicion de MainWindow (ver comentario mas abajo,
-        # antes de la linea que programa _cargar_vista_general_inicial).
-        # Ese costo se sigue viendo aparte, en la medicion
-        # "instanciar módulo: Vista General".
-        with medir("data_ready -> _on_data_loaded_success (sin incluir Vista General, diferida)"):
-            self._on_data_loaded_success_impl()
+        self._on_data_loaded_success_impl()
 
     def _on_data_loaded_success_impl(self):
         print("Excel cargado en memoria exitosamente.")
+        self.progreso_arranque.emit(0.86)
+        self._actualizar_contador_busqueda(self.search_bar.text())
         for btn in self.menu_buttons.values():
             btn.setEnabled(True)
         self.config_btn.setEnabled(True)
@@ -429,7 +548,7 @@ class MainWindow(QMainWindow):
         self._base_notif_thread.start()
 
     def _corregir_estado_comercial_conectados(self):
-        """Una unidad "Conectado" en Servicios Conectados no puede seguir en ESTADO
+        """Una unidad "Conectado" en Volvo Connect no puede seguir en ESTADO
         COMERCIAL "Activación Pendiente": se pasa a Vigente (misma regla que el
         botón "Marcar como Vigente" de Comercial). Cada VIN se intenta una sola
         vez por sesión, para no reintentar en bucle si el guardado falla."""
@@ -502,22 +621,77 @@ class MainWindow(QMainWindow):
             # "Cargando y formateando bases de datos..." (_show_loading_screen)
             # puesta hasta que Vista General avise que ya tiene sus
             # clientes/flota/unidades listos (primera_carga_lista).
-            with medir("instanciar módulo: Vista General"):
-                from src.ui.general import GeneralModule
-                module = GeneralModule()
+            from src.ui.general import GeneralModule
+            module = GeneralModule()
             self.loaded_modules["Vista General"] = module
             self.workspace.addWidget(module)
 
-            def _mostrar_vista_general_cuando_este_lista():
-                # Si el usuario ya navegó a otro módulo mientras Vista
-                # General terminaba de cargar en segundo plano, no lo
-                # interrumpimos -- solo mostramos el resultado si seguimos
-                # en la pantalla de carga.
-                if self.workspace.currentWidget() is self.loading_page:
-                    self.workspace.setCurrentWidget(module)
-                    self._update_module_chip("Vista General")
+            # Con Vista General lista, el resto de las pantallas se arman con la
+            # pantalla de carga a la vista, y recién entonces se abre la primera.
+            module.primera_carga_lista.connect(self._arrancar_precarga)
 
-            module.primera_carga_lista.connect(_mostrar_vista_general_cuando_este_lista)
+    def _arrancar_precarga(self):
+        """Vista General ya está lista: la app se abre y el resto de las pantallas se arma después, de a una."""
+        self._pre_pendientes = [n for n in self.menu_buttons if n not in self.loaded_modules]
+        self._pre_aplazadas = 0
+        self.progreso_arranque.emit(0.99)
+        self._terminar_arranque()
+        QTimer.singleShot(PRECARGA_TRAS_ARRANQUE_MS, self._precargar_en_arranque)
+
+    def _precargar_en_arranque(self):
+        """Arma y carga de a un módulo por vuelta del event loop, con la app ya abierta. Si la persona
+        entra antes a una pantalla pendiente, `_load_module` la arma en ese momento."""
+        try:
+            if self._pre_pendientes:
+                if _ms_sin_actividad() < PRECARGA_ESPERA_INACTIVIDAD_MS and self._pre_aplazadas < PRECARGA_MAX_APLAZAMIENTOS:
+                    self._pre_aplazadas += 1
+                    QTimer.singleShot(PRECARGA_REINTENTO_MS, self._precargar_en_arranque)
+                    return
+                self._pre_aplazadas = 0
+                nombre = self._pre_pendientes.pop(0)
+                if self._asegurar_modulo(nombre):
+                    activo = self._get_active_submodule(self.loaded_modules.get(nombre))
+                    if activo is not None:
+                        _refrescar_modulo_visible(self, activo)
+                QTimer.singleShot(ARRANQUE_ENTRE_MODULOS_MS, self._precargar_en_arranque)
+        except Exception as e:
+            print(f"[PRECARGA] Se detuvo la precarga de las pantallas: {e}")
+
+    def _terminar_arranque(self):
+        """Todas las pantallas listas: se abre la que el usuario eligió durante la carga o Vista General."""
+        self._cargando_inicial = False
+        pendiente, self._pantalla_pendiente = self._pantalla_pendiente, None
+        if self.workspace.currentWidget() is self.loading_page:
+            self._on_menu_clicked(pendiente if pendiente in self.menu_buttons else "Vista General")
+        self.arranque_listo.emit()
+
+    def revelar(self):
+        """Muestra la ventana ya armada (ver `arranque_oculto`)."""
+        self.setEnabled(True)
+        self.setWindowOpacity(1.0)
+        self.raise_()
+        self.activateWindow()
+        QTimer.singleShot(400, self._programar_aviso_actualizacion)
+
+    def _programar_aviso_actualizacion(self):
+        from src.core.actualizador import ControlActualizacion
+        control = ControlActualizacion.instancia()
+        control.cambio.connect(self._mostrar_aviso_actualizacion)
+        self._mostrar_aviso_actualizacion()
+        # Con la app abierta durante horas también se detectan versiones publicadas después
+        self._timer_revision_actualizacion = QTimer(self)
+        self._timer_revision_actualizacion.setInterval(INTERVALO_REVISION_ACTUALIZACION_MS)
+        self._timer_revision_actualizacion.timeout.connect(control.buscar)
+        self._timer_revision_actualizacion.start()
+
+    def _mostrar_aviso_actualizacion(self):
+        from src.core.actualizador import ControlActualizacion
+        control = ControlActualizacion.instancia()
+        if self._cargando_inicial or not control.debe_avisar():
+            return
+        from src.ui.dialogo_actualizacion import TarjetaAviso
+        control.marcar_avisada()
+        TarjetaAviso(self, control).mostrar()
 
     def _on_backup_automatico_finalizado(self, resultado):
         if not resultado:
@@ -572,6 +746,8 @@ class MainWindow(QMainWindow):
         self.workspace.addWidget(error_widget)
         self.workspace.setCurrentWidget(error_widget)
         self.loaded_modules.clear()
+        self._cargando_inicial = False
+        self.arranque_listo.emit()
 
     def _start_file_lock_monitor(self):
         # Fase 5: bloqueo funcional de la app cuando alguno de los 4
@@ -713,7 +889,7 @@ class MainWindow(QMainWindow):
         
         panel = self.__dict__.get('panel_notificaciones')
         if cambios and panel is not None:
-            panel.registrar("RM_CONTRATOS", cambios)
+            panel.registrar("RM_JAVI", cambios)
 
         # Aunque la comparación no encuentre diferencias (columnas fuera del
         # snapshot, lectura a medias, auto-heal), el watchdog ya confirmó un
@@ -772,8 +948,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.settings.setValue("window_geometry", self.saveGeometry())
-        self.settings.setValue("sidebar_expanded", self.sidebar_expanded)
-        
+        self.settings.setValue("sidebar_expanded", self._sidebar_previo if self._sidebar_bloqueado else self.sidebar_expanded)
+
         if "Comercial" in self.loaded_modules:
             self.loaded_modules["Comercial"].table.save_state()
         if "Operaciones" in self.loaded_modules:
@@ -792,7 +968,7 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _setup_sidebar(self):
-        # Estilo de dashboard-v2.html (ver sidebar_estilo.py): el
+        # Estilo de volvo-dashboard-v2.html (ver sidebar_estilo.py): el
         # degradado y la barra del ítem activo los pinta FondoSidebar
         fuente_comercial(self.font())  # registra Inter
         self.sidebar = sidebar_estilo.FondoSidebar()
@@ -830,11 +1006,11 @@ class MainWindow(QMainWindow):
         logo_layout.setContentsMargins(0, 0, 0, 0)
         logo_layout.setSpacing(3)
         logo_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        self.empresa_lbl = QLabel("EMPRESA")
-        self.empresa_lbl.setStyleSheet(sidebar_estilo.QSS_MARCA)
+        self.volvo_lbl = QLabel("VOLVO")
+        self.volvo_lbl.setStyleSheet(sidebar_estilo.QSS_MARCA)
         self.sistema_lbl = QLabel("Sistema de Gestión")
         self.sistema_lbl.setStyleSheet(sidebar_estilo.QSS_SUBTITULO)
-        logo_layout.addWidget(self.empresa_lbl)
+        logo_layout.addWidget(self.volvo_lbl)
         logo_layout.addWidget(self.sistema_lbl)
         cabecera_layout.addWidget(self.logo_container, stretch=1)
 
@@ -888,7 +1064,6 @@ class MainWindow(QMainWindow):
             btn.setCheckable(True)
 
             btn.setToolTip(f"Ir a {display_text}")
-            btn.setEnabled(False)
             btn.clicked.connect(lambda checked, t=internal_key: self._on_menu_clicked(t))
 
             content_layout.addWidget(btn)
@@ -897,7 +1072,7 @@ class MainWindow(QMainWindow):
         content_layout.addStretch()
         self.sidebar.registrar_botones(self.menu_buttons.values())
 
-        # Foto del camión Empresa Demo FH al pie del sidebar. Se agrega al layout
+        # Foto del camión Volvo FH al pie del sidebar. Se agrega al layout
         # externo (sin márgenes) para que cubra el sidebar de borde a borde,
         # en vez de quedar recortada por los márgenes del contenido. El PNG
         # ya trae el cielo de la parte superior desvanecido a transparente
@@ -940,6 +1115,8 @@ class MainWindow(QMainWindow):
         # Evita relayouts del módulo activo en cada cuadro de la animación
         if not hasattr(self, 'workspace') or not self.workspace.isVisible():
             return
+        if self.workspace.currentWidget() in [self.loaded_modules.get(n) for n in self.PAGINAS_SIDEBAR_VIVO]:
+            return
         self._transicion_modulo.terminar()
         self._fade_anim.stop()
         self._fade_overlay.hide()
@@ -969,8 +1146,32 @@ class MainWindow(QMainWindow):
         # Si llegó un data_ready mientras estaba oculto, el módulo quedó dirty
         self._trigger_load_data(self._get_active_submodule(self.workspace.currentWidget()))
 
+    def _fijar_sidebar(self, expandido):
+        """Cambia el menú lateral sin animar (al entrar o salir de una pantalla que lo bloquea)."""
+        if self.sidebar_expanded == expandido:
+            return
+        self.animation.stop()
+        self._sidebar_animating = False
+        ancho = sidebar_estilo.ANCHO_EXPANDIDO if expandido else sidebar_estilo.ANCHO_COLAPSADO
+        self.sidebar.setMinimumWidth(ancho)
+        self.sidebar.setMaximumWidth(ancho)
+        self.sidebar_expanded = expandido
+        self._aplicar_estado_sidebar(expandido)
+
+    def _ajustar_sidebar_a_pagina(self, module_name):
+        """El Dashboard va con el menú plegado y sin poder desplegarlo; al salir
+        vuelve al estado que tenía el usuario."""
+        bloqueado = module_name in self.PAGINAS_SIDEBAR_PLEGADO
+        if bloqueado and not self._sidebar_bloqueado:
+            self._sidebar_previo = self.sidebar_expanded
+            self._fijar_sidebar(False)
+        elif not bloqueado and self._sidebar_bloqueado:
+            self._fijar_sidebar(self._sidebar_previo)
+        self._sidebar_bloqueado = bloqueado
+        self.btn_plegar_sidebar.setEnabled(not bloqueado)
+
     def _toggle_sidebar(self):
-        if self._sidebar_animating:
+        if self._sidebar_animating or self._sidebar_bloqueado:
             return  # Ignora clics mientras la animacion esta en curso (evita snaps/estados intermedios)
 
         standard_width = sidebar_estilo.ANCHO_EXPANDIDO
@@ -1012,6 +1213,22 @@ class MainWindow(QMainWindow):
         self._global_search_timer.timeout.connect(self._ejecutar_busqueda_global_pendiente)
         self._pending_search_text = ""
         self.search_bar.textChanged.connect(self._on_global_search_text_changed)
+
+        # Cifras junto al buscador: términos buscados y filas seleccionadas en la tabla visible
+        self.pill_buscados = self._crear_pill_contador("pillBuscados")
+        self.pill_seleccion = self._crear_pill_contador("pillSeleccion")
+        self.pill_buscados.setToolTip("Términos en el buscador y cuántos aparecen en el Registro Maestro (VIN, chasis o RUT)")
+        self.pill_seleccion.setToolTip("Filas seleccionadas en la tabla de esta pantalla")
+        self._indice_coincidencias = None
+        self._tabla_sel = self._sel_modelo = self._sel_modulo = None
+        self._timer_conteo_sel = QTimer(self)
+        self._timer_conteo_sel.setSingleShot(True)
+        self._timer_conteo_sel.setInterval(80)
+        self._timer_conteo_sel.timeout.connect(self._actualizar_contador_seleccion)
+        self._timer_vigilar_sel = QTimer(self)
+        self._timer_vigilar_sel.setInterval(350)
+        self._timer_vigilar_sel.timeout.connect(self._vigilar_seleccion)
+        self._timer_vigilar_sel.start()
 
         # Encabezado de página (título + descripción, como el HTML v2); lo
         # actualiza _update_module_chip al cambiar de pantalla
@@ -1074,7 +1291,7 @@ class MainWindow(QMainWindow):
         
         from PyQt6.QtWidgets import QWidgetAction
         from src.ui.notificaciones import PanelNotificaciones
-        self.panel_notificaciones = PanelNotificaciones(archivos_vigilados=("RM_CONTRATOS",), parent=self.notif_menu)
+        self.panel_notificaciones = PanelNotificaciones(archivos_vigilados=("RM_JAVI",), parent=self.notif_menu)
         self.panel_notificaciones.no_leidos_cambiado.connect(self._on_no_leidos_cambiado)
         menu_action = QWidgetAction(self.notif_menu)
         menu_action.setDefaultWidget(self.panel_notificaciones)
@@ -1098,6 +1315,10 @@ class MainWindow(QMainWindow):
         self._on_tema_cambiado(gestor_tema.modo)
 
         header_layout.addWidget(self.search_bar)
+        header_layout.addSpacing(10)
+        header_layout.addWidget(self.pill_buscados)
+        header_layout.addSpacing(6)
+        header_layout.addWidget(self.pill_seleccion)
         header_layout.addStretch()
         header_layout.addWidget(self.last_update_label)
         header_layout.addSpacing(15) 
@@ -1176,11 +1397,7 @@ class MainWindow(QMainWindow):
         self.search_bar.selectAll()
 
     def _instantiate_module(self, module_name):
-        # Medicion Fase 0 (auditoria de rendimiento, 17-09-2026): tiempo de
-        # construccion de cada modulo al abrirlo por primera vez -- ver
-        # src/core/perf_log.py.
-        with medir(f"instanciar módulo: {module_name}"):
-            module = self._instantiate_module_impl(module_name)
+        module = self._instantiate_module_impl(module_name)
         if module is not None:
             for sub_tabs in module.findChildren(QTabWidget):
                 instalar_transicion_pestanas(sub_tabs)
@@ -1238,11 +1455,7 @@ class MainWindow(QMainWindow):
         return module
 
     def _build_group_module(self, group_key):
-        # Medicion Fase 0 (auditoria de rendimiento, 17-09-2026): tiempo de
-        # construir TODAS las sub-pestañas del grupo (ej. "Administración")
-        # de una sola vez -- ver src/core/perf_log.py.
-        with medir(f"construir grupo: {group_key}"):
-            return self._build_group_module_impl(group_key)
+        return self._build_group_module_impl(group_key)
 
     def _build_group_module_impl(self, group_key):
         container = QWidget()
@@ -1338,6 +1551,13 @@ class MainWindow(QMainWindow):
         self.loaded_modules[group_key] = container
         return container
 
+    PAGINAS_SIDEBAR_PLEGADO = ("Dashboard BI",)
+    # Pantallas cuya tabla se estira en vivo con el menú, sin la foto congelada
+    PAGINAS_SIDEBAR_VIVO = ("Comercial", "Operaciones", "Vista General", "Ingresos y Conciliación",
+                            "Administración", "Configuración")
+    _sidebar_bloqueado = False
+    _sidebar_previo = True
+
     _ENCABEZADOS_PAGINA = {
         "Dashboard BI": ("Dashboard", "Resumen general de la flota y los indicadores del negocio."),
         "Vista General": ("Clientes y Flota", "Clientes, unidades y su estado en la flota."),
@@ -1366,7 +1586,7 @@ class MainWindow(QMainWindow):
         self.page_sub.setText(sub)
         self.page_sub.setVisible(bool(sub))
         # Clientes y Flota dibuja su propio título para que la caja derecha suba al borde
-        self.page_head.setVisible(module_name != "Vista General")
+        self.page_head.setVisible(module_name not in ("Vista General", "Dashboard BI", "Configuración"))
         for i in range(self.page_acciones.count()):
             self.page_acciones.itemAt(i).widget().hide()
         boton = getattr(self.loaded_modules.get(module_name), 'boton_encabezado', None)
@@ -1385,19 +1605,28 @@ class MainWindow(QMainWindow):
         self._transicion_modulo.terminar()
         return self.workspace.grab()
 
+    def _asegurar_modulo(self, module_name):
+        """Construye el módulo y lo agrega al workspace sin mostrarlo, si aún no existe.
+        Devuelve False si el nombre no corresponde a ningún módulo."""
+        if module_name in self.loaded_modules:
+            return True
+        if module_name in self.group_definitions:
+            module = self._build_group_module(module_name)
+        else:
+            module = self._instantiate_module(module_name)
+        if module is None:
+            return False
+        self.workspace.addWidget(module)
+        return True
+
     def _load_module(self, module_name):
         foto_anterior = self._foto_para_transicion(module_name)
 
-        if module_name not in self.loaded_modules:
-            if module_name in self.group_definitions:
-                module = self._build_group_module(module_name)
-            else:
-                module = self._instantiate_module(module_name)
-                if module is None:
-                    return
-            self.workspace.addWidget(module)
+        if not self._asegurar_modulo(module_name):
+            return
 
         self.workspace.setCurrentWidget(self.loaded_modules[module_name])
+        self._ajustar_sidebar_a_pagina(module_name)
 
         if module_name in self.group_definitions:
             group_widget = self.loaded_modules[module_name]
@@ -1429,12 +1658,21 @@ class MainWindow(QMainWindow):
         # de la animación (docs/12 §8.2). El tick 0 es necesario porque en
         # un cambio de pestaña la transición arranca después de este
         # llamado (ver _on_tab_changed / instalar_transicion_pestanas).
-        QTimer.singleShot(0, lambda: _refrescar_modulo_tras_transicion(self, modulo))
+        token = None
+        if self is not None:
+            self._token_refresco = getattr(self, '_token_refresco', 0) + 1
+            token = self._token_refresco
+        QTimer.singleShot(0, lambda: _refrescar_modulo_tras_transicion(self, modulo, token))
 
     def _on_menu_clicked(self, clicked_text):
         for text, btn in self.menu_buttons.items():
             if text == clicked_text: btn.setChecked(True)
             else: btn.setChecked(False)
+
+        if self._cargando_inicial:
+            # Los datos siguen cargando: se sigue viendo la pantalla de carga y la elegida se abre al terminar
+            self._pantalla_pendiente = clicked_text
+            return
 
         self._load_module(clicked_text)
 
@@ -1466,18 +1704,29 @@ class MainWindow(QMainWindow):
     def _ejecutar_busqueda_global_pendiente(self):
         """Timeout del debounce: recien aca se ejecuta el filtrado real,
         exactamente igual que antes (_on_global_search sin cambios)."""
+        self._actualizar_contador_busqueda(self._pending_search_text)
         self._on_global_search(self._pending_search_text)
 
     def _on_global_search(self, text):
-        # Instrumentacion temporal (auditoria de rendimiento B-2, 18-09-2026):
-        # mide el costo real de UN disparo de _on_global_search (ya con
-        # debounce aplicado desde _ejecutar_busqueda_global_pendiente, ver
-        # DEBOUNCE_BUSQUEDA_GLOBAL_MS) sobre el modulo activo. No cambia el
-        # comportamiento del filtrado en si, solo agrega la medicion.
-        with medir(f"B-2 _on_global_search('{text[:30]}', {len(text)} chars)"):
-            current_widget = self._get_active_submodule(self.workspace.currentWidget())
-            if not current_widget: return
-            self._aplicar_busqueda_a_modulo(current_widget, text)
+        current_widget = self._get_active_submodule(self.workspace.currentWidget())
+        if not current_widget: return
+        self._animar_busqueda_en_tabla(current_widget)
+        self._aplicar_busqueda_a_modulo(current_widget, text)
+
+    DURACION_ANIMACION_BUSQUEDA_MS = 650
+
+    def _animar_busqueda_en_tabla(self, modulo):
+        """Esqueleto corto sobre la tabla más grande visible del módulo al
+        buscar. General ya anima sus propias cajas."""
+        if hasattr(modulo, '_animar_carga_breve'):
+            return
+        from PyQt6.QtWidgets import QAbstractItemView
+        tablas = [t for t in modulo.findChildren(QAbstractItemView) if t.isVisible()]
+        if not tablas:
+            return
+        tabla = max(tablas, key=lambda t: t.viewport().width() * t.viewport().height())
+        from src.ui.esqueleto_carga import animar_sobre_tabla
+        animar_sobre_tabla(tabla, self.DURACION_ANIMACION_BUSQUEDA_MS)
 
     def _aplicar_busqueda_a_modulo(self, modulo, text):
         """Aplica el texto de la barra de búsqueda global a un módulo puntual
@@ -1499,9 +1748,5 @@ class MainWindow(QMainWindow):
 
     def _open_mail_dialog(self):
         from src.ui.mail_dialog import MailDialog
-        # Medicion Fase 0 (auditoria de rendimiento, 17-09-2026): solo la
-        # construccion (lectura de Correos.csv + render de tabla), no el
-        # tiempo que el dialogo modal queda abierto -- ver src/core/perf_log.py.
-        with medir("abrir mail_dialog (construcción)"):
-            dialog = MailDialog(parent=self)
+        dialog = MailDialog(parent=self)
         dialog.exec()

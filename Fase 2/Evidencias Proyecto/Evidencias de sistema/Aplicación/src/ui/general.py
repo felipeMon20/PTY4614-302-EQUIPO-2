@@ -5,12 +5,11 @@ import pandas as pd
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton,
                              QStackedWidget, QListWidget, QListWidgetItem, QHeaderView, QDialog,
                              QMessageBox, QApplication, QScrollArea, QMenu, QWidgetAction, QLineEdit,
-                             QComboBox, QGridLayout, QSizePolicy, QProgressBar, QGraphicsDropShadowEffect)
+                             QComboBox, QGridLayout, QSizePolicy, QProgressBar, QGraphicsDropShadowEffect, QCheckBox)
 from PyQt6.QtCore import Qt, QSize, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QAction, QActionGroup, QPixmap, QIcon
 from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
-from src.core.perf_log import medir
 from src.core.hilos import iniciar_hilo_retenido
 from src.core.constants import (COL_RAZON_SOCIAL, COL_RUT, COL_INDUSTRIA, COL_CDB, COL_CDB_FLOTA, COL_VIN, COL_CHASIS,
                                 COL_FLOTA_VC, COL_TIPO_SERVICIO, COL_ESTADO_ACTIVACION, COL_EJECUTIVO,
@@ -22,7 +21,7 @@ from src.core.constants import (COL_RAZON_SOCIAL, COL_RUT, COL_INDUSTRIA, COL_CD
                                 ETAPA_GESTION_COLORES, FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ)
 from src.core.dataframe_formatter import DataFrameFormatter
 from src.services import comercial_services, contactos_service, powerbi_cache_service
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui.comercial import SaveExcelThread
 from src.ui.contactos_agregar import ContactosAddDialog
 from src.ui.contactos import AddContactoThread
@@ -32,7 +31,7 @@ from src.theme.theme_manager import ThemeManager
 from src.theme.colors import *
 from config.settings import POWERBI_EXCEL_PATH
 
-# Azul oscuro Empresa Demo (mismo de las barras de Comercial/Administración) y sus apoyos
+# Azul oscuro Volvo (mismo de las barras de Comercial/Administración) y sus apoyos
 AZUL = "#1B2B4E"
 AZUL_HOVER = "#2C4170"
 TINTE_CLARO = "#EEF1F6"
@@ -99,8 +98,8 @@ COLUMNAS_CLIENTES = ['Razón Social', 'RUT', 'Industria/s', 'CDB', 'Total unidad
 # que la tabla derecha de detalle (por CDB) pueda filtrar este mismo df sin
 # reconsultar Comercial.
 # Anchos máximos de las dos cajas de Clientes y Flota (px)
-ANCHO_MAX_CAJA_IZQUIERDA = 760
-ANCHO_MAX_CAJA_DERECHA = 560
+ANCHO_MAX_CAJA_IZQUIERDA = 940
+ANCHO_MAX_CAJA_DERECHA = 690
 COLOR_CDB_FLOTA_MINORITARIO = "#E8740C"
 
 COLUMNAS_UNIDADES = ['VIN', 'CHASIS', 'Razón Social', 'CDB', 'RUT', 'Flota VC', 'Estado Activación',
@@ -111,13 +110,13 @@ COLUMNAS_UNIDADES = ['VIN', 'CHASIS', 'Razón Social', 'CDB', 'RUT', 'Flota VC',
 # "Unidades"): CDB y Flota VC quedan fuera de la vista (a pedido explícito)
 # pero se conservan en df_unidades_base porque los filtros y el detalle de
 # la caja derecha los siguen necesitando. VIN también
-# queda fuera de la vista desde el 10-09-2026 (a pedido de la contraparte comercial) pero se
+# queda fuera de la vista desde el 10-09-2026 (a pedido de Javiera) pero se
 # conserva en df_unidades_base y en COLUMNAS_BUSQUEDA_UNIDADES: el buscador
 # global de MainWindow sigue encontrando unidades por VIN exactamente igual
 # que antes, solo que la columna no se pinta en pantalla (mismo mecanismo
 # que ya se usaba para ocultar CDB/Flota VC). 'Industria/s' (antes visible
 # solo en la tabla de Clientes) y 'ETAPA GESTIÓN' (antes no visible en
-# ningún lugar de este módulo) se agregan aquí a pedido de la contraparte comercial.
+# ningún lugar de este módulo) se agregan aquí a pedido de Javiera.
 COLUMNAS_UNIDADES_VISIBLES = ['CHASIS', 'Razón Social', 'Estado Activación', 'Industria/s', 'ETAPA GESTIÓN']
 
 # Buscador global de MainWindow (self.search_bar en main_window.py), aplicado
@@ -217,7 +216,7 @@ _TARJETAS_POR_PAGINA = 200  # valor por defecto, usado solo como fallback
 # importa arriba junto con el resto de constantes; mismo diccionario, sin
 # cambios de valores.
 
-ESTADO_ACTIVACION_CONECTADO = "CONECTADO"  # único valor que cuenta para el KPI "Servicios Conectados"
+ESTADO_ACTIVACION_CONECTADO = "CONECTADO"  # único valor que cuenta para el KPI "Volvo Connect"
 
 # DROPDOWN_OPTIONS_NUEVO_CLIENTE eliminado (25-09-2026, refactor de alta de
 # unidades): alimentaba el ComercialAgregarDialog que abría "+ Nuevo
@@ -373,6 +372,15 @@ QSS_PESTANAS_CLARAS = f"""
     QPushButton:checked {{ color: white; border-bottom: 3px solid white; }}
 """
 QSS_CONTENEDOR_PESTANAS_CLARO = "QFrame#barraPestanasGeneral { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.22); }"
+QSS_BOTON_FILTRO_SOBRE_AZUL = (
+    "QPushButton { background-color: rgba(255,255,255,0.10); color: white; border: 1px solid rgba(255,255,255,0.28);"
+    " border-radius: 9px; padding: 6px 14px; font-weight: 700; font-size: 12px; }"
+    "QPushButton:hover { background-color: rgba(255,255,255,0.20); }"
+)
+QSS_BOTON_FILTRO_SOBRE_AZUL_ACTIVO = (
+    "QPushButton { background-color: rgba(255,255,255,0.28); color: white; border: 1px solid rgba(255,255,255,0.55);"
+    " border-radius: 9px; padding: 6px 14px; font-weight: 700; font-size: 12px; }"
+)
 
 
 class CopyableLabel(QLabel):
@@ -530,7 +538,7 @@ QSS_TARJETAS_CLIENTE = f"""
     QFrame#general_cliente_card QLabel {{ border: none; }}
     QLabel#gc_nombre {{ font-size: 12px; font-weight: bold; color: {TEXT_PRIMARY}; }}
     QLabel#gc_sub {{ font-size: 10px; color: {TEXT_SECONDARY}; }}
-    QLabel#gc_badge {{ background-color: {BRAND_BLUE}; color: white; font-size: 10px; font-weight: bold; padding: 5px 10px; border-radius: 10px; }}
+    QLabel#gc_badge {{ background-color: {VOLVO_BLUE}; color: white; font-size: 10px; font-weight: bold; padding: 5px 10px; border-radius: 10px; }}
 """
 
 
@@ -564,7 +572,7 @@ class GeneralClienteCard(QFrame):
     clicked = pyqtSignal(int)
 
     def __init__(self, row_idx, razon_social, rut, cdb, industria, total_unidades, parent=None, duplicado=False,
-                 total_flotas=0):
+                 total_flotas=0, aviso_flota=""):
         super().__init__(parent)
         self.row_idx = row_idx
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -613,6 +621,12 @@ class GeneralClienteCard(QFrame):
         text_layout.addWidget(self.lbl_sub)
         layout.addLayout(text_layout, 1)
 
+        if aviso_flota:
+            icono_aviso = QLabel()
+            icono_aviso.setPixmap(ThemeManager.icon_pixmap('fa5s.exclamation-circle', color=WARNING, size=16))
+            icono_aviso.setToolTip(aviso_flota)
+            layout.addWidget(icono_aviso, 0, Qt.AlignmentFlag.AlignVCenter)
+
         ancho_unidades, ancho_flotas = _anchos_contadores_cliente()
         plural = "unidad" if total_unidades == 1 else "unidades"
         badge = QLabel(f"{total_unidades} {plural}")
@@ -622,7 +636,7 @@ class GeneralClienteCard(QFrame):
         layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignVCenter)
         if total_flotas:
             badge_flotas = QLabel(f"{total_flotas} {'flota' if total_flotas == 1 else 'flotas'}")
-            badge_flotas.setStyleSheet(f"background-color: {BRAND_BLUE}; color: white; font-size: 10px; "
+            badge_flotas.setStyleSheet(f"background-color: {VOLVO_BLUE}; color: white; font-size: 10px; "
                                        "font-weight: bold; padding: 5px 10px; border-radius: 10px;")
         else:
             badge_flotas = QLabel("Sin flota")
@@ -686,7 +700,7 @@ class GeneralDuplicadoCard(QFrame):
 
         if principal:
             etiqueta = QLabel("Principal")
-            etiqueta.setStyleSheet(f"background-color: {BRAND_BLUE}; color: white; font-size: 10px; "
+            etiqueta.setStyleSheet(f"background-color: {VOLVO_BLUE}; color: white; font-size: 10px; "
                                    "font-weight: bold; padding: 4px 10px; border-radius: 10px;")
             layout.addWidget(etiqueta, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -761,7 +775,7 @@ QSS_TARJETAS_UNIDAD = f"""
 """
 
 
-# Valores de FLOTA VC que indican que la unidad no tiene flota en Servicios Conectados
+# Valores de FLOTA VC que indican que la unidad no tiene flota en Volvo Connect
 _FLOTA_VC_SIN_FLOTA = ('sin flota', 'no existe en vc')
 
 
@@ -1005,11 +1019,13 @@ class FiltroValoresBoton(QPushButton):
     def valores_distintos(serie):
         """[(clave, etiqueta, cantidad)] ordenado, sin vacíos ni '-'."""
         cuenta, etiquetas = {}, {}
-        for v in serie.astype(str).str.strip():
+        texto = serie.astype(str).str.strip()
+        repeticiones = texto.value_counts()
+        for v in texto.drop_duplicates():
             if v == '' or v == '-' or v.lower() in ('nan', 'none', '<na>'):
                 continue
             k = _clave_flota_texto(v)
-            cuenta[k] = cuenta.get(k, 0) + 1
+            cuenta[k] = cuenta.get(k, 0) + int(repeticiones[v])
             etiquetas.setdefault(k, v)
         return [(k, etiquetas[k], cuenta[k]) for k in sorted(cuenta, key=lambda x: x.lower())]
 
@@ -1107,10 +1123,11 @@ def _color_forma_facturacion(forma, tipo_facturacion):
 
 
 def _es_sin_vc(estado_comercial, estado_activacion, forma_contrato, tipo_facturacion):
-    """Unidad sin Servicios Conectados: estado comercial vacío o '-', activación NO
-    APLICA, forma de contrato SIN CONTRATO y facturación SIN REGISTRO."""
+    """Unidad sin Volvo Connect: estado comercial vacío, '-' o SIN SERVICIO,
+    activación NO APLICA, forma de contrato SIN CONTRATO y facturación SIN
+    REGISTRO."""
     norm = lambda x: str(x).strip().upper()
-    return (norm(estado_comercial) in ('', '-', 'NAN', 'NONE', '<NA>')
+    return (norm(estado_comercial) in ('', '-', 'SIN SERVICIO', 'NAN', 'NONE', '<NA>')
             and norm(estado_activacion) == 'NO APLICA'
             and norm(forma_contrato) == 'SIN CONTRATO'
             and norm(tipo_facturacion) == 'SIN REGISTRO')
@@ -1332,6 +1349,11 @@ class _ContratoAnteriorCard(QFrame):
         super().mousePressEvent(event)
 
 
+# Proporción de las 5 columnas de la tarjeta de unidad: VIN/Inicio, Chasis/Término, espacio,
+# Comercial/Forma de contrato y Activación/Facturación
+_ESTIRAR_COLUMNAS_UNIDAD = (5, 4, 4, 4, 5)
+
+
 class GeneralUnidadCard(QFrame):
     """Tarjeta clickeable de una unidad (VIN), caja izquierda -> Unidades.
     VIN y Chasis son copiables al pasar el mouse (CopyableLabel) -- único
@@ -1357,21 +1379,20 @@ class GeneralUnidadCard(QFrame):
         # depende del dato.
         self.setProperty("seleccionado", False)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 8, 12, 8)
-        outer.setSpacing(4)
+        # Rejilla de 5 columnas con las mismas proporciones en todas las tarjetas: los chips
+        # de una columna quedan alineados entre filas y entre tarjetas
+        # (VIN/Inicio, Chasis/Término, espacio, Comercial/Forma, Activación/Facturación)
+        grilla = QGridLayout(self)
+        grilla.setContentsMargins(12, 8, 12, 8)
+        grilla.setHorizontalSpacing(6)
+        grilla.setVerticalSpacing(4)
+        for columna, estirar in enumerate(_ESTIRAR_COLUMNAS_UNIDAD):
+            grilla.setColumnStretch(columna, estirar)
 
-        def fila(*, izq=(), der=()):
-            if not izq and not der:
-                return
-            layout = QHBoxLayout()
-            layout.setSpacing(6)
-            for w in izq:
-                layout.addWidget(w)
-            layout.addStretch(1)
-            for w in der:
-                layout.addWidget(w)
-            outer.addLayout(layout)
+        def poner(fila, columna, widget):
+            widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            grilla.addWidget(widget, fila, columna)
 
         # Razón social, etapa e inicio de contrato ya no se muestran en la
         # tarjeta (09-10-2026); siguen en la ficha de la caja derecha.
@@ -1389,33 +1410,31 @@ class GeneralUnidadCard(QFrame):
         self.lbl_vin.set_value("VIN", vin)
         self.lbl_chasis = CopyableChip()
         self.lbl_chasis.set_value("Chasis", chasis)
-        ids = [self.lbl_vin, self.lbl_chasis]
+        poner(0, 0, self.lbl_vin)
+        poner(0, 1, self.lbl_chasis)
         self.lbl_rut = None
         self.lbl_cdb = None
 
-        derecha_2 = []
         estado_comercial = str(extras.get('estado_comercial', '')).strip()
         self.es_sin_vc = _es_sin_vc(estado_comercial, estado_activacion,
                                     extras.get('forma_contrato', ''), extras.get('tipo_facturacion', ''))
         if self.es_sin_vc:
-            self.badge_estado = _crear_pildora("SIN VC", _PAL_GRIS, tooltip="Sin Servicios Conectados: sin estado comercial, "
+            self.badge_estado = _crear_pildora("SIN VC", _PAL_GRIS, tooltip="Sin Volvo Connect: sin estado comercial, "
                                                "activación No aplica, Sin contrato y Sin registro")
-            fila(izq=ids, der=[self.badge_estado])
+            poner(0, 4, self.badge_estado)
             self.lbl_vigencia = None
             return
         if _flota_valida(estado_comercial):
-            derecha_2.append(_crear_pildora(estado_comercial, _color_estado_comercial(estado_comercial),
-                                            "Comercial", "Estado comercial"))
+            poner(0, 3, _crear_pildora(estado_comercial, _color_estado_comercial(estado_comercial),
+                                       "Comercial", "Estado comercial"))
         estado_act = str(estado_activacion).strip()
         self.badge_estado = _crear_pildora(estado_act or "-", _color_estado_activacion(estado_act),
                                            "Activación", "Estado de activación")
-        derecha_2.append(self.badge_estado)
-        fila(izq=ids, der=derecha_2)
+        poner(0, 4, self.badge_estado)
 
-        izquierda_3 = []
-        periodo = str(extras.get('periodo', '')).strip()
-        if _flota_valida(periodo):
-            izquierda_3.append(_crear_pildora(periodo, _PAL_GRIS, "Periodo interno", "Periodo interno", chip=True))
+        inicio = _formatear_fecha_contrato(extras.get('inicio', ''))[0]
+        if inicio:
+            poner(1, 0, _crear_pildora(inicio, _PAL_GRIS, "Inicio contrato", "Inicio del contrato", chip=True))
         self.lbl_vigencia = None
         termino, vencido = _formatear_fecha_contrato(extras.get('termino', ''), con_vencimiento=True)
         if termino:
@@ -1424,17 +1443,15 @@ class GeneralUnidadCard(QFrame):
             color_termino = _PAL_GRIS if (vencido and finalizado) else (_PAL_ROJO if vencido else _PAL_VERDE)
             self.lbl_vigencia = _crear_pildora(termino, color_termino,
                                                "Término contrato", "Término del contrato", chip=True)
-            izquierda_3.append(self.lbl_vigencia)
+            poner(1, 1, self.lbl_vigencia)
 
-        derecha_3 = []
         forma = str(extras.get('forma_contrato', '')).strip()
         tipo_fact = str(extras.get('tipo_facturacion', '')).strip()
         color_matriz = _color_forma_facturacion(forma, tipo_fact)
         if _flota_valida(forma):
-            derecha_3.append(_crear_pildora(forma, color_matriz, "Forma de contrato", "Forma de contrato", chip=True))
+            poner(1, 3, _crear_pildora(forma, color_matriz, "Forma de contrato", "Forma de contrato", chip=True))
         if _flota_valida(tipo_fact):
-            derecha_3.append(_crear_pildora(tipo_fact, color_matriz, "Facturación", "Tipo de facturación", chip=True))
-        fila(izq=izquierda_3, der=derecha_3)
+            poner(1, 4, _crear_pildora(tipo_fact, color_matriz, "Facturación", "Tipo de facturación", chip=True))
 
     def set_selected(self, selected):
         _repulir_seleccion(self, selected)
@@ -1479,6 +1496,8 @@ class GeneralModule(QWidget):
         # carga). Se recalcula en _on_prep_finished junto con df_clientes_base
         # (ver _calcular_claves_duplicadas_rut_cdb). Vacío hasta la primera carga.
         self._clientes_con_varias_razones = set()
+        # Clave de cliente -> texto del aviso de flotas incoherentes (ver _calcular_avisos_flota)
+        self._clientes_aviso_flota = {}
         # (RUT, CDB) del grupo de duplicados actualmente mostrado en la
         # pestaña Duplicados, o None -- ver _populate_duplicados_detalle /
         # _on_unificar_razon_social_clicked.
@@ -1642,56 +1661,33 @@ class GeneralModule(QWidget):
         # chip del header de main_window.py)
         # ==========================================
         # El encabezado de página de main_window se oculta para este módulo
-        # (ver _update_module_chip): el título vive aquí, en la columna
-        # izquierda, para que la caja derecha suba hasta el borde superior.
-        lbl_titulo = QLabel("Clientes y Flota")
-        lbl_titulo.setStyleSheet("color: #0F1B33; font-size: 24px; font-weight: 800; background: transparent; border: none;")
-        lbl_subtitulo = QLabel("Clientes, unidades y su estado en la flota.")
-        lbl_subtitulo.setStyleSheet("color: #66748D; font-size: 13.5px; background: transparent; border: none;")
-
-        # ==========================================
-        # CONTROLES SUPERIORES: navegación Cliente/Flota/Unidades + Filtro
-        # (fuera de las cajas, mismo nivel que el encabezado)
-        # ==========================================
-        # La caja derecha ocupa todo el alto desde la fila de pestañas
-        # (07-10-2026, a pedido explícito): la columna izquierda lleva las
-        # pestañas Cliente/Flota/Unidades encima de su caja.
+        # (ver _update_module_chip): el título y las pestañas Cliente/Unidades
+        # viven dentro de la caja izquierda (ver _setup_left_box), que lleva el
+        # mismo marco azul que la derecha (23-10-2026, a pedido explícito).
         boxes_layout = QHBoxLayout()
         boxes_layout.setSpacing(15)
 
-        columna_izquierda = QVBoxLayout()
-        columna_izquierda.setSpacing(6)
-        columna_izquierda.addSpacing(8)
-        columna_izquierda.addWidget(lbl_titulo)
-        columna_izquierda.addWidget(lbl_subtitulo)
-        columna_izquierda.addSpacing(6)
-        self._setup_top_controls(columna_izquierda)
-
         self.left_box = QFrame()
-        ThemeManager.apply_card_style(self.left_box)
         self.right_box = QFrame()
-        ThemeManager.apply_card_style(self.right_box)
         for caja in (self.left_box, self.right_box):
+            ThemeManager.apply_card_style(caja)
             caja.setObjectName("cajaGeneral")
-            caja.setStyleSheet("QFrame#cajaGeneral { border-radius: 24px; }")
-        self.right_box.setStyleSheet(f"QFrame#cajaGeneral {{ background-color: {AZUL}; border: 1px solid {AZUL}; border-radius: 24px; }}")
-
-        columna_izquierda.addWidget(self.left_box, stretch=1)
+            caja.setStyleSheet(f"QFrame#cajaGeneral {{ background-color: {AZUL}; border: 1px solid {AZUL}; border-radius: 24px; }}")
 
         # Anchos acotados (07-10-2026, a pedido explícito) y política Ignored:
         # el ancho de cada caja lo fijan estos topes y no el texto que
         # contengan (antes un nombre largo ensanchaba la caja derecha).
-        contenedor_izquierdo = QWidget()
-        contenedor_izquierdo.setLayout(columna_izquierda)
-        columna_izquierda.setContentsMargins(0, 0, 0, 0)
-        contenedor_izquierdo.setMaximumWidth(ANCHO_MAX_CAJA_IZQUIERDA)
-        contenedor_izquierdo.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.left_box.setMaximumWidth(ANCHO_MAX_CAJA_IZQUIERDA)
+        self.left_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.right_box.setMaximumWidth(ANCHO_MAX_CAJA_DERECHA)
         self.right_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
 
         # Izquierda más ancha / derecha más estrecha y compacta (a pedido
         # explícito, 15/16-09-2026): antes 4:5, ahora 5:3.
-        boxes_layout.addWidget(contenedor_izquierdo, stretch=5)
+        # Espacios con factor 0 a ambos lados: solo reciben lo que sobra cuando
+        # las cajas llegan a su tope, y así el bloque queda centrado (20-10-2026)
+        boxes_layout.addStretch(0)
+        boxes_layout.addWidget(self.left_box, stretch=5)
         boxes_layout.addWidget(self.right_box, stretch=3)
         boxes_layout.addStretch(0)
         main_layout.addLayout(boxes_layout, stretch=1)
@@ -1700,12 +1696,41 @@ class GeneralModule(QWidget):
         self._setup_right_box()
 
         # Se crean al final para quedar encima del contenido de cada caja
-        self._esqueleto_izq = EsqueletoCarga(self.left_box, 'tarjetas')
+        self._esqueleto_izq = EsqueletoCarga(self._hoja_izquierda, 'tarjetas')
         self._esqueleto_der = EsqueletoCarga(self.right_box, 'ficha')
 
     def _esqueletos(self):
         # __dict__.get: tolera instancias creadas con __new__ en los tests
         return [e for e in (self.__dict__.get('_esqueleto_izq'), self.__dict__.get('_esqueleto_der')) if e is not None]
+
+    DURACION_ANIMACION_BREVE_MS = 300
+
+    def _animar_carga_breve(self, solo_izquierda=False):
+        """Esqueleto corto al cambiar de pestaña o buscar. Si hay una carga
+        real en curso ya hay esqueleto y no se toca."""
+        if self.__dict__.get('_prep_en_curso'):
+            return
+        esqueletos = self._esqueletos()
+        if not esqueletos:
+            return
+        if solo_izquierda:
+            esqueletos = esqueletos[:1]
+        for esqueleto in esqueletos:
+            esqueleto.iniciar_ya(rapido=True)
+        timer = self.__dict__.get('_timer_animacion_breve')
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._terminar_animacion_breve)
+            self._timer_animacion_breve = timer
+        self._esqueletos_breves = esqueletos
+        timer.start(self.DURACION_ANIMACION_BREVE_MS)
+
+    def _terminar_animacion_breve(self):
+        if self.__dict__.get('_prep_en_curso'):
+            return
+        for esqueleto in self.__dict__.get('_esqueletos_breves', []):
+            esqueleto.terminar()
 
     # ==========================================
     # CONTROLES SUPERIORES (fuera de las cajas)
@@ -1713,7 +1738,7 @@ class GeneralModule(QWidget):
     def _setup_top_controls(self, main_layout):
         barra = QFrame()
         barra.setObjectName("barraPestanasGeneral")
-        barra.setStyleSheet(QSS_CONTENEDOR_PESTANAS)
+        barra.setStyleSheet(QSS_CONTENEDOR_PESTANAS_CLARO)
         controls_layout = QHBoxLayout(barra)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(2)
@@ -1724,7 +1749,7 @@ class GeneralModule(QWidget):
 
         # Mismo estilo tipo pestaña que Ingreso y Conciliación / Comercial:
         # borde de color por estado (normal/seleccionada) y hover.
-        nav_tab_style = QSS_PESTANAS_SUBRAYADAS
+        nav_tab_style = QSS_PESTANAS_CLARAS
         for i, btn in enumerate(self._nav_buttons):
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1748,7 +1773,7 @@ class GeneralModule(QWidget):
         self.btn_filtro_unidades.setIcon(ThemeManager.icon('fa5s.filter', color='white'))
         self.btn_filtro_unidades.setCheckable(True)
         self.btn_filtro_unidades.setCursor(Qt.CursorShape.PointingHandCursor)
-        _boton_azul(self.btn_filtro_unidades)
+        self.btn_filtro_unidades.setStyleSheet(QSS_BOTON_FILTRO_SOBRE_AZUL)
         self.btn_filtro_unidades.toggled.connect(self._toggle_filtro_unidades)
         self.btn_filtro_unidades.hide()
         controls_layout.addWidget(self.btn_filtro_unidades)
@@ -1862,7 +1887,7 @@ class GeneralModule(QWidget):
         kpis = QHBoxLayout()
         kpis.setSpacing(8)
         for titulo_k, icono_k, fondo, color in (
-                ("UNIDADES", "fa5s.truck", "#E8ECF4", TEXT_MUTED), ("SERVICIOS CONECTADOS", "fa5s.wifi", "#F1F5F9", TEXT_MUTED),
+                ("UNIDADES", "fa5s.truck", "#E8ECF4", TEXT_MUTED), ("VOLVO CONNECT", "fa5s.wifi", "#F1F5F9", TEXT_MUTED),
                 ("CIV", "fa5s.video", "#F1F5F9", TEXT_MUTED), ("SAFETY ZONE", "fa5s.shield-alt", "#F1F5F9", TEXT_MUTED)):
             card, _ = self._crear_kpi_comercial(titulo_k, "—", "")
             kpis.addWidget(card)
@@ -1992,7 +2017,7 @@ class GeneralModule(QWidget):
 
         titulo = QLabel("Ninguna unidad seleccionada")
         titulo.setStyleSheet(f"color: {TEXTO_SOBRE_AZUL}; font-size: 16px; font-weight: bold;")
-        sub = QLabel("Sin datos de Servicios Conectados")
+        sub = QLabel("Sin datos de Volvo Connect")
         sub.setStyleSheet("color: rgba(201,212,234,0.6); font-size: 11px;")
         lay_p.addWidget(titulo, 0, Qt.AlignmentFlag.AlignHCenter)
         lay_p.addWidget(sub, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -2056,7 +2081,7 @@ class GeneralModule(QWidget):
 
     def _build_vin_detalle_view(self):
         """Detalle de unidad como afiche: una hoja blanca con portada azul
-        (estado de Servicios Conectados, VIN, chasis y modelo, y las pestañas Ficha/
+        (estado de Volvo Connect, VIN, chasis y modelo, y las pestañas Ficha/
         Historial) y debajo el contenido de la pestaña activa."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -2171,7 +2196,7 @@ class GeneralModule(QWidget):
 
     def _build_ficha_vin_view(self):
         """Ficha de la unidad con formato de afiche: portada con el estado de
-        Servicios Conectados, vigencia del contrato y tarjetas por tema (cliente,
+        Volvo Connect, vigencia del contrato y tarjetas por tema (cliente,
         situación, unidad, facturación y CM). Se construye una vez con las
         tarjetas vacías; _render_ficha_vin() las repuebla en cada cambio de VIN."""
         widget = QWidget()
@@ -2234,7 +2259,7 @@ class GeneralModule(QWidget):
         icono_cta.setPixmap(ThemeManager.icon_pixmap('fa5s.phone-alt', color=AZUL, size=18))
         texto_cta = QVBoxLayout()
         texto_cta.setSpacing(0)
-        lbl_cta1 = QLabel("Ofrécele Servicios Conectados")
+        lbl_cta1 = QLabel("Ofrécele Volvo Connect")
         lbl_cta1.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 13px; font-weight: bold;")
         lbl_cta2 = QLabel("Contacta al cliente para activar esta unidad.")
         lbl_cta2.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px;")
@@ -2504,14 +2529,14 @@ class GeneralModule(QWidget):
         sin_vc = not _flota_valida(flota)
         estado_act = v(COL_ESTADO_ACTIVACION)
 
-        # Portada: estado de Servicios Conectados
+        # Portada: estado de Volvo Connect
         if sin_vc:
             self._ficha_hero_icono.setPixmap(ThemeManager.icon_pixmap('fa5s.unlink', color='white', size=18))
-            self._ficha_hero_titulo.setText("Sin Servicios Conectados")
+            self._ficha_hero_titulo.setText("Sin Volvo Connect")
             self._ficha_hero_sub.setText("No aparece en ninguna flota")
         else:
             self._ficha_hero_icono.setPixmap(ThemeManager.icon_pixmap('fa5s.wifi', color='white', size=18))
-            self._ficha_hero_titulo.setText(f"Servicios Conectados · {estado_act.capitalize()}" if estado_act != '-' else "Servicios Conectados")
+            self._ficha_hero_titulo.setText(f"Volvo Connect · {estado_act.capitalize()}" if estado_act != '-' else "Volvo Connect")
             self._ficha_hero_sub.setText(flota)
         self._ficha_cta.setVisible(sin_vc)
 
@@ -2846,7 +2871,7 @@ class GeneralModule(QWidget):
         kpi_layout.setSpacing(8)
         card, self.lbl_kpi_unidades = self._crear_kpi_comercial("UNIDADES", "0", "en total")
         kpi_layout.addWidget(card)
-        card, self.lbl_kpi_connect = self._crear_kpi_comercial("SERVICIOS CONECTADOS", "0", "")
+        card, self.lbl_kpi_connect = self._crear_kpi_comercial("VOLVO CONNECT", "0", "")
         kpi_layout.addWidget(card)
         card, self.lbl_kpi_civ = self._crear_kpi_comercial("CIV", "0", "")
         kpi_layout.addWidget(card)
@@ -3001,7 +3026,7 @@ class GeneralModule(QWidget):
         fila_conteos = QHBoxLayout()
         fila_conteos.setSpacing(8)
         self._btn_conteo_directores = btn_dir = self._crear_conteo_contactos("Directores", "fa5s.crown", "#D4AF37")
-        self._btn_conteo_administradores = btn_adm = self._crear_conteo_contactos("Administradores", "fa5s.user-tie", BRAND_BLUE)
+        self._btn_conteo_administradores = btn_adm = self._crear_conteo_contactos("Administradores", "fa5s.user-tie", VOLVO_BLUE)
         fila_conteos.addWidget(btn_dir)
         fila_conteos.addWidget(btn_adm)
         contactos_outer_layout.addLayout(fila_conteos)
@@ -3039,7 +3064,7 @@ class GeneralModule(QWidget):
         return widget
 
     def _crear_boton_circular(self, icono, tooltip):
-        """Botón redondo azul Empresa Demo con ícono blanco."""
+        """Botón redondo azul Volvo con ícono blanco."""
         btn = QPushButton()
         btn.setFixedSize(26, 26)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3170,7 +3195,7 @@ class GeneralModule(QWidget):
     def _create_contacto_card(self, nombre, apellidos, correo, telefono, contact_id=None):
         iniciales = f"{nombre[:1]}{apellidos[:1]}".upper().strip() or "?"
         avatar = QLabel(iniciales)
-        avatar.setStyleSheet(f"background-color: {BRAND_BLUE}; color: white; border-radius: 17px; font-weight: bold; font-size: 12px;")
+        avatar.setStyleSheet(f"background-color: {VOLVO_BLUE}; color: white; border-radius: 17px; font-weight: bold; font-size: 12px;")
         frame, row_layout = self._armar_tarjeta_persona(avatar, f"{nombre} {apellidos}".strip(), correo, telefono)
 
         # Favorito: mismo sistema de favoritos que contactos.py (archivo
@@ -3280,18 +3305,39 @@ class GeneralModule(QWidget):
     # ==========================================
     def _setup_left_box(self):
         layout = QVBoxLayout(self.left_box)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        layout.setContentsMargins(15, 18, 15, 15)
+        layout.setSpacing(2)
 
+        lbl_titulo = QLabel("Clientes y Flota")
+        lbl_titulo.setStyleSheet("color: white; font-size: 24px; font-weight: 800; background: transparent; border: none;")
+        lbl_subtitulo = QLabel("Clientes, unidades y su estado en la flota.")
+        lbl_subtitulo.setStyleSheet(f"color: {TEXTO_SOBRE_AZUL}; font-size: 13.5px; background: transparent; border: none;")
+        for lbl in (lbl_titulo, lbl_subtitulo):
+            lbl.setContentsMargins(16, 0, 0, 0)
+            layout.addWidget(lbl)
+        layout.addSpacing(8)
+        self._setup_top_controls(layout)
+        layout.addSpacing(10)
+
+        self._hoja_izquierda = QFrame()
+        self._hoja_izquierda.setObjectName("hojaIzquierda")
+        self._hoja_izquierda.setStyleSheet(f"QFrame#hojaIzquierda {{ background-color: {SURFACE}; border: none; border-radius: 16px; }}")
+        lay_hoja = QVBoxLayout(self._hoja_izquierda)
+        lay_hoja.setContentsMargins(15, 15, 15, 15)
+        lay_hoja.setSpacing(10)
         self.left_stack = QStackedWidget()
         self.left_stack.addWidget(self._build_cliente_view())
         self.left_stack.addWidget(self._build_unidades_view())
-        layout.addWidget(self.left_stack, stretch=1)
+        lay_hoja.addWidget(self.left_stack, stretch=1)
+        layout.addWidget(self._hoja_izquierda, stretch=1)
 
     def _switch_left_view(self, index):
+        cambio = self.left_stack.currentIndex() != index
         for i, btn in enumerate(self._nav_buttons):
             btn.setChecked(i == index)
         self.left_stack.setCurrentIndex(index)
+        if cambio:
+            self._animar_carga_breve()
         # Único botón de filtros del módulo (Razón Social/Estado Activación/
         # Industria): solo aplica a Unidades, se oculta en las demás pestañas
         # en vez de dejarlo inerte.
@@ -3351,6 +3397,12 @@ class GeneralModule(QWidget):
         pag_top.setParent(widget)
         pag_top.hide()
         top_row = QHBoxLayout()
+        self.chk_solo_avisos_flota = QCheckBox("Solo con aviso de flotas")
+        self.chk_solo_avisos_flota.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_solo_avisos_flota.setToolTip("Muestra solo los clientes con flotas incoherentes (el ícono amarillo de la tarjeta)")
+        self.chk_solo_avisos_flota.setStyleSheet(f"QCheckBox {{ color: {TEXT_SECONDARY}; font-size: 11px; font-weight: bold; spacing: 6px; }}")
+        self.chk_solo_avisos_flota.toggled.connect(lambda _c: (self._animar_carga_breve(solo_izquierda=True), self.filter_clientes()))
+        top_row.addWidget(self.chk_solo_avisos_flota)
         top_row.addStretch(1)
         top_row.addWidget(self._crear_selector_tamano_pagina(self._on_cambiar_tamano_pagina_clientes))
         top_row.addWidget(self._crear_boton_ordenar(self._on_cambiar_orden_clientes, self._on_cambiar_orden_clientes_unidades,
@@ -3397,6 +3449,7 @@ class GeneralModule(QWidget):
     def _on_cambiar_tamano_pagina_clientes(self, nuevo_tamano):
         self._clientes_tam_pagina = nuevo_tamano
         self._clientes_pagina_actual = 0
+        self._animar_carga_breve(solo_izquierda=True)
         self._pintar_pagina_clientes()
 
     def _render_clientes_cards(self, df_f):
@@ -3421,12 +3474,14 @@ class GeneralModule(QWidget):
     def _pagina_anterior_clientes(self):
         if self._clientes_pagina_actual > 0:
             self._clientes_pagina_actual -= 1
+            self._animar_carga_breve(solo_izquierda=True)
             self._pintar_pagina_clientes()
 
     def _pagina_siguiente_clientes(self):
         total_paginas = max(1, -(-len(self._clientes_df_paginado) // self._clientes_tam_pagina))
         if self._clientes_pagina_actual < total_paginas - 1:
             self._clientes_pagina_actual += 1
+            self._animar_carga_breve(solo_izquierda=True)
             self._pintar_pagina_clientes()
 
     def _pintar_pagina_clientes(self):
@@ -3464,6 +3519,7 @@ class GeneralModule(QWidget):
                 fila.get('CDB', ''), fila.get('Industria/s', ''), fila.get('Total unidades', 0),
                 duplicado=str(fila.get('Clave', '')) in self._clientes_con_varias_razones,
                 total_flotas=int(fila.get('Total flotas', 0) or 0),
+                aviso_flota=getattr(self, '_clientes_aviso_flota', {}).get(str(fila.get('Clave', '')), ''),
             )
             card.clicked.connect(self._on_cliente_card_clicked)
             cdb_key = self._clave_cliente(fila)
@@ -3627,7 +3683,10 @@ class GeneralModule(QWidget):
         pag_top.setParent(widget)
         pag_top.hide()
         top_row = QHBoxLayout()
+        self._lbl_total_unidades = QLabel("")
+        self._lbl_total_unidades.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px; font-weight: bold;")
         top_row.addStretch(1)
+        top_row.addWidget(self._lbl_total_unidades)
         top_row.addWidget(self._crear_selector_tamano_pagina(self._on_cambiar_tamano_pagina_unidades))
         top_row.addWidget(self._crear_boton_ordenar_unidades())
         layout.addLayout(top_row)
@@ -3670,6 +3729,7 @@ class GeneralModule(QWidget):
     def _on_cambiar_tamano_pagina_unidades(self, nuevo_tamano):
         self._unidades_tam_pagina = nuevo_tamano
         self._unidades_pagina_actual = 0
+        self._animar_carga_breve(solo_izquierda=True)
         self._pintar_pagina_unidades()
 
     def _render_unidades_cards(self, df_f):
@@ -3690,12 +3750,14 @@ class GeneralModule(QWidget):
     def _pagina_anterior_unidades(self):
         if self._unidades_pagina_actual > 0:
             self._unidades_pagina_actual -= 1
+            self._animar_carga_breve(solo_izquierda=True)
             self._pintar_pagina_unidades()
 
     def _pagina_siguiente_unidades(self):
         total_paginas = max(1, -(-len(self._unidades_df_paginado) // self._unidades_tam_pagina))
         if self._unidades_pagina_actual < total_paginas - 1:
             self._unidades_pagina_actual += 1
+            self._animar_carga_breve(solo_izquierda=True)
             self._pintar_pagina_unidades()
 
     def _pintar_pagina_unidades(self):
@@ -3709,6 +3771,7 @@ class GeneralModule(QWidget):
 
         df_f = self._unidades_df_paginado
         total_paginas = max(1, -(-len(df_f) // self._unidades_tam_pagina))
+        self._lbl_total_unidades.setText(f"{len(df_f):,} contrato{'' if len(df_f) == 1 else 's'}".replace(",", "."))
         self._actualizar_controles_paginacion(
             self._unidades_pagina_actual, total_paginas,
             (self._lbl_pagina_unidades_top, self._btn_pagina_ant_unidades_top, self._btn_pagina_sig_unidades_top),
@@ -3794,7 +3857,7 @@ class GeneralModule(QWidget):
         fila_filtro.addWidget(self.lbl_filtro_flota_detalle, 1)
         btn_quitar = QPushButton("Quitar filtro")
         btn_quitar.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_quitar.setStyleSheet("QPushButton { background-color: white; color: " + BRAND_BLUE + "; border: none; "
+        btn_quitar.setStyleSheet("QPushButton { background-color: white; color: " + VOLVO_BLUE + "; border: none; "
                                  "border-radius: 9px; padding: 3px 10px; font-size: 10px; font-weight: bold; }")
         btn_quitar.clicked.connect(self._quitar_filtro_flota_detalle)
         fila_filtro.addWidget(btn_quitar)
@@ -4115,7 +4178,7 @@ class GeneralModule(QWidget):
 
         # Unificación manual (23-09-2026, a pedido explícito): conserva la
         # Razón Social con más unidades del grupo (mismo criterio que
-        # RMReporteSyncWorker aplica automáticamente en cada sincronización,
+        # RMJaviSyncWorker aplica automáticamente en cada sincronización,
         # ver comercial_services.detectar_grupos_razon_social_duplicada) y
         # renombra las demás a esa misma. Reescribe PruebasFM de verdad, por
         # eso pide confirmación antes de ejecutar.
@@ -4225,7 +4288,7 @@ class GeneralModule(QWidget):
     # UNIFICACIÓN MANUAL DE RAZÓN SOCIAL DUPLICADA (23-09-2026, a pedido
     # explícito): botón "Unificar en una sola Razón Social" de la pestaña
     # Duplicados. Misma lógica de detección/ganadora que aplica
-    # automáticamente RMReporteSyncWorker en cada sincronización con RM_CONTRATOS
+    # automáticamente RMJaviSyncWorker en cada sincronización con RM_JAVI
     # (comercial_services.detectar_grupos_razon_social_duplicada), pero
     # acotada al grupo (RUT, CDB) que el usuario está viendo y con
     # confirmación explícita antes de escribir.
@@ -4297,12 +4360,8 @@ class GeneralModule(QWidget):
     def _toggle_filtro_unidades(self, checked):
         self.advanced_filters_frame_unidades.setVisible(checked)
         # Mismo feedback visual que _toggle_advanced_filters en comercial.py
-        if checked:
-            self.btn_filtro_unidades.setStyleSheet(f"padding: 6px 12px; border: 1px solid {AZUL}; border-radius: 6px; background-color: {AZUL_HOVER}; color: white; font-weight: bold;")
-            self.btn_filtro_unidades.setIcon(ThemeManager.icon('fa5s.filter', color='white'))
-        else:
-            _boton_azul(self.btn_filtro_unidades)
-            self.btn_filtro_unidades.setIcon(ThemeManager.icon('fa5s.filter', color='white'))
+        self.btn_filtro_unidades.setStyleSheet(QSS_BOTON_FILTRO_SOBRE_AZUL_ACTIVO if checked else QSS_BOTON_FILTRO_SOBRE_AZUL)
+        self.btn_filtro_unidades.setIcon(ThemeManager.icon('fa5s.filter', color='white'))
 
     # ==========================================
     # FILTROS DE "UNIDADES" (caja izquierda): ver FiltroValoresBoton.
@@ -4311,7 +4370,7 @@ class GeneralModule(QWidget):
         """Botón único 'Ordenar' (menú A-Z/Z-A, y opcionalmente Más/Menos
         unidades) para las tarjetas de Cliente/Flota/Unidades -- reemplaza
         el clic en encabezado de columna que tenían las tablas anteriores
-        (AppTableWidget.apply_sort), a pedido explícito (20-09-2026: 'todo
+        (VolvoTableWidget.apply_sort), a pedido explícito (20-09-2026: 'todo
         esto en un solo boton'). on_change(is_asc) se invoca al elegir A-Z/
         Z-A. on_change_unidades(is_asc), si se entrega, agrega las opciones
         'Más unidades'/'Menos unidades' (24-09-2026, a pedido explícito) --
@@ -4948,6 +5007,44 @@ class GeneralModule(QWidget):
         return set(conteo[conteo > 1].index)
 
     @staticmethod
+    def _calcular_avisos_flota(df):
+        """{clave de cliente: texto} de los clientes con datos de flota
+        incoherentes: un CDB flota con varias Flota VC, una Flota VC con varios
+        CDB flota, o unidades con solo uno de los dos datos."""
+        if df.empty or '_clave_cliente' not in df.columns or COL_FLOTA_VC not in df.columns \
+                or COL_CDB_FLOTA not in df.columns:
+            return {}
+        vacios = {'', 'NAN', 'NONE', '-', 'NAT', '<NA>'}
+        cdb = df[COL_CDB_FLOTA].astype(str).str.strip().str.upper()
+        flota = df[COL_FLOTA_VC].astype(str).str.strip().map(_clave_flota_texto)
+        flota_vacia = flota.isin(vacios)
+        cdb_ok = ~cdb.isin(vacios)
+        flota_ok = ~flota_vacia & ~flota.str.lower().isin(_FLOTA_VC_SIN_FLOTA)
+        clave = df['_clave_cliente']
+
+        ambos = cdb_ok & flota_ok
+        pares = pd.DataFrame({'clave': clave[ambos], 'cdb': cdb[ambos], 'flota': flota[ambos]})
+        if pares.empty:
+            cdb_varias = flota_varios = pd.Series(dtype=int)
+        else:
+            cdb_varias = (pares.groupby(['clave', 'cdb'])['flota'].nunique() > 1).groupby(level=0).sum()
+            flota_varios = (pares.groupby(['clave', 'flota'])['cdb'].nunique() > 1).groupby(level=0).sum()
+        incompletas = (cdb_ok ^ ~flota_vacia).groupby(clave).sum()
+
+        avisos = {}
+        for k in set(cdb_varias[cdb_varias > 0].index) | set(flota_varios[flota_varios > 0].index) \
+                | set(incompletas[incompletas > 0].index):
+            partes = []
+            if cdb_varias.get(k, 0):
+                partes.append(f"{int(cdb_varias[k])} CDB flota con varias Flota VC")
+            if flota_varios.get(k, 0):
+                partes.append(f"{int(flota_varios[k])} Flota VC con varios CDB flota")
+            if incompletas.get(k, 0):
+                partes.append(f"{int(incompletas[k])} unidad(es) con solo CDB flota o solo Flota VC")
+            avisos[k] = "Revisar flotas: " + " · ".join(partes)
+        return avisos
+
+    @staticmethod
     def _build_unidades_df(df_comercial):
         """Listado general de unidades (caja izquierda, apartado "Unidades"):
         una fila por VIN, sin agrupar ni filtrar. Misma fuente que
@@ -5027,6 +5124,13 @@ class GeneralModule(QWidget):
             self.df_comercial_raw = self.df_comercial_raw.assign(_clave_cliente=comercial_services.clave_cliente_serie(
                 self.df_comercial_raw[COL_RUT], self.df_comercial_raw[COL_RAZON_SOCIAL]))
         self._clientes_con_varias_razones = self._calcular_claves_con_varias_razones(self.df_comercial_raw)
+        self._clientes_aviso_flota = self._calcular_avisos_flota(self.df_comercial_raw)
+        try:
+            chk_avisos = self.chk_solo_avisos_flota
+        except (AttributeError, RuntimeError):
+            chk_avisos = None
+        if chk_avisos is not None:
+            chk_avisos.setText(f"Solo con aviso de flotas ({len(self._clientes_aviso_flota)})")
 
         self._poblar_filtros_unidades()
 
@@ -5078,6 +5182,10 @@ class GeneralModule(QWidget):
             df_f = df_f[df_f.index.isin(df_filtrado.index) | df_f['Clave'].astype(str).isin(claves_vin)]
         else:
             df_f = df_filtrado
+
+        chk_avisos = getattr(self, 'chk_solo_avisos_flota', None)
+        if chk_avisos is not None and chk_avisos.isChecked():
+            df_f = df_f[df_f['Clave'].astype(str).isin(self._clientes_aviso_flota)]
 
         columna_orden = {'unidades': 'Total unidades', 'flotas': 'Total flotas'}.get(self._clientes_orden_campo, 'Razón Social')
         df_f = df_f.sort_values(by=columna_orden, ascending=self._clientes_orden_asc, na_position='last')
@@ -5208,12 +5316,9 @@ class GeneralModule(QWidget):
         ningún estado de la caja derecha (selección de cliente/CDB, KPIs,
         Contactos, filtros), que sigue su propio ciclo de vida independiente
         del buscador."""
-        # Instrumentacion temporal (auditoria de rendimiento B-2, 18-09-2026):
-        # mide por separado el costo de cada sub-pestaña. No cambia el comportamiento.
-        with medir("B-2 General.filter_table > filter_clientes"):
-            self.filter_clientes()
-        with medir("B-2 General.filter_table > filter_unidades"):
-            self.filter_unidades()
+        self._animar_carga_breve(solo_izquierda=True)
+        self.filter_clientes()
+        self.filter_unidades()
 
     def filter_unidades(self):
         if self.df_unidades_base.empty:

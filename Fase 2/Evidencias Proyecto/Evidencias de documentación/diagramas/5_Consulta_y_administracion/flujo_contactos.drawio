@@ -1,0 +1,178 @@
+<mxfile host="65bd71144e">
+    <diagram id="flujo-contactos" name="Flujo de Contactos">
+        <mxGraphModel dx="2436" dy="1799" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Contactos: cómo funciona hoy&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Administradores de flotas (se edita) y Director de empresas (solo se lee)&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="640" x="-30" y="-110" as="geometry"/>
+                </mxCell>
+                <mxCell id="zona_adm" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFAF3;strokeColor=#D79B00;dashed=1;strokeWidth=1.5;verticalAlign=top;align=left;fontFamily=Helvetica;fontSize=13;spacingLeft=14;spacingTop=6;" value="&lt;b&gt;Pestaña «Administradores de flotas»&lt;/b&gt;" vertex="1">
+                    <mxGeometry height="960" width="1260" x="-30" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="zona_dir" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fillColor=#FDF3F2;strokeColor=#B85450;dashed=1;strokeWidth=1.5;verticalAlign=top;align=left;fontFamily=Helvetica;fontSize=13;spacingLeft=14;spacingTop=6;" value="&lt;b&gt;Pestaña «Director de empresas»&lt;/b&gt;" vertex="1">
+                    <mxGeometry height="530" width="300" x="1270" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="maxi" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" value="Maxi" vertex="1">
+                    <mxGeometry height="60" width="30" x="330" y="2" as="geometry"/>
+                </mxCell>
+                <mxCell id="contactos" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" value="contactos.xlsx" vertex="1">
+                    <mxGeometry height="64" width="220" x="450" as="geometry"/>
+                </mxCell>
+                <mxCell id="nota_usos" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;dashed=1;strokeWidth=2;fontFamily=Helvetica;fontSize=12;fontColor=#5D4037;align=left;spacing=10;" value="&lt;b&gt;Quién lo usa:&lt;/b&gt; Instalaciones y el Gestor de Correos leen este archivo por CDB." vertex="1">
+                    <mxGeometry height="80" width="380" x="720" y="-8" as="geometry"/>
+                </mxCell>
+                <mxCell id="david" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" value="David" vertex="1">
+                    <mxGeometry height="60" width="30" x="1590" y="2" as="geometry"/>
+                </mxCell>
+                <mxCell id="bbdd" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=13;fontStyle=1;" value="BBDD CLIENTES CM.xlsx" vertex="1">
+                    <mxGeometry height="64" width="240" x="1300" as="geometry"/>
+                </mxCell>
+                <mxCell id="lista" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Lista de flotas con CDB, Flota y cantidad de contactos" vertex="1">
+                    <mxGeometry height="70" width="220" x="450" y="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="flota" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Clic en una flota: se ven sus contactos, sin paginación" vertex="1">
+                    <mxGeometry height="70" width="220" x="450" y="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1a" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="&lt;b&gt;Agregar&lt;/b&gt;&lt;br&gt;Botón «Agregar nuevo contacto»" vertex="1">
+                    <mxGeometry height="64" width="220" y="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1b" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Completa el formulario; la app le asigna el ID" vertex="1">
+                    <mxGeometry height="64" width="220" y="530" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1c" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Se guarda de inmediato en contactos.xlsx y se recarga la lista" vertex="1">
+                    <mxGeometry height="70" width="220" y="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2a" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="&lt;b&gt;Importar&lt;/b&gt;&lt;br&gt;Excel del bot de Volvo Connect" vertex="1">
+                    <mxGeometry height="64" width="220" x="300" y="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2b" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Lee la hoja Administradores y omite los que ya están, los repetidos y los incompletos" vertex="1">
+                    <mxGeometry height="84" width="220" x="300" y="530" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2c" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Muestra el resumen y pide confirmar" vertex="1">
+                    <mxGeometry height="64" width="220" x="300" y="660" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2d" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Agrega los nuevos a contactos.xlsx; los con datos por corregir quedan en rojo" vertex="1">
+                    <mxGeometry height="84" width="220" x="300" y="770" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3a" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="&lt;b&gt;Editar&lt;/b&gt;&lt;br&gt;Una celda: Nombre, Apellidos, Correo o Móvil" vertex="1">
+                    <mxGeometry height="64" width="220" x="600" y="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3v" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;fontStyle=1;" value="¿El dato es&lt;br&gt;válido?" vertex="1">
+                    <mxGeometry height="100" width="160" x="630" y="530" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3c" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Queda como cambio pendiente: celda naranja, visible solo en esta pantalla" vertex="1">
+                    <mxGeometry height="84" width="220" x="600" y="690" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3d" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Botón «Guardar cambios» y confirmación" vertex="1">
+                    <mxGeometry height="64" width="220" x="600" y="820" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3e" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Escribe en contactos.xlsx por ID y fecha de extracción, y limpia los pendientes" vertex="1">
+                    <mxGeometry height="84" width="220" x="600" y="930" as="geometry"/>
+                </mxCell>
+                <mxCell id="c4a" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="&lt;b&gt;Eliminar&lt;/b&gt;&lt;br&gt;Clic derecho en la fila" vertex="1">
+                    <mxGeometry height="64" width="220" x="900" y="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="c4b" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Pide confirmar mostrando empresa, nombre y correo" vertex="1">
+                    <mxGeometry height="70" width="220" x="900" y="530" as="geometry"/>
+                </mxCell>
+                <mxCell id="c4c" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Borra el registro por su ID y recarga la lista" vertex="1">
+                    <mxGeometry height="64" width="220" x="900" y="650" as="geometry"/>
+                </mxCell>
+                <mxCell id="nota_valid" parent="1" style="rounded=1;arcSize=5;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontFamily=Helvetica;fontSize=12;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Qué se valida al editar&lt;/b&gt;&lt;br&gt;• Nombre: solo letras.&lt;br&gt;• Correo: formato correcto y dominio que pueda recibir correo.&lt;br&gt;• Teléfono: con «+» y código de país (Chile: +56 9 XXXX XXXX).&lt;br&gt;Si falla, avisa y se mantiene el valor anterior." vertex="1">
+                    <mxGeometry height="160" width="300" x="900" y="770" as="geometry"/>
+                </mxCell>
+                <mxCell id="nota_extra" parent="1" style="rounded=1;arcSize=5;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontFamily=Helvetica;fontSize=12;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Detalles de la pantalla&lt;/b&gt;&lt;br&gt;• Los cambios pendientes se mantienen aunque busques o filtres. «Recargar» los descarta.&lt;br&gt;• ★ Favoritos: se guardan en este equipo y salen primero.&lt;br&gt;• «Corregir teléfonos» propone el formato +56 9 XXXX XXXX y lo deja como pendiente para revisar antes de guardar." vertex="1">
+                    <mxGeometry height="140" width="540" y="880" as="geometry"/>
+                </mxCell>
+                <mxCell id="r1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Solo lectura: no se agrega, edita ni elimina" vertex="1">
+                    <mxGeometry height="70" width="240" x="1300" y="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="r2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="La app trae solo las empresas con contratos activos en Comercial, cruzadas por CDB" vertex="1">
+                    <mxGeometry height="84" width="240" x="1300" y="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="r3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Muestra CDB, Nombre, RUT, Teléfono, Correo electrónico, Dirección, Comuna, Categoría y Responsable" vertex="1">
+                    <mxGeometry height="90" width="240" x="1300" y="394" as="geometry"/>
+                </mxCell>
+                <mxCell id="r4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Se puede buscar, filtrar por empresa, ordenar y exportar a Excel" vertex="1">
+                    <mxGeometry height="70" width="240" x="1300" y="534" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" edge="1" parent="1" source="maxi" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" target="contactos" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" edge="1" parent="1" source="contactos" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="lista" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" edge="1" parent="1" source="lista" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="flota" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" edge="1" parent="1" source="flota" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="c1a" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" edge="1" parent="1" source="flota" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="c2a" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" edge="1" parent="1" source="flota" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="c3a" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" edge="1" parent="1" source="flota" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="c4a" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g1" edge="1" parent="1" source="c1a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c1b" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g2" edge="1" parent="1" source="c1b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c1c" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="h1" edge="1" parent="1" source="c2a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c2b" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="h2" edge="1" parent="1" source="c2b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c2c" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="h3" edge="1" parent="1" source="c2c" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c2d" value="Confirma">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="i1" edge="1" parent="1" source="c3a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c3v" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="i2" edge="1" parent="1" source="c3v" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;" target="c3c" value="Sí">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="i3" edge="1" parent="1" source="c3v" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#C62828;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;fontColor=#C62828;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.914;entryY=1.037;entryDx=0;entryDy=0;exitDx=0;exitDy=0;entryPerimeter=0;" target="c3a" value="No: avisa y deja el valor anterior">
+                    <mxGeometry relative="1" x="0.0983" as="geometry">
+                        <mxPoint x="815" y="580" as="sourcePoint"/>
+                        <mxPoint x="835" y="452" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="i4" edge="1" parent="1" source="c3c" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c3d" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="i5" edge="1" parent="1" source="c3d" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c3e" value="Confirma">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="j1" edge="1" parent="1" source="c4a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="c4b" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="j2" edge="1" parent="1" source="c4b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="c4c" value="Confirma">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="k0" edge="1" parent="1" source="david" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" target="bbdd" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="k1" edge="1" parent="1" source="bbdd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="r1" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="k2" edge="1" parent="1" source="r1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="r2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="k3" edge="1" parent="1" source="r2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="r3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="k4" edge="1" parent="1" source="r3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="r4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

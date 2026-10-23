@@ -3,19 +3,45 @@ import html
 import os
 
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import qtawesome as qta
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QLabel, QFrame,
                              QPushButton, QMessageBox, QLineEdit, QTabWidget)
 from PyQt6.QtCore import Qt
 from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
-from src.core.perf_log import medir
 from src.ui import admin_estilo, admin_listas, comercial_estilo as estilo_com
 from src.theme.theme_manager import ThemeManager
 from src.theme.colors import *
 import openpyxl
 import config.settings
+
+# Antigüedad desde la que el botón de limpiar borra, en el historial de
+# modificaciones y en la Papelera
+DIAS_RETENCION_LOG = 30
+
+
+def _es_mas_antigua(valor, limite):
+    """True si la fecha y hora del registro (texto 'aaaa-mm-dd hh:mm:ss' o
+    datetime) es anterior a `limite`; una fecha ilegible nunca cuenta como
+    antigua, para no borrar un registro sin saber de cuándo es."""
+    if isinstance(valor, datetime):
+        return valor < limite
+    try:
+        return datetime.strptime(str(valor).strip(), "%Y-%m-%d %H:%M:%S") < limite
+    except ValueError:
+        return False
+
+
+def _a_fecha(serie, formato, **opciones):
+    """to_datetime con un formato fijo; solo lo que no calce pasa por el
+    análisis elemento a elemento ('mixed' con dayfirst), que es lento."""
+    fechas = pd.to_datetime(serie, format=formato, errors='coerce')
+    faltan = fechas.isna() & serie.notna()
+    if faltan.any():
+        fechas[faltan] = pd.to_datetime(serie[faltan], format='mixed', errors='coerce', **opciones)
+    return fechas
+
 
 class HistorialModule(QWidget):
     def __init__(self):
@@ -86,11 +112,11 @@ class HistorialModule(QWidget):
 
         # Vacía la pestaña activa (LogApp.csv o RegistroEliminado.xlsx) con
         # backup previo y conservando encabezados (ver _clear_logs).
-        self.btn_clear = admin_estilo.boton_capsula(self._barra, 'fa5s.trash-alt', "Vaciar pestaña actual", QPushButton())
+        self.btn_clear = admin_estilo.boton_capsula(self._barra, 'fa5s.trash-alt', "Limpiar pestaña actual", QPushButton())
         self.btn_clear.clicked.connect(self._clear_logs)
-        self.btn_export_excel = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel", QPushButton())
+        self.btn_export_excel = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel", QPushButton(), grupo='generales')
         self.btn_export_excel.clicked.connect(self._export_current_tab_excel)
-        self.btn_reload = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Actualizar", QPushButton())
+        self.btn_reload = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Actualizar", QPushButton(), grupo='generales')
         self.btn_reload.clicked.connect(self.data_manager.load_data_async)
 
         marco, capas = admin_estilo.tarjeta_contenido("tarjetaHistorial")
@@ -127,9 +153,9 @@ class HistorialModule(QWidget):
         # Ambas pestañas vacían con backup previo y conservan los encabezados.
         self.btn_clear.setEnabled(True)
         if es_papelera:
-            self.btn_clear.setToolTip("Elimina todos los registros de todas las hojas de la Papelera, con backup previo.")
+            self.btn_clear.setToolTip(f"Elimina los registros de todas las hojas de la Papelera con más de {DIAS_RETENCION_LOG} días, con backup previo.")
         else:
-            self.btn_clear.setToolTip("Elimina todos los registros del historial de modificaciones, con backup previo.")
+            self.btn_clear.setToolTip(f"Elimina los registros del historial de modificaciones con más de {DIAS_RETENCION_LOG} días, con backup previo.")
 
         self._pintar()
 
@@ -146,13 +172,15 @@ class HistorialModule(QWidget):
         self._clear_papelera()
 
     def _clear_logs_modificaciones(self):
-        # Vacía LogApp.csv dejando solo la línea de encabezado, con backup previo.
+        # Borra de LogApp.csv solo los registros con más de DIAS_RETENCION_LOG
+        # días (con backup previo); los recientes se conservan porque otras
+        # pantallas los consultan (ej. el nivel anterior en los correos).
         msg = QMessageBox(self)
-        msg.setWindowTitle("Vaciar Logs de Modificaciones")
+        msg.setWindowTitle("Limpiar Logs de Modificaciones")
         msg.setIcon(QMessageBox.Icon.Warning)
         msg.setText(
-            "¿Estás seguro de que deseas eliminar TODOS los registros del historial de modificaciones?\n\n"
-            "Esta acción borrará todas las filas de datos, manteniendo los encabezados intactos."
+            f"¿Deseas eliminar los registros del historial de modificaciones con más de {DIAS_RETENCION_LOG} días?\n\n"
+            f"Los registros de los últimos {DIAS_RETENCION_LOG} días se conservan."
         )
         msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if msg.exec() != QMessageBox.StandardButton.Yes:
@@ -163,23 +191,34 @@ class HistorialModule(QWidget):
             QMessageBox.information(self, "Aviso", "El historial de modificaciones no existe o ya está vacío.")
             return
 
-        if not self.writer._crear_backup(filepath):
-            QMessageBox.warning(
-                self, "Error",
-                "No se pudo crear el backup de LogApp.csv antes de vaciarlo. "
-                "Por seguridad, no se eliminó ningún registro. Inténtalo nuevamente."
-            )
-            return
+        limite = datetime.now() - timedelta(days=DIAS_RETENCION_LOG)
 
         try:
             with open(filepath, 'r', encoding='utf-8-sig', newline='') as f:
-                encabezado = f.readline()
-                filas_borradas = sum(1 for fila in csv.reader(f) if any(fila))
-            if not encabezado.strip():
+                lector = csv.reader(f)
+                encabezado = next(lector, None)
+                filas = [fila for fila in lector if any(fila)]
+            if not encabezado:
                 QMessageBox.information(self, "Aviso", "El historial de modificaciones ya está vacío.")
                 return
+            conservadas = [fila for fila in filas if not _es_mas_antigua(fila[0], limite)]
+            filas_borradas = len(filas) - len(conservadas)
+            if filas_borradas == 0:
+                QMessageBox.information(self, "Aviso", f"No hay registros con más de {DIAS_RETENCION_LOG} días.")
+                return
+
+            if not self.writer._crear_backup(filepath):
+                QMessageBox.warning(
+                    self, "Error",
+                    "No se pudo crear el backup de LogApp.csv antes de limpiarlo. "
+                    "Por seguridad, no se eliminó ningún registro. Inténtalo nuevamente."
+                )
+                return
+
             with open(filepath, 'w', encoding='utf-8-sig', newline='') as f:
-                f.write(encabezado if encabezado.endswith(('\n', '\r')) else encabezado + '\r\n')
+                escritor = csv.writer(f)
+                escritor.writerow(encabezado)
+                escritor.writerows(conservadas)
         except PermissionError:
             QMessageBox.warning(self, "Error", "El archivo está abierto o bloqueado. Ciérralo e inténtalo de nuevo.")
             return
@@ -187,13 +226,10 @@ class HistorialModule(QWidget):
             QMessageBox.warning(self, "Error", f"Ocurrió un problema: {e}")
             return
 
-        if filas_borradas == 0:
-            QMessageBox.information(self, "Aviso", "El historial de modificaciones ya estaba vacío.")
-        else:
-            QMessageBox.information(
-                self, "Éxito",
-                f"Se eliminaron {filas_borradas} registro(s) del historial, manteniendo los encabezados."
-            )
+        QMessageBox.information(
+            self, "Éxito",
+            f"Se eliminaron {filas_borradas} registro(s) con más de {DIAS_RETENCION_LOG} días."
+        )
         self.data_manager.load_data_async()
 
     def _clear_papelera(self):
@@ -204,13 +240,13 @@ class HistorialModule(QWidget):
         # ya protege el resto de las escrituras sobre este archivo, ver
         # ExcelWriter._log_deleted) antes de borrar nada.
         msg = QMessageBox(self)
-        msg.setWindowTitle("Vaciar Papelera")
+        msg.setWindowTitle("Limpiar Papelera")
         msg.setIcon(QMessageBox.Icon.Warning)
         msg.setText(
-            "¿Estás seguro de que deseas eliminar TODOS los registros de la Papelera, "
+            f"¿Deseas eliminar los registros de la Papelera con más de {DIAS_RETENCION_LOG} días, "
             "en todos los módulos (Comercial, Provisiones, Contactos, etc.)?\n\n"
-            "Esta acción borrará todas las filas de datos de cada hoja, manteniendo "
-            "los encabezados y la estructura de hojas intactos."
+            f"Los eliminados en los últimos {DIAS_RETENCION_LOG} días se conservan, "
+            "y los encabezados y las hojas quedan intactos."
         )
         msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
@@ -222,35 +258,33 @@ class HistorialModule(QWidget):
             QMessageBox.information(self, "Aviso", "El archivo de la Papelera no existe o ya está vacío.")
             return
 
-        if not self.writer._crear_backup(filepath):
-            QMessageBox.warning(
-                self, "Error",
-                "No se pudo crear el backup de RegistroEliminado.xlsx antes de vaciar la Papelera. "
-                "Por seguridad, no se eliminó ningún registro. Inténtalo nuevamente."
-            )
-            return
-
+        limite = datetime.now() - timedelta(days=DIAS_RETENCION_LOG)
         try:
-            # Instrumentacion temporal (auditoria de rendimiento B-3,
-            # 18-09-2026): separa la carga del workbook, el borrado de filas
-            # por hoja y el guardado final, todo en Main Thread. No cambia
-            # el comportamiento.
-            with medir("B-3 _clear_papelera > load_workbook"):
-                wb = openpyxl.load_workbook(filepath)
-            total_hojas = len(wb.sheetnames)
-            hojas_con_datos = 0
-            filas_totales_borradas = 0
-            with medir(f"B-3 _clear_papelera > delete_rows ({total_hojas} hojas)"):
-                for sheet_name in wb.sheetnames:
-                    ws = wb[sheet_name]
-                    if ws.max_row > 1:
-                        filas_totales_borradas += ws.max_row - 1
-                        ws.delete_rows(2, ws.max_row - 1)
-                        hojas_con_datos += 1
-            with medir("B-3 _clear_papelera > wb.save"):
-                wb.save(filepath)
+            wb = openpyxl.load_workbook(filepath)
+            antiguas = {
+                nombre: [r for r in range(2, wb[nombre].max_row + 1) if _es_mas_antigua(wb[nombre].cell(row=r, column=1).value, limite)]
+                for nombre in wb.sheetnames
+            }
+            filas_borradas = sum(len(filas) for filas in antiguas.values())
+            if filas_borradas == 0:
+                wb.close()
+                QMessageBox.information(self, "Aviso", f"No hay registros con más de {DIAS_RETENCION_LOG} días en la Papelera.")
+                return
+
+            if not self.writer._crear_backup(filepath):
+                wb.close()
+                QMessageBox.warning(
+                    self, "Error",
+                    "No se pudo crear el backup de RegistroEliminado.xlsx antes de limpiar la Papelera. "
+                    "Por seguridad, no se eliminó ningún registro. Inténtalo nuevamente."
+                )
+                return
+
+            for nombre, filas in antiguas.items():
+                for r in reversed(filas):
+                    wb[nombre].delete_rows(r)
+            wb.save(filepath)
             wb.close()
-            print(f"[PERF][UI] B-3 _clear_papelera -> {filas_totales_borradas} filas borradas en {hojas_con_datos} hojas")
         except PermissionError:
             QMessageBox.warning(self, "Error", "El archivo está abierto en Excel o bloqueado. Ciérralo e inténtalo de nuevo.")
             return
@@ -258,14 +292,10 @@ class HistorialModule(QWidget):
             QMessageBox.warning(self, "Error", f"Ocurrió un problema: {e}")
             return
 
-        if hojas_con_datos == 0:
-            QMessageBox.information(self, "Aviso", f"La Papelera ya estaba vacía ({total_hojas} hoja(s), sin registros).")
-        else:
-            QMessageBox.information(
-                self, "Éxito",
-                f"Se han limpiado los registros de {hojas_con_datos} de {total_hojas} hoja(s) de la Papelera, "
-                "manteniendo los encabezados y todas las hojas."
-            )
+        QMessageBox.information(
+            self, "Éxito",
+            f"Se eliminaron {filas_borradas} registro(s) de la Papelera con más de {DIAS_RETENCION_LOG} días."
+        )
         self.data_manager.load_data_async()  # Recargamos la interfaz
 
 
@@ -430,11 +460,10 @@ class HistorialModule(QWidget):
         col_fecha = self._col(df, 'FECHA')
         if df.empty or col_fecha is None:
             return [(None, df)] if not df.empty else []
-        fechas = pd.to_datetime(df[col_fecha].astype(str).str.strip(), dayfirst=True, format='mixed', errors='coerce')
+        fechas = _a_fecha(df[col_fecha].astype(str).str.strip(), '%d-%m-%Y %H:%M:%S', dayfirst=True)
         dias = fechas.dt.normalize()
-        bloques = []
-        for dia in sorted(dias.dropna().unique(), reverse=True):
-            bloques.append((pd.Timestamp(dia), df[(dias == dia).values]))
+        # Un solo agrupamiento: una máscara por día recorría todo el log cada vez
+        bloques = [(pd.Timestamp(dia), sub) for dia, sub in reversed(list(df.groupby(dias.values)))]
         if dias.isna().any():
             bloques.append((None, df[dias.isna().values]))
         return bloques
@@ -484,7 +513,7 @@ class HistorialModule(QWidget):
             eventos = self._eventos_del_dia(df_dia)
             lista.agregar(self._bloque_dia(dia, eventos, len(df_dia), abierto=i < 2,
                                            constructor_eventos=self._cuerpo_eventos))
-        n_guardados = sum(len(self._eventos_del_dia(d)) for _, d in dias)
+        n_guardados = self._contar_guardados(self.filtered_mods, dias)
         if len(dias) > self._tanda_mods:
             lista.boton_pie(f"Mostrar {min(self.DIAS_POR_TANDA, len(dias) - self._tanda_mods)} días más", self._mas_dias_mods)
         self._actualizar_resumen(n_guardados_mods=n_guardados)
@@ -493,9 +522,18 @@ class HistorialModule(QWidget):
         self._tanda_mods += self.DIAS_POR_TANDA
         self._pintar_mods()
 
+    def _contar_guardados(self, df, dias):
+        """Total de _eventos_del_dia en todos los días sin agrupar día por
+        día: cada fecha y hora cae en un solo día."""
+        claves = [c for c in (self._col(df, 'FECHA'), self._col(df, 'MODULO', 'MÓDULO'), self._col(df, 'IDENTIFICADOR', 'VIN'))
+                  if c is not None]
+        if not claves:
+            return len(dias)
+        return len(df[claves].dropna().drop_duplicates())
+
     def _eventos_del_dia(self, df_dia):
         """[(fecha_hora, módulo, identificador, df_cambios)] en el orden del log."""
-        col_f, col_m, col_i = self._col(df_dia, 'FECHA'), self._col(df_dia, 'MODULO', 'MÓDULO'), self._col(df_dia, 'IDENTIFICADOR')
+        col_f, col_m, col_i = self._col(df_dia, 'FECHA'), self._col(df_dia, 'MODULO', 'MÓDULO'), self._col(df_dia, 'IDENTIFICADOR', 'VIN')
         claves = [c for c in (col_f, col_m, col_i) if c is not None]
         if not claves:
             return [("", "", "", df_dia)]

@@ -16,7 +16,7 @@ rediseño de Activaciones/Conectividad/Sin Flota, 24-09-2026):
 - Sin Flota (24-09-2026, reemplaza el valor SIN FLOTA dentro de Activaciones
   por una pestaña propia): ESTADO COMERCIAL = Activacion Pendiente Y ESTADO
   DE ACTIVACION ACTUAL = Sin Flota. Unidades que todavia no aparecen en
-  Servicios Conectados -- se sacan de Activaciones (antes SIN FLOTA era uno de los
+  Volvo Connect -- se sacan de Activaciones (antes SIN FLOTA era uno de los
   tres valores elegibles ahi) para que cada unidad viva en una sola cola, a
   pedido explicito. Ver filtrar_sin_flota() sobre el alias con/sin tilde de
   "Activación Pendiente".
@@ -47,7 +47,8 @@ from datetime import date
 
 from src.core.constants import (COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_ETAPA_GESTION,
                                 COL_CDB_FLOTA, COL_RAZON_SOCIAL, COL_EJECUTIVO, COL_VIN, COL_TIPO_FACTURACION,
-                                COL_FECHA_BAJA, COL_FLOTA_VC, ESTADO_ACTIVANDO, ESTADO_NO_ENTREGADO,
+                                COL_FECHA_BAJA, COL_FLOTA_VC, COL_INICIO_CONTRATO, COL_DURACION_MESES, COL_TERMINO_CONTRATO,
+                                ESTADO_ACTIVANDO, ESTADO_NO_ENTREGADO,
                                 ESTADO_SIN_FLOTA, ESTADO_CONECTADO, ESTADO_DESCONECTADO,
                                 VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA,
                                 VALOR_ESTADO_COMERCIAL_VIGENTE, VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE,
@@ -59,7 +60,7 @@ def filtrar_activaciones(df):
     """Panel Operaciones -> Activaciones. Ver docstring del modulo.
 
     Alineado con ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ (constants.py,
-    la matriz de negocio confirmada con la contraparte comercial, 24-09-2026): además de
+    la matriz de negocio confirmada con Javiera, 24-09-2026): además de
     ESTADO DE ACTIVACIÓN ACTUAL en {Activando, No entregado, Desconectado},
     exige ETAPA GESTIÓN = Operaciones -- sin esta segunda condición,
     combinaciones que la matriz manda a COMERCIAL (ej. VENCIDO+Activando,
@@ -85,7 +86,7 @@ def filtrar_activaciones(df):
     etapa_gestion = df[COL_ETAPA_GESTION].astype(str).str.strip().str.upper()
     mask = estado_activacion.isin({ESTADO_ACTIVANDO, ESTADO_NO_ENTREGADO, ESTADO_DESCONECTADO}) & \
         (etapa_gestion == VALOR_ETAPA_GESTION_OPERACIONES)
-    # Desde el 15-10-2026 la sincronización RM_CONTRATOS convierte No entregado en
+    # Desde el 15-10-2026 la sincronización RM_JAVI convierte No entregado en
     # Sin flota; aquí se conserva solo para datos anteriores. Una baja con
     # Activando va a Bajas.
     if COL_ESTADO_COMERCIAL in df.columns:
@@ -111,7 +112,20 @@ def filtrar_sin_flota(df):
     estado_activacion = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
     etapa_gestion = df[COL_ETAPA_GESTION].astype(str).str.strip().str.upper()
     mask = (estado_activacion == ESTADO_SIN_FLOTA) & (etapa_gestion == VALOR_ETAPA_GESTION_OPERACIONES)
-    return df[mask]
+    return df[mask | mascara_flota_incompleta(df)]
+
+
+def mascara_flota_incompleta(df):
+    """Contratos con solo uno de los dos datos: FLOTA VC sin CDB FLOTA o CDB
+    FLOTA sin FLOTA VC. Una FLOTA VC vacía, '-', 'SIN FLOTA' o 'NO EXISTE EN VC'
+    cuenta como faltante. Entran a Sin Flota para que Operaciones los complete
+    o los limpie."""
+    if df.empty or COL_FLOTA_VC not in df.columns or COL_CDB_FLOTA not in df.columns:
+        return pd.Series(False, index=df.index)
+    vacios = {'', 'NAN', 'NONE', '-', 'NAT'}
+    sin_flota_vc = df[COL_FLOTA_VC].astype(str).str.strip().str.upper().isin(vacios | FLOTAS_VC_NO_REALES)
+    sin_cdb_flota = df[COL_CDB_FLOTA].astype(str).str.strip().str.upper().isin(vacios)
+    return sin_flota_vc ^ sin_cdb_flota
 
 
 def filtrar_conectados_vigentes(df):
@@ -126,7 +140,7 @@ def filtrar_conectados_vigentes(df):
     return df[(estado_comercial == VALOR_ESTADO_COMERCIAL_VIGENTE.upper()) & (estado_activacion == ESTADO_CONECTADO)]
 
 
-# FLOTA VC que no corresponde a una flota real de Servicios Conectados: "NO EXISTE EN VC" (la
+# FLOTA VC que no corresponde a una flota real de Volvo Connect: "NO EXISTE EN VC" (la
 # unidad no está en VC, típico de "No aplica") y "SIN FLOTA" (aún sin asignar).
 FLOTAS_VC_NO_REALES = {'SIN FLOTA', 'NO EXISTE EN VC'}
 
@@ -157,10 +171,24 @@ def mascara_flota_pendiente(df):
     return sin_flota_vc | sin_cdb_flota
 
 
+def mascara_cdb_con_varias_flotas(df):
+    """Filas cuyo CDB FLOTA aparece con más de una FLOTA VC distinta en `df`
+    (se ignoran las flotas vacías y las no reales: SIN FLOTA / NO EXISTE EN VC)."""
+    if df.empty or COL_FLOTA_VC not in df.columns or COL_CDB_FLOTA not in df.columns:
+        return pd.Series(False, index=df.index)
+    vacios = {'', 'NAN', 'NONE', '-', 'NAT'}
+    cdb = df[COL_CDB_FLOTA].astype(str).str.strip().str.upper()
+    flota = df[COL_FLOTA_VC].astype(str).str.strip().str.upper()
+    valido = ~cdb.isin(vacios) & ~flota.isin(vacios | FLOTAS_VC_NO_REALES)
+    distintas = flota[valido].groupby(cdb[valido]).nunique()
+    cdb_multiples = set(distintas[distintas > 1].index)
+    return cdb.isin(cdb_multiples) & valido
+
+
 def construir_mapa_flota_por_cdb(df):
     """CDB (mayusculas) -> lista ordenada de FLOTA VC ya asociadas a ese CDB
     en `df`. Usado por Operaciones -> Sin Flota para sugerir FLOTA VC en
-    cuanto el consultor de operaciones ingresa un CDB ya conocido (24-09-2026, a pedido explicito);
+    cuanto Luis ingresa un CDB ya conocido (24-09-2026, a pedido explicito);
     mismo criterio que ComercialAgregarDialog._construir_lookups
     (flota_by_cdb), reimplementado aqui como funcion pura en vez de
     importar un metodo privado de un QDialog. CDB sin FLOTA VC asociada, o
@@ -290,7 +318,34 @@ def calcular_cambios_marcar_desconectado(fila):
     }
 
 
-def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None):
+def es_activacion_pendiente(fila):
+    """True si la unidad (dict o fila) tiene ESTADO COMERCIAL = Activación
+    Pendiente, con o sin tilde."""
+    estado = str(fila.get(COL_ESTADO_COMERCIAL, '')).strip().upper()
+    return estado in (VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE, 'ACTIVACION PENDIENTE')
+
+
+def duracion_sin_dato(fila):
+    """True si DURACIÓN (MESES) está vacía: sin ella no se puede calcular el
+    término al fijar el inicio ('-' y MENSUAL sí son un dato)."""
+    texto = str(fila.get(COL_DURACION_MESES, '')).strip().upper()
+    return texto in ('', 'NAN', 'NONE', 'NAT', '<NA>')
+
+
+def calcular_termino_desde_inicio(inicio, duracion):
+    """TÉRMINO CONTRATO (DD-MM-YYYY) para un inicio y una duración en meses;
+    None si la duración no es un número (el término queda como está)."""
+    try:
+        meses = int(float(str(duracion).strip().replace(',', '.')))
+    except (ValueError, TypeError):
+        return None
+    inicio_dt = DataFrameFormatter.parsear_fecha_segura(inicio)
+    if pd.isna(inicio_dt):
+        return None
+    return (inicio_dt + pd.DateOffset(months=meses)).strftime("%d-%m-%Y")
+
+
+def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None, fecha_inicio=None):
     """Cambios a aplicar cuando Operaciones (Activaciones o Sin Flota)
     marca una unidad como CONECTADO (24-09-2026, alineado con
     ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ -- ver riesgo detectado el
@@ -304,7 +359,11 @@ def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None):
     calcular_cambios_marcar_desconectado. Si `cdb`/`flota_vc` vienen
     informados (obligatorios desde Sin Flota, ver operaciones.py), se
     incluyen también en el resultado para guardarse en la misma
-    operación."""
+    operación.
+    `fecha_inicio` (DD-MM-YYYY, 19-10-2026): si la unidad estaba en
+    Activación Pendiente, pasa a ser su INICIO CONTRATO (reemplaza el que
+    tuviera) y el término se recalcula con su duración. Con otro estado
+    comercial no se toca el inicio."""
     nueva_etapa = DataFrameFormatter.calcular_etapa_gestion_esperada({
         COL_ESTADO_COMERCIAL: 'Vigente',
         COL_ESTADO_ACTIVACION: ESTADO_CONECTADO,
@@ -316,6 +375,11 @@ def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None):
         COL_ESTADO_ACTIVACION: ESTADO_CONECTADO,
         COL_ETAPA_GESTION: nueva_etapa,
     }
+    if fecha_inicio and es_activacion_pendiente(fila):
+        cambios[COL_INICIO_CONTRATO] = fecha_inicio
+        termino = calcular_termino_desde_inicio(fecha_inicio, fila.get(COL_DURACION_MESES, ''))
+        if termino:
+            cambios[COL_TERMINO_CONTRATO] = termino
     if cdb is not None:
         cambios[COL_CDB_FLOTA] = cdb
     if flota_vc is not None:

@@ -147,7 +147,7 @@ class TestArmarExportContactosEjecutivo(unittest.TestCase):
             _fila(vin='V2', cdb='100', razon_social='Cliente Uno', ejecutivo='Ana'),
         ])
         df_contactos = pd.DataFrame([
-            {'CDB': '100', 'Nombre': 'Juan', 'Apellidos': 'Soto', 'Correo electrónico': 'juan@x.example', 'Número móvil': '+56999000037'},
+            {'CDB': '100', 'Nombre': 'Juan', 'Apellidos': 'Soto', 'Correo electrónico': 'juan@x.cl', 'Número móvil': '+56911112222'},
         ])
         resultado = armar_export_contactos_ejecutivo(df_unidades, df_contactos)
         self.assertEqual(len(resultado), 1)
@@ -159,7 +159,7 @@ class TestArmarExportContactosEjecutivo(unittest.TestCase):
     def test_cdb_sin_contacto_igual_aparece_con_campos_vacios(self):
         df_unidades = pd.DataFrame([_fila(vin='V1', cdb='999')])
         df_contactos = pd.DataFrame([
-            {'CDB': '100', 'Nombre': 'Juan', 'Apellidos': 'Soto', 'Correo electrónico': 'juan@x.example', 'Número móvil': '1'},
+            {'CDB': '100', 'Nombre': 'Juan', 'Apellidos': 'Soto', 'Correo electrónico': 'juan@x.cl', 'Número móvil': '1'},
         ])
         resultado = armar_export_contactos_ejecutivo(df_unidades, df_contactos)
         self.assertEqual(len(resultado), 1)
@@ -168,8 +168,8 @@ class TestArmarExportContactosEjecutivo(unittest.TestCase):
     def test_multiples_contactos_mismo_cdb_generan_multiples_filas(self):
         df_unidades = pd.DataFrame([_fila(vin='V1', cdb='100')])
         df_contactos = pd.DataFrame([
-            {'CDB': '100', 'Nombre': 'Juan', 'Apellidos': 'Soto', 'Correo electrónico': 'juan@x.example', 'Número móvil': '1'},
-            {'CDB': '100', 'Nombre': 'Maria', 'Apellidos': 'Perez', 'Correo electrónico': 'maria@x.example', 'Número móvil': '2'},
+            {'CDB': '100', 'Nombre': 'Juan', 'Apellidos': 'Soto', 'Correo electrónico': 'juan@x.cl', 'Número móvil': '1'},
+            {'CDB': '100', 'Nombre': 'Maria', 'Apellidos': 'Perez', 'Correo electrónico': 'maria@x.cl', 'Número móvil': '2'},
         ])
         resultado = armar_export_contactos_ejecutivo(df_unidades, df_contactos)
         self.assertEqual(len(resultado), 2)

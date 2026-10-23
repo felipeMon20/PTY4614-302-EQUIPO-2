@@ -8,14 +8,13 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFrame,
                              QDialog, QTextEdit, QLineEdit, QInputDialog, QApplication)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from src.core.data_manager import DataManager
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui.ingresos_base import ModeloTablaIngresos
 from src.ui import admin_estilo, admin_listas, comercial_estilo as estilo_com
 from src.theme.theme_manager import ThemeManager 
 from src.theme.colors import *
-from config.settings import PROVISION_EXCEL_PATH, INSTALACIONES_PATH, POWERBI_EXCEL_PATH, CONTACTOS_EXCEL_PATH, RM_REPORTE_PATH
+from config.settings import PROVISION_EXCEL_PATH, INSTALACIONES_PATH, POWERBI_EXCEL_PATH, CONTACTOS_EXCEL_PATH, RM_JAVI_PATH
 from src.core.excel_writer import ExcelWriter
-from src.core.perf_log import medir
 from src.services import powerbi_cache_service, provisiones_services, comercial_services
 from src.ui.guardado_overlay import mostrar_guardando, terminar_guardando
 
@@ -105,11 +104,11 @@ class InstalacionesSyncWorker(QThread):
                 faltantes.add(vin)
         sin_comercial = vines - set(comercial['VIN_CLEAN'])
         faltantes |= sin_comercial
-        if not faltantes or not RM_REPORTE_PATH or not os.path.exists(RM_REPORTE_PATH):
+        if not faltantes or not RM_JAVI_PATH or not os.path.exists(RM_JAVI_PATH):
             return {}
         try:
             self.log_signal.emit("[LEYENDO] Completando RUT y CDB desde el RM de Excel...")
-            df = pd.read_excel(RM_REPORTE_PATH, sheet_name="BBDD", usecols=['VIN', 'RUT', 'CDB', 'RAZÓN SOCIAL'], dtype=str)
+            df = pd.read_excel(RM_JAVI_PATH, sheet_name="BBDD", usecols=['VIN', 'RUT', 'CDB', 'RAZÓN SOCIAL'], dtype=str)
         except Exception as e:
             self.log_signal.emit(f"[AVISO] No se pudo leer el RM de Excel: {e}")
             return {}
@@ -183,7 +182,7 @@ class InstalacionesSyncWorker(QThread):
 
             self.df_comercial['VIN_CLEAN'] = self.df_comercial['VIN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
 
-            self.log_signal.emit("[LEYENDO] Conectando con BBDD CLIENTE CM.xlsx (equipo Power BI, cache CSV interno)...")
+            self.log_signal.emit("[LEYENDO] Conectando con BBDD CLIENTE CM.xlsx (David, cache CSV interno)...")
             df_bbdd = pd.DataFrame()
             if POWERBI_EXCEL_PATH and os.path.exists(POWERBI_EXCEL_PATH):
                 df_bbdd = powerbi_cache_service.leer_bbdd_clientes_cm(POWERBI_EXCEL_PATH)
@@ -193,7 +192,7 @@ class InstalacionesSyncWorker(QThread):
             else:
                 self.log_signal.emit("[AVISO] BBDD CLIENTE CM no configurada o no encontrada.")
 
-            self.log_signal.emit("[LEYENDO] Conectando con Contactos.xlsx (equipo Contactos)...")
+            self.log_signal.emit("[LEYENDO] Conectando con Contactos.xlsx (Maxi)...")
             df_contactos = pd.DataFrame()
             if CONTACTOS_EXCEL_PATH and os.path.exists(CONTACTOS_EXCEL_PATH):
                 df_contactos = pd.read_excel(CONTACTOS_EXCEL_PATH)
@@ -223,7 +222,7 @@ class InstalacionesSyncWorker(QThread):
                 meses = _formatear_meses(row_prov['Cantidad de Meses'])
                 if not meses:
                     # Provisión sin meses: se toman de la observación solo si habla de
-                    # un plan Servicios Conectados (Blue/Gold/Silver son de CM y no cuentan)
+                    # un plan Volvo Connect (Blue/Gold/Silver son de CM y no cuentan)
                     meses = provisiones_services.meses_desde_observacion(row_prov.get('OBSERVACIONES', '')) or ""
                 cliente_prov = _limpio(row_prov.get('CLIENTE', ''))
 
@@ -549,7 +548,7 @@ class SyncInstalacionesDialog(QDialog):
         self.fila_resumen = QHBoxLayout()
         self.fila_resumen.setSpacing(8)
         lay.addLayout(self.fila_resumen)
-        self.preview_table = AppTableWidget()
+        self.preview_table = VolvoTableWidget()
         self.preview_table.menu_type = "general"  # solo lectura: sin "Eliminar Camión"
         self.preview_model = PandasTableModel()
         self.preview_table.setModel(self.preview_model)
@@ -788,21 +787,15 @@ class SyncInstalacionesDialog(QDialog):
                     wb.remove(wb[nombre_hoja])
                 ws = wb.create_sheet(nombre_hoja)
 
-            # Instrumentacion temporal (auditoria de rendimiento B-4,
-            # 18-09-2026): separa dataframe_to_rows+wb.save (Instalaciones.xlsx)
-            # del guardado hacia Comercial (writer.update_cells), ambos en
-            # Main Thread. No cambia el comportamiento.
-            with medir(f"B-4 save_data > dataframe_to_rows+wb.save ({len(self.df_para_guardar)} filas)"):
-                for r in dataframe_to_rows(self.df_para_guardar, index=False, header=True):
-                    ws.append(r)
+            for r in dataframe_to_rows(self.df_para_guardar, index=False, header=True):
+                ws.append(r)
 
-                wb.save(INSTALACIONES_PATH)
+            wb.save(INSTALACIONES_PATH)
 
-            # --- INYECCIÓN HACIA COMERCIAL (PruebasFM) ---
+        # --- INYECCIÓN HACIA COMERCIAL (PruebasFM) ---
             if self.dict_comercial:
-                with medir(f"B-4 save_data > writer.update_cells ({len(self.dict_comercial)} registros)"):
-                    writer = ExcelWriter()
-                    writer.update_cells(self.dict_comercial, module_name="Auto-Instalaciones")
+                writer = ExcelWriter()
+                writer.update_cells(self.dict_comercial, module_name="Auto-Instalaciones")
                 self.data_manager.load_data_async()
 
             mensaje_exito = f"Datos guardados exitosamente en la hoja '{nombre_hoja}' de Instalaciones.\nFechas de facturación actualizadas en Comercial."
@@ -855,11 +848,11 @@ class InstalacionesModule(QWidget):
         self.btn_renombrar.clicked.connect(self.rename_current_sheet)
         self.btn_eliminar = admin_estilo.boton_capsula(self._barra, 'fa5s.trash-alt', "Eliminar hoja", QPushButton())
         self.btn_eliminar.clicked.connect(self.delete_current_sheet)
-        self.btn_export_excel = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel", QPushButton())
+        self.btn_export_excel = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar a Excel", QPushButton(), grupo='generales')
         self.btn_export_excel.clicked.connect(lambda: self.table.export_to_excel("Instalaciones_Claudia"))
 
         marco, capas = admin_estilo.tarjeta_contenido("tarjetaInstalaciones")
-        self.table = AppTableWidget()
+        self.table = VolvoTableWidget()
         self.table.menu_type = "general"  # Instalaciones no tiene "Eliminar Camión"
         self.table.sort_changed.connect(self.filter_table)
         self.model = ModeloTablaIngresos(alineacion=Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
@@ -993,19 +986,21 @@ class InstalacionesModule(QWidget):
                 self._actualizar_kpis(pd.DataFrame())
                 return
 
-            xls = pd.ExcelFile(INSTALACIONES_PATH)
-            hojas = xls.sheet_names
-            
-            if not hojas:
-                return
-                
-            self.combo_mes.blockSignals(True)
-            self.combo_mes.clear()
-            self.combo_mes.addItems(hojas)
-            self.combo_mes.setCurrentText(hojas[-1]) 
-            self.combo_mes.blockSignals(False)
-            
-            self.df_base = _meses_sin_decimales(pd.read_excel(INSTALACIONES_PATH, sheet_name=hojas[-1]).fillna(""))
+            # Un solo ExcelFile: read_excel volvía a abrir y parsear el libro completo
+            with pd.ExcelFile(INSTALACIONES_PATH) as xls:
+                hojas = xls.sheet_names
+
+                if not hojas:
+                    return
+
+                self.combo_mes.blockSignals(True)
+                self.combo_mes.clear()
+                self.combo_mes.addItems(hojas)
+                self.combo_mes.setCurrentText(hojas[-1])
+                self.combo_mes.blockSignals(False)
+
+                df_hoja = xls.parse(hojas[-1])
+            self.df_base = _meses_sin_decimales(df_hoja.fillna(""))
             self.filter_table()
             
         except Exception as e:

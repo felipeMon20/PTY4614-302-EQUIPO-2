@@ -247,7 +247,19 @@ class AuditingTestResult(unittest.TestResult):
         self.subtest_records.append(entry)
 
 
+def _liberar_widgets_previos():
+    """Libera los widgets de la clase anterior antes de correr la siguiente: sin
+    esto, acumularlos termina en un cierre nativo de Qt en la clase de Revisión CM."""
+    import gc
+    from PyQt6.QtCore import QEvent
+    from PyQt6.QtWidgets import QApplication
+    gc.collect()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    QApplication.processEvents()
+
+
 def _run_group_and_time(suite: unittest.TestSuite, result: AuditingTestResult) -> float:
+    _liberar_widgets_previos()
     start = time.perf_counter()
     suite.run(result)
     return round((time.perf_counter() - start) * 1000, 3)

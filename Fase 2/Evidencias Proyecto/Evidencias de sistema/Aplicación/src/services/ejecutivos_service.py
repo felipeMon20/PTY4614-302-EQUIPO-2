@@ -27,12 +27,12 @@ _NOMBRES_IGNORADOS = {"", "-", "nan", "none", "desconocido", "no aplica"}
 # Directorio inicial de ejemplo (nombre en el RM, correo, alias). Datos ficticios
 # de esta versión pública; en producción el archivo lo mantiene el negocio.
 _SEMILLA = [
-    ("Andres Muestra Silva", "andres.muestra.silva@ejemplo.example", ""),
-    ("Carlos Ficticio Diaz", "carlos.ficticio.diaz@ejemplo.example", ""),
-    ("Claudia Test Fuentes", "claudia.test.fuentes@ejemplo.example", ""),
-    ("Juan Prueba Soto", "juan.prueba.soto@ejemplo.example", "Juan Carlos Prueba"),
-    ("Maria Demo Rojas", "maria.demo.rojas@ejemplo.example", ""),
-    ("Paula Ejemplo Muñoz", "paula.ejemplo.munoz@ejemplo.example", ""),
+    ("Andres Muestra Silva", "andres.muestra.silva@ejemplo.com", ""),
+    ("Carlos Ficticio Diaz", "carlos.ficticio.diaz@ejemplo.com", ""),
+    ("Claudia Test Fuentes", "claudia.test.fuentes@ejemplo.com", ""),
+    ("Juan Prueba Soto", "juan.prueba.soto@ejemplo.com", "Juan Carlos Prueba"),
+    ("Maria Demo Rojas", "maria.demo.rojas@ejemplo.com", ""),
+    ("Paula Ejemplo Muñoz", "paula.ejemplo.munoz@ejemplo.com", ""),
 ]
 
 
@@ -97,7 +97,7 @@ def buscar_ejecutivo(nombre, directorio=None, incluir_inactivos=False):
     """Fila (dict) del ejecutivo que corresponde a `nombre`, o None. Coincide
     por nombre o alias sin importar mayúsculas/tildes; si no hay coincidencia
     exacta, acepta un nombre más largo que contenga el nombre y apellido
-    registrados (ej. "Carlos Ficticio Diaz")."""
+    registrados (ej. "Leonardo Gomez Correa")."""
     directorio = leer_ejecutivos() if directorio is None else directorio
     consulta = normalizar_nombre(nombre)
     if not consulta or consulta in _NOMBRES_IGNORADOS or directorio.empty:

@@ -1,4 +1,7 @@
+import hashlib
 import os
+import pickle
+import threading
 import time
 import uuid
 import urllib3
@@ -11,7 +14,6 @@ import config.settings
 from src.core.cdb_columnas import cdb_a_memoria, asegurar_cdb_flota
 from src.core.dataframe_formatter import DataFrameFormatter, aplicar_por_fila_memoizado
 from src.core.constants import *
-from src.core.perf_log import medir
 from src.core.hilos import iniciar_hilo_retenido
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -180,6 +182,10 @@ def leer_datos_principales(filepath):
             except Exception: pass
 
     df = asegurar_cdb_flota(cdb_a_memoria(df))
+    # clean() recalcula TÉRMINO CONTRATO: las diferencias con INICIO + DURACIÓN
+    # se detectan antes y viajan en df.attrs para el botón de Comercial.
+    from src.services.comercial_services import detectar_termino_distinto_de_duracion
+    termino_distinto = detectar_termino_distinto_de_duracion(df)
     df = DataFrameFormatter.clean(df)
 
     for col in COLUMNAS_FECHA_LEGADO:
@@ -227,11 +233,68 @@ def leer_datos_principales(filepath):
             pass
 
     load_time = round(time.time() - start_time, 2)
+    df.attrs['termino_distinto_de_duracion'] = termino_distinto
     return (df, df_logs, df_deleted, load_time, deleted_sheets)
 
 # =========================================================
 # MOTOR 2: DEDICADO SOLO A PROVISIONES
 # =========================================================
+# Copia rápida del resultado (20-10-2026): leer provisionFelipe.xlsx con
+# openpyxl toma ~1 s en el hilo de fondo compitiendo por el GIL con la
+# interfaz. Solo se usa si el Excel tiene la misma fecha de modificación y
+# tamaño que cuando se guardó la copia; cualquier escritura la invalida.
+_DIR_CACHE = os.path.join(os.getcwd(), 'data', 'cache')
+_VERSION_CACHE_PROVISIONES = 1
+
+
+def _ruta_cache_provisiones(ruta):
+    # Una por ruta de origen: los tests apuntan a otro Excel y no deben pisarse
+    hash_ruta = hashlib.sha1(os.path.abspath(ruta).encode('utf-8')).hexdigest()[:16]
+    return os.path.join(_DIR_CACHE, f'provisiones_{hash_ruta}.pkl')
+
+
+def _firma_archivo(ruta):
+    estado = os.stat(ruta)
+    return (estado.st_mtime_ns, estado.st_size)
+
+
+def _leer_cache_provisiones(ruta, firma):
+    try:
+        with open(_ruta_cache_provisiones(ruta), 'rb') as archivo:
+            guardado = pickle.load(archivo)
+        if guardado.get('version') == _VERSION_CACHE_PROVISIONES and guardado.get('firma') == firma:
+            return guardado['datos']
+    except Exception:
+        pass
+    return None
+
+
+def _guardar_cache_provisiones(ruta, firma, datos):
+    """Escritura atómica; deja solo la copia de esta ruta (las de otras
+    rutas, como las de los tests, se borran)."""
+    destino = _ruta_cache_provisiones(ruta)
+    temporal = f"{destino}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        os.makedirs(_DIR_CACHE, exist_ok=True)
+        with open(temporal, 'wb') as archivo:
+            pickle.dump({'version': _VERSION_CACHE_PROVISIONES, 'firma': firma, 'datos': datos},
+                        archivo, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(temporal, destino)
+    except Exception:
+        try:
+            os.remove(temporal)
+        except OSError:
+            pass
+        return
+    try:
+        for nombre in os.listdir(_DIR_CACHE):
+            ruta_otro = os.path.join(_DIR_CACHE, nombre)
+            if nombre.startswith('provisiones_') and nombre.endswith('.pkl') and ruta_otro != destino:
+                os.remove(ruta_otro)
+    except OSError:
+        pass
+
+
 class ProvisionesLoaderThread(QThread):
     data_loaded_signal = pyqtSignal(object) 
     error_signal = pyqtSignal(str)
@@ -246,11 +309,19 @@ class ProvisionesLoaderThread(QThread):
             return
 
         try:
+            # La firma se toma antes de leer: si el archivo cambia a mitad de
+            # la lectura, la copia queda con la firma vieja y no se reutiliza
+            firma = _firma_archivo(self.filepath)
+            datos = _leer_cache_provisiones(self.filepath, firma)
+            if datos is not None:
+                self.data_loaded_signal.emit(datos)
+                return
+
             df_prov = pd.DataFrame()
             lista_planes = []
             valor_uf = 0
             valor_civ = 0
-            
+
             try:
                 # Un solo ExcelFile para las 3 hojas: antes cada read_excel
                 # volvía a abrir y parsear el libro completo.
@@ -328,7 +399,9 @@ class ProvisionesLoaderThread(QThread):
                 self.error_signal.emit(f"Error procesando provisiones: {str(e)}")
                 return
 
-            self.data_loaded_signal.emit((df_prov, lista_planes, valor_uf, valor_civ))
+            datos = (df_prov, lista_planes, valor_uf, valor_civ)
+            _guardar_cache_provisiones(self.filepath, firma, datos)
+            self.data_loaded_signal.emit(datos)
             
         except Exception as e:
             self.error_signal.emit(str(e))
@@ -368,8 +441,7 @@ class ContactosLoaderThread(QThread):
             
             for intento in range(intentos_maximos):
                 try:
-                    with medir("Contactos: lectura del Excel", hilo="WORKER"):
-                        df = pd.read_excel(ruta_lectura, sheet_name=0)
+                    df = pd.read_excel(ruta_lectura, sheet_name=0)
                     break
                 except PermissionError:
                     if intento == intentos_maximos - 1: raise 
@@ -448,6 +520,7 @@ class DataManager(QObject):
         super().__init__()
 
         self.df_master = pd.DataFrame()
+        self.termino_distinto_de_duracion = {}
         self.df_logs = pd.DataFrame()
         self.df_deleted = pd.DataFrame()
         # deleted_sheets: {nombre_modulo: DataFrame} — una entrada por hoja de
@@ -541,6 +614,8 @@ class DataManager(QObject):
             df_clean, df_logs, df_deleted = dataframes
 
         self.df_master = df_clean
+        # Se saca de attrs: pandas lo copia en cada operación sobre el df
+        self.termino_distinto_de_duracion = df_clean.attrs.pop('termino_distinto_de_duracion', {})
         self.df_logs = df_logs
         self.df_deleted = df_deleted
         self.deleted_sheets = deleted_sheets

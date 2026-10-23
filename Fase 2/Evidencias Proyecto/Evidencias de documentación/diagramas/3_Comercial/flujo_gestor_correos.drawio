@@ -1,0 +1,168 @@
+<mxfile host="65bd71144e">
+    <diagram id="flujo-gestor-correos" name="Flujo del Gestor de Correos">
+        <mxGraphModel dx="2068" dy="1346" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="titulo" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=13;" value="&lt;b style=&quot;font-size:20px&quot;&gt;Gestor de Correos: cómo funciona hoy&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#607D8B&quot;&gt;Desde que se abre hasta que los borradores quedan en Outlook&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="50" width="560" x="20" y="-130" as="geometry"/>
+                </mxCell>
+                <mxCell id="nota_entrada" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;dashed=1;strokeWidth=2;fontFamily=Helvetica;fontSize=12;fontColor=#5D4037;align=left;spacing=10;" value="&lt;b&gt;Dónde se abre:&lt;/b&gt; desde Comercial (Gestionar CM › Enviar correo, con los VIN y la plantilla ya elegidos), desde General (por VIN) o directo. Si falta algún VIN en Correos.csv, Comercial avisa y ofrece abrir el Gestor para sincronizar primero." vertex="1">
+                    <mxGeometry height="85" width="620" x="720" y="-140" as="geometry"/>
+                </mxCell>
+                <mxCell id="zona_sync" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fillColor=#FFF7EE;strokeColor=#D79B00;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontFamily=Helvetica;fontSize=13;spacing=6;" value="&lt;b&gt;Sincronizar BBDD Correos&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot; color=&quot;#8A5A00&quot;&gt;Solo a mano, nunca se dispara sola&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="710" width="250" x="170" y="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="zona_envio" parent="1" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fillColor=#FDF3F2;strokeColor=#B85450;dashed=1;strokeWidth=1.5;verticalAlign=top;align=left;fontFamily=Helvetica;fontSize=13;spacingLeft=12;spacingTop=4;" value="&lt;b&gt;Envío por Outlook&lt;/b&gt;" vertex="1">
+                    <mxGeometry height="270" width="800" x="700" y="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="javiera" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontFamily=Helvetica;fontSize=13;fontStyle=1;" value="Javiera" vertex="1">
+                    <mxGeometry height="60" width="30" x="20" y="2" as="geometry"/>
+                </mxCell>
+                <mxCell id="inicio" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontFamily=Helvetica;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;" value="Abre el Gestor&lt;br&gt;de Correos" vertex="1">
+                    <mxGeometry height="50" width="50" x="95" y="7" as="geometry"/>
+                </mxCell>
+                <mxCell id="existe" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;fontStyle=1;" value="¿Existe&lt;br&gt;Correos.csv?" vertex="1">
+                    <mxGeometry height="100" width="170" x="210" y="-18" as="geometry"/>
+                </mxCell>
+                <mxCell id="carga" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;fontStyle=1;spacing=6;" value="Carga Correos.csv&lt;br&gt;y arma la tabla" vertex="1">
+                    <mxGeometry height="64" width="190" x="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="bandejas" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Cuatro bandejas con contador: Contratos, Por vencer (≤ 30 días), Sin correo y Con correo" vertex="1">
+                    <mxGeometry height="80" width="220" x="720" y="-8" as="geometry"/>
+                </mxCell>
+                <mxCell id="filtro" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Filtra por plan o busca por razón social, RUT o VIN" vertex="1">
+                    <mxGeometry height="64" width="210" x="1000" as="geometry"/>
+                </mxCell>
+                <mxCell id="tabla" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Tabla por cliente; al abrir uno se ven sus unidades" vertex="1">
+                    <mxGeometry height="64" width="210" x="1270" as="geometry"/>
+                </mxCell>
+                <mxCell id="s1" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="1. Lee Comercial: el contrato actual de cada VIN" vertex="1">
+                    <mxGeometry height="70" width="190" x="200" y="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="s2" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="2. Revisa que haya CDB FLOTA; si no hay ninguno, se detiene" vertex="1">
+                    <mxGeometry height="70" width="190" x="200" y="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="s3" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="3. Lee contactos.xlsx; si falta, cruza sin la agenda" vertex="1">
+                    <mxGeometry height="70" width="190" x="200" y="410" as="geometry"/>
+                </mxCell>
+                <mxCell id="s4" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="4. Cruza por CDB FLOTA y une los correos distintos con «; »" vertex="1">
+                    <mxGeometry height="70" width="190" x="200" y="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="prev" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Vista previa: total, con correo y sin correo" vertex="1">
+                    <mxGeometry height="70" width="190" x="200" y="630" as="geometry"/>
+                </mxCell>
+                <mxCell id="guardar" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;fontStyle=1;spacing=6;" value="Guarda Correos.csv, con copia de seguridad previa" vertex="1">
+                    <mxGeometry height="70" width="190" x="200" y="740" as="geometry"/>
+                </mxCell>
+                <mxCell id="nota_cols" parent="1" style="rounded=1;arcSize=5;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#9E9E9E;fontFamily=Helvetica;fontSize=12;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Columnas de Correos.csv&lt;/b&gt;&lt;br&gt;VIN, CHASIS, RAZÓN SOCIAL, RUT, TIPO DE SERVICIO, FECHA TERMINO y CORREO ELECTRÓNICO.&lt;br&gt;&lt;br&gt;Razón social y RUT salen de Comercial. El correo sale solo de contactos.xlsx. BBDD CLIENTES CM ya no participa. Hay una fila por cada VIN, tenga o no correo." vertex="1">
+                    <mxGeometry height="170" width="380" x="-250" y="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="marca" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Marca con la casilla el cliente entero o unidades sueltas" vertex="1">
+                    <mxGeometry height="64" width="210" x="1270" y="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="panel" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Panel Redactar: elige una de las 12 plantillas (o personalizado), asunto y CC" vertex="1">
+                    <mxGeometry height="80" width="210" x="1000" y="162" as="geometry"/>
+                </mxCell>
+                <mxCell id="destinatarios" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Lista de destinatarios, agrupados por razón social y correo" vertex="1">
+                    <mxGeometry height="64" width="210" x="720" y="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="abrir" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;fontStyle=1;spacing=6;" value="«Abrir N borradores en Outlook»" vertex="1">
+                    <mxGeometry height="64" width="210" x="720" y="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="crea" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Por cada destinatario crea el borrador con la plantilla y lo muestra" vertex="1">
+                    <mxGeometry height="80" width="210" x="1000" y="332" as="geometry"/>
+                </mxCell>
+                <mxCell id="espera" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Espera a que lo envíes o lo cierres antes de abrir el siguiente" vertex="1">
+                    <mxGeometry height="80" width="210" x="1270" y="332" as="geometry"/>
+                </mxCell>
+                <mxCell id="registro" parent="1" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;spacing=6;" value="Anota el resultado en el Registro de envíos: ENVIADO o CERRADO SIN ENVIAR" vertex="1">
+                    <mxGeometry height="80" width="210" x="1270" y="445" as="geometry"/>
+                </mxCell>
+                <mxCell id="quedan" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#d6b656;strokeWidth=2;shadow=1;fontFamily=Helvetica;fontSize=12;fontStyle=1;" value="¿Quedan&lt;br&gt;destinatarios?" vertex="1">
+                    <mxGeometry height="90" width="170" x="1020" y="440" as="geometry"/>
+                </mxCell>
+                <mxCell id="fin" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontFamily=Helvetica;fontSize=16;fontStyle=1;" value="FIN" vertex="1">
+                    <mxGeometry height="80" width="80" x="800" y="445" as="geometry"/>
+                </mxCell>
+                <mxCell id="nota_sin_correo" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;dashed=1;strokeWidth=2;fontFamily=Helvetica;fontSize=12;fontColor=#5D4037;align=left;spacing=10;" value="&lt;b&gt;Sin correo:&lt;/b&gt; el borrador se abre igual, sin destinatario, y se completa en Outlook. Antes se puede agregar el correo con clic derecho sobre la fila." vertex="1">
+                    <mxGeometry height="60" width="800" x="700" y="600" as="geometry"/>
+                </mxCell>
+                <mxCell id="a0" edge="1" parent="1" source="javiera" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;endArrow=block;endFill=1;" target="inicio" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" edge="1" parent="1" source="inicio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="existe" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" edge="1" parent="1" source="existe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;" target="carga" value="Sí">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" edge="1" parent="1" source="existe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="s1" value="No: la tabla queda vacía">
+                    <mxGeometry relative="1" x="-0.6667" y="5" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e4" edge="1" parent="1" source="carga" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="bandejas" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" edge="1" parent="1" source="bandejas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="filtro" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" edge="1" parent="1" source="filtro" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="tabla" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" edge="1" parent="1" source="tabla" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="marca" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" edge="1" parent="1" source="marca" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="panel" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" edge="1" parent="1" source="panel" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="destinatarios" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e10" edge="1" parent="1" source="destinatarios" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="abrir" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" edge="1" parent="1" source="abrir" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="crea" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e12" edge="1" parent="1" source="crea" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="espera" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e13" edge="1" parent="1" source="espera" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="registro" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e14" edge="1" parent="1" source="registro" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;" target="quedan" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e15" edge="1" parent="1" source="quedan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="crea" value="Sí">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e16" edge="1" parent="1" source="quedan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#546E7A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontStyle=1;labelBackgroundColor=#FFFFFF;" target="fin" value="No">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f1" edge="1" parent="1" source="s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D79B00;strokeWidth=2;endArrow=block;endFill=1;" target="s2" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f2" edge="1" parent="1" source="s2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D79B00;strokeWidth=2;endArrow=block;endFill=1;" target="s3" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f3" edge="1" parent="1" source="s3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D79B00;strokeWidth=2;endArrow=block;endFill=1;" target="s4" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f4" edge="1" parent="1" source="s4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D79B00;strokeWidth=2;endArrow=block;endFill=1;" target="prev" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f5" edge="1" parent="1" source="prev" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D79B00;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;" target="guardar" value="Aprueba">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f6" edge="1" parent="1" source="guardar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D79B00;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" target="carga" value="Recarga la tabla">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="f7" edge="1" parent="1" source="nota_cols" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;dashed=1;endArrow=none;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="guardar" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

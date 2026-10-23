@@ -16,7 +16,7 @@ Este archivo es el punto de entrada directo y realiza las siguientes acciones:
     
 - **Genera el ícono de la app:** Utiliza `create_white_background_icon` para procesar el logo (`src/assets/splash_logo.png`), dándole fondo blanco, y lo asigna a la ventana.
     
-- **Agrupa el proceso en Windows:** Utiliza `ctypes` para asignar un identificador (`gestor.sscc.gestion.1`) al proceso, lo que afecta cómo se agrupa en la barra de tareas.
+- **Agrupa el proceso en Windows:** Utiliza `ctypes` para asignar un identificador (`volvo.dashboard.gestion.1`) al proceso, lo que afecta cómo se agrupa en la barra de tareas.
     
 - **Carga el Splash Screen (actualizado 01-10-2026):** Instancia `CustomSplashScreen`, que hereda la animación de `src/ui/pantalla_inicio.py` (dibujada con `QPainter`, sin hojas de estilo).
     

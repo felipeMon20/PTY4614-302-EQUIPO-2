@@ -1,5 +1,5 @@
 """Backend de escritura CSV para ExcelWriter (Fase 1, migracion PruebasFM.xlsx
--> RM_CONTRATOS.csv, 23-09-2026). Implementa el mismo contrato/comportamiento que
+-> RM_JAVI.csv, 23-09-2026). Implementa el mismo contrato/comportamiento que
 la rama .xlsx de update_cells/add_new_row/delete_row en excel_writer.py, pero
 persistiendo sobre un DataFrame + pd.read_csv/to_csv en vez de un Workbook de
 openpyxl. Estas funciones NO se llaman directo desde la UI: ExcelWriter las
@@ -225,9 +225,10 @@ def update_cells_csv(writer, target_file, changes_dict, module_name="Sistema"):
 
             for col_name, new_value in cambios.items():
                 new_value = normalizar_para_escritura(col_name, new_value)
-                if col_name == 'TÉRMINO CONTRATO':
+                if col_name == 'TÉRMINO CONTRATO' and not data.get('escribir_termino'):
                     # Igual que la rama .xlsx: nunca se escribe directo, se
-                    # recalcula siempre en DataFrameFormatter.clean().
+                    # recalcula siempre en DataFrameFormatter.clean(). Solo
+                    # "Revisar fechas" lo graba, para corregir el archivo.
                     continue
 
                 if col_name in df.columns:

@@ -1,5 +1,5 @@
 # Paleta de colores oficial del sistema
-BRAND_BLUE = "#003057"
+VOLVO_BLUE = "#003057"
 PRIMARY = "#2563EB"       # Azul moderno (Botones principales)
 SECONDARY = "#60A5FA"     # Azul claro
 SUCCESS = "#10B981"       # Verde (Vigente, Conectado)

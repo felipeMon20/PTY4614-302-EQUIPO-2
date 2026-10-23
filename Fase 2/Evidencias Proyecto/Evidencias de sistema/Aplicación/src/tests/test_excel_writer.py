@@ -395,7 +395,7 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
     para no tocar data/backups real -- mismo patron que el resto de esta
     clase de test, ver test_escenario_4/5 arriba)."""
 
-    COLUMNAS = ['VIN', 'ESTADO DEL CM'] + comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM
+    COLUMNAS = ['VIN', 'ESTADO DEL CM', 'ESTADO COMERCIAL', 'ETAPA GESTIÓN', 'N CONTRATO 3PC', 'PAGO CM']
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -417,11 +417,10 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
         wb.close()
 
     def _valid_para(self, vin):
-        """Misma construccion que comercial.py::_on_accion_cm_confirmar_baja_clicked
-        (post-fix): {'VIN': vin, 'cambios': {...}}, reutilizando
-        aplica_regla_terminated_cm tal cual, sin duplicar la regla."""
-        limpieza = comercial_services.aplica_regla_terminated_cm('ESTADO DEL CM', 'Terminated')
-        cambios = {'ESTADO DEL CM': 'Terminated', **limpieza}
+        """Misma construccion que comercial.py::_on_accion_cm_confirmar_baja_clicked:
+        {'VIN': vin, 'cambios': {...}}. El estado del CM pasa a Terminated y el
+        contrato a BAJA sin tocar los datos del CM."""
+        cambios = {'ESTADO DEL CM': 'Terminated', 'ESTADO COMERCIAL': 'BAJA', 'ETAPA GESTIÓN': 'OPERACIONES'}
         return {'VIN': vin, 'cambios': cambios}
 
     def _leer_celda(self, vin, columna):
@@ -444,7 +443,7 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
     @patch('src.core.excel_writer.ExcelWriter._crear_backup')
     def test_un_vin_escribe_excel_y_genera_log_por_cada_columna_que_cambia(self, mock_backup):
         self._crear_excel([
-            ['VIN1', 'Expired', '3PC-1', '01-01-2025', '01-01-2026', 'Silver', '15000'],
+            ['VIN1', 'Expired', 'Vigente', 'COMERCIAL', '3PC-1', '15000'],
         ])
         valid = {'VIN1': self._valid_para('VIN1')}
 
@@ -452,11 +451,13 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
         self.assertTrue(resultado, "Fallo: update_cells debe devolver True con el dict correcto (con 'VIN').")
 
         self.assertEqual(self._leer_celda('VIN1', 'ESTADO DEL CM'), 'Terminated')
-        for col in comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM:
-            self.assertEqual(self._leer_celda('VIN1', col), '-', f"Fallo: {col} no quedó limpio en el Excel real.")
+        self.assertEqual(self._leer_celda('VIN1', 'ESTADO COMERCIAL'), 'BAJA')
+        self.assertEqual(self._leer_celda('VIN1', 'ETAPA GESTIÓN'), 'OPERACIONES')
+        self.assertEqual(self._leer_celda('VIN1', 'N CONTRATO 3PC'), '3PC-1', "Fallo: los datos del CM deben conservarse.")
+        self.assertEqual(self._leer_celda('VIN1', 'PAGO CM'), '15000')
 
         df_log = self._leer_log()
-        self.assertEqual(len(df_log), 6, "Fallo: deben generarse 6 líneas (ESTADO DEL CM + 5 columnas de limpieza).")
+        self.assertEqual(len(df_log), 3, "Fallo: deben generarse 3 líneas (ESTADO DEL CM, ESTADO COMERCIAL y ETAPA GESTIÓN).")
 
         fila_estado = df_log[df_log['CAMPO MODIFICADO'] == 'ESTADO DEL CM'].iloc[0]
         self.assertEqual(fila_estado['IDENTIFICADOR'], 'VIN1')
@@ -464,39 +465,29 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
         self.assertEqual(fila_estado['VALOR ANTERIOR'], 'Expired')
         self.assertEqual(fila_estado['NUEVO VALOR'], 'Terminated')
 
-        valores_anteriores_esperados = {
-            'N CONTRATO 3PC': '3PC-1', 'FECHA INICIO CM': '01-01-2025',
-            'FECHA TERMINO CM': '01-01-2026', 'TIPO DE CM': 'Silver', 'PAGO CM': '15000',
-        }
-        for col, valor_anterior in valores_anteriores_esperados.items():
-            fila = df_log[df_log['CAMPO MODIFICADO'] == col].iloc[0]
-            self.assertEqual(fila['IDENTIFICADOR'], 'VIN1')
-            self.assertEqual(fila['VALOR ANTERIOR'], valor_anterior)
-            self.assertEqual(fila['NUEVO VALOR'], '-')
-
     @patch('src.core.excel_writer.ExcelWriter._crear_backup')
     def test_columna_ya_en_su_valor_final_no_genera_log_innecesario(self, mock_backup):
-        """Si PAGO CM ya era '-' antes de confirmar la baja, update_cells()
-        no debe generar una línea de log para esa columna (old_value ==
-        new_value, ver excel_writer.py update_cells())."""
+        """Si el contrato ya estaba en BAJA antes de confirmar la baja,
+        update_cells() no debe generar una línea de log para esa columna
+        (old_value == new_value, ver excel_writer.py update_cells())."""
         self._crear_excel([
-            ['VIN1', 'Expired', '3PC-1', '01-01-2025', '01-01-2026', 'Silver', '-'],
+            ['VIN1', 'Expired', 'BAJA', 'COMERCIAL', '3PC-1', '15000'],
         ])
         valid = {'VIN1': self._valid_para('VIN1')}
 
         self.writer.update_cells(valid, module_name="Comercial", custom_filepath=self.excel_path)
 
         df_log = self._leer_log()
-        self.assertEqual(len(df_log), 5, "Fallo: PAGO CM ya estaba en '-'; no debía generar una línea de log.")
-        self.assertNotIn('PAGO CM', df_log['CAMPO MODIFICADO'].tolist())
+        self.assertEqual(len(df_log), 2, "Fallo: ESTADO COMERCIAL ya estaba en BAJA; no debía generar una línea de log.")
+        self.assertNotIn('ESTADO COMERCIAL', df_log['CAMPO MODIFICADO'].tolist())
 
     @patch('src.core.excel_writer.ExcelWriter._crear_backup')
     def test_multiples_vin_en_una_sola_llamada_escriben_y_loguean_todos(self, mock_backup):
         self._crear_excel([
-            ['VIN1', 'Expired', '3PC-1', '01-01-2025', '01-01-2026', 'Silver', '15000'],
-            ['VIN2', 'Expired', '3PC-2', '02-01-2025', '02-01-2026', 'Gold', '20000'],
-            ['VIN3', 'Expired', '3PC-3', '03-01-2025', '03-01-2026', 'Basico', '10000'],
-            ['VIN_NO_SELECCIONADO', 'Expired', '3PC-9', '09-01-2025', '09-01-2026', 'Gold', '99999'],
+            ['VIN1', 'Expired', 'Vigente', 'COMERCIAL', '3PC-1', '15000'],
+            ['VIN2', 'Expired', 'Vigente', 'COMERCIAL', '3PC-2', '20000'],
+            ['VIN3', 'Expired', 'Vigente', 'COMERCIAL', '3PC-3', '10000'],
+            ['VIN_NO_SELECCIONADO', 'Expired', 'Vigente', 'COMERCIAL', '3PC-9', '99999'],
         ])
         valid = {vin: self._valid_para(vin) for vin in ('VIN1', 'VIN2', 'VIN3')}
 
@@ -505,18 +496,19 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
 
         for vin in ('VIN1', 'VIN2', 'VIN3'):
             self.assertEqual(self._leer_celda(vin, 'ESTADO DEL CM'), 'Terminated')
-            for col in comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM:
-                self.assertEqual(self._leer_celda(vin, col), '-')
+            self.assertEqual(self._leer_celda(vin, 'ESTADO COMERCIAL'), 'BAJA')
+            self.assertNotEqual(self._leer_celda(vin, 'N CONTRATO 3PC'), '-')
 
         # El VIN no seleccionado no debe tocarse.
         self.assertEqual(self._leer_celda('VIN_NO_SELECCIONADO', 'ESTADO DEL CM'), 'Expired')
+        self.assertEqual(self._leer_celda('VIN_NO_SELECCIONADO', 'ESTADO COMERCIAL'), 'Vigente')
         self.assertEqual(self._leer_celda('VIN_NO_SELECCIONADO', 'PAGO CM'), '99999')
 
         df_log = self._leer_log()
-        self.assertEqual(len(df_log), 18, "Fallo: 3 VIN x 6 columnas cada uno = 18 líneas de log.")
+        self.assertEqual(len(df_log), 9, "Fallo: 3 VIN x 3 columnas cada uno = 9 líneas de log.")
         for vin in ('VIN1', 'VIN2', 'VIN3'):
-            self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == vin]), 6,
-                              f"Fallo: {vin} debería generar exactamente 6 líneas de log.")
+            self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == vin]), 3,
+                              f"Fallo: {vin} debería generar exactamente 3 líneas de log.")
         self.assertNotIn('VIN_NO_SELECCIONADO', df_log['IDENTIFICADOR'].tolist())
 
     @patch('src.core.excel_writer.ExcelWriter._crear_backup')
@@ -526,7 +518,7 @@ class TestUpdateCellsConfirmarBajaCm(unittest.TestCase):
         ubicar la fila (usa data.get('VIN'), no la clave del diccionario) y
         debe fallar sin escribir nada ni generar ningún log."""
         self._crear_excel([
-            ['VIN1', 'Expired', '3PC-1', '01-01-2025', '01-01-2026', 'Silver', '15000'],
+            ['VIN1', 'Expired', 'Vigente', 'COMERCIAL', '3PC-1', '15000'],
         ])
         valid_roto = {'VIN1': {'cambios': {'ESTADO DEL CM': 'Terminated'}}}  # sin 'VIN'
 

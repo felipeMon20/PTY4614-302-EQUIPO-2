@@ -13,11 +13,12 @@ from src.core.data_manager import DataManager
 from src.core.excel_writer import ExcelWriter
 from src.core.hilos import iniciar_hilo_retenido
 from src.theme.theme_manager import ThemeManager
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.ui import admin_estilo, comercial_estilo as estilo_com
 from src.ui.guardado_overlay import mostrar_guardando, guardado_listo, terminar_guardando, crear_tarjeta_carga
 from src.ui.contactos_agregar import ContactosAddDialog
 from src.ui.dialogo_accion import DialogoAccion
+from src.ui.esqueleto_carga import animar_sobre_tabla
 from src.theme import tema
 from src.services import contactos_service, powerbi_cache_service
 import config.settings
@@ -80,7 +81,7 @@ class DeleteContactoThread(QThread):
         self.finished_signal.emit(success, self.keys_dict)
 
 # =========================================================
-# WORKER: Sincronizador de Power BI (equipo Power BI)
+# WORKER: Sincronizador de Power BI (David)
 # =========================================================
 class PowerBiSyncWorker(QThread):
     log_signal = pyqtSignal(str)          
@@ -94,14 +95,14 @@ class PowerBiSyncWorker(QThread):
     def run(self):
         try:
             if not POWERBI_EXCEL_PATH or not os.path.exists(POWERBI_EXCEL_PATH):
-                raise Exception("La ruta de 'BBDD CLIENTES CM' no está configurada o el archivo no existe.\nVe a Configuración para enlazar el archivo del equipo Power BI.")
+                raise Exception("La ruta de 'BBDD CLIENTES CM' no está configurada o el archivo no existe.\nVe a Configuración para enlazar el archivo de David.")
 
             self.log_signal.emit("[SISTEMA] Leyendo BBDD CLIENTES CM (cache CSV interno)...")
             df_bbdd = powerbi_cache_service.leer_bbdd_clientes_cm(POWERBI_EXCEL_PATH)
             
             cdbs_activos = self.df_comercial['CDB'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().unique().tolist()
             if 'CDB' not in df_bbdd.columns: 
-                raise Exception("El archivo del equipo Power BI no tiene la columna 'CDB'. Verifica el formato.")
+                raise Exception("El archivo de David no tiene la columna 'CDB'. Verifica el formato.")
                 
             self.log_signal.emit("[CRUZANDO] Limpiando decimales fantasma y filtrando base gigante...")
             
@@ -171,7 +172,10 @@ class ContactosModule(QWidget):
         
         self.data_manager.contactos_ready.connect(self._on_data_ready)
         self.data_manager.load_contactos_error.connect(self._on_load_error)
-        
+        self._data_dirty = False
+        self._firma_cargada = None
+        self.data_manager.data_ready.connect(self._marcar_dirty)
+
         self._setup_ui()
         self.table_plat.clicked.connect(self._on_table_plat_clicked)
         
@@ -220,7 +224,7 @@ class ContactosModule(QWidget):
         self.btn_add.clicked.connect(self._open_add_dialog)
 
         self.btn_importar = admin_estilo.boton_capsula(
-            self._barra, 'fa5s.file-import', "Importar contactos nuevos desde el Excel del bot de Servicios Conectados", QPushButton())
+            self._barra, 'fa5s.file-import', "Importar contactos nuevos desde el Excel del bot de Volvo Connect", QPushButton())
         self.btn_importar.clicked.connect(self._importar_contactos_bot)
 
         self.btn_save = admin_estilo.boton_capsula(self._barra, 'fa5s.save', "Guardar cambios", QPushButton())
@@ -231,7 +235,7 @@ class ContactosModule(QWidget):
             QPushButton())
         self.btn_corregir_tel.clicked.connect(self._corregir_telefonos)
 
-        self.btn_filtro_lista = admin_estilo.boton_capsula(self._barra, 'fa5s.filter', "Filtrar", QPushButton())
+        self.btn_filtro_lista = admin_estilo.boton_capsula(self._barra, 'fa5s.filter', "Filtrar", QPushButton(), grupo='filtros')
         self.btn_filtro_lista.setStyleSheet(self.btn_filtro_lista.styleSheet() + "QPushButton::menu-indicator { image: none; width: 0; }")
 
         self.menu_filtro = QMenu(self)
@@ -271,10 +275,10 @@ class ContactosModule(QWidget):
         self.menu_filtro.addAction(self.action_filtro_widget)
         self.btn_filtro_lista.setMenu(self.menu_filtro)
 
-        self.btn_export_excel = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar Excel", QPushButton())
+        self.btn_export_excel = admin_estilo.boton_capsula(self._barra, 'fa5s.file-excel', "Exportar Excel", QPushButton(), grupo='generales')
         self.btn_export_excel.clicked.connect(self._export_current_tab)
 
-        self.btn_reload = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Recargar", QPushButton())
+        self.btn_reload = admin_estilo.boton_capsula(self._barra, 'fa5s.sync-alt', "Recargar", QPushButton(), grupo='generales')
         # El botón explícito Recargar borra pending_changes pasando clear_pending=True
         self.btn_reload.clicked.connect(lambda: self.load_data(clear_pending=True))
 
@@ -294,7 +298,7 @@ class ContactosModule(QWidget):
         self.tabs = QTabWidget()
 
         # TABLA DE CONTACTOS (CRUD SIN PAGINACIÓN - MOSTRANDO ID REAL DEL EXCEL)
-        self.table_plat = AppTableWidget()
+        self.table_plat = VolvoTableWidget()
         self.table_plat.menu_type = "contactos" 
         self.table_plat.action_eliminar.connect(self._handle_eliminar)
         self.table_plat.item_edited.connect(self.on_item_edited)
@@ -338,7 +342,7 @@ class ContactosModule(QWidget):
         self.table_plat.sort_changed.connect(self.filter_tables)
 
         # Lista de flotas (CDB, Flota): al hacer clic se muestran sus contactos
-        self.table_flotas = AppTableWidget()
+        self.table_flotas = VolvoTableWidget()
         self.table_flotas.menu_type = "general"
         self.table_flotas.sort_changed.connect(self.filter_tables)
         self.model_flotas = PandasTableModel(alineacion=Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
@@ -363,8 +367,8 @@ class ContactosModule(QWidget):
         self.table_plat.search_input = self.search_input
         self.table_plat.filter_tables = self.filter_tables
 
-        # TABLA DE BBDD POWER BI
-        self.table_emp = AppTableWidget()
+        # TABLA DE BBDD DAVID
+        self.table_emp = VolvoTableWidget()
         self.table_emp.menu_type = "general"  # directorio de solo lectura: sin "Eliminar Camión"
         self.table_emp.sort_changed.connect(self.filter_tables)
         self.model_emp = PandasTableModel(alineacion=Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
@@ -690,6 +694,7 @@ class ContactosModule(QWidget):
         self._actualizar_barra()
         self.render_table()
         self._actualizar_kpis()
+        animar_sobre_tabla(self.table_plat, 350)
 
     def _volver_a_flotas(self):
         self._flota_abierta = None
@@ -697,6 +702,7 @@ class ContactosModule(QWidget):
         self._actualizar_barra()
         self.render_table()
         self._actualizar_kpis()
+        animar_sobre_tabla(self.table_flotas, 350)
 
     def _export_current_tab(self):
         if self.tabs.currentIndex() == 0:
@@ -712,6 +718,8 @@ class ContactosModule(QWidget):
         self.btn_reload.setEnabled(False)
         if clear_pending:
             self.pending_changes.clear()
+        self._data_dirty = False
+        self._firma_cargada = self._firma_archivos()
 
         self._plataforma_cargada = False
         self._empresas_cargada = False
@@ -722,6 +730,26 @@ class ContactosModule(QWidget):
         self._load_empresas_async()
 
         QTimer.singleShot(12000, self._force_unlock_content)
+
+    def _marcar_dirty(self):
+        self._data_dirty = True
+
+    @staticmethod
+    def _firma_archivos():
+        firma = []
+        for ruta in (config.settings.CONTACTOS_EXCEL_PATH, POWERBI_EXCEL_PATH):
+            try:
+                firma.append((ruta, os.path.getmtime(ruta) if ruta else None))
+            except OSError:
+                firma.append((ruta, None))
+        return tuple(firma)
+
+    def refresh_if_dirty(self):
+        """Al volver a la pantalla solo se relee si cambió el RM (data_ready) o
+        alguno de los dos archivos. Releer en cada visita también disparaba
+        contactos_ready, y General, Operaciones y Comercial reprocesaban."""
+        if self._data_dirty or self._firma_archivos() != self._firma_cargada:
+            self.load_data(clear_pending=False)
 
     def _check_carga_completa(self):
         """Solo oculta la pantalla de carga cuando ambas fuentes (contactos.xlsx
@@ -821,7 +849,7 @@ class ContactosModule(QWidget):
 
     def filter_tables(self):
         """Aplica filtros, búsqueda global y overlay seguro sobre el maestro Read-Only."""
-        if self.table_plat.state() == AppTableWidget.State.EditingState:
+        if self.table_plat.state() == VolvoTableWidget.State.EditingState:
             self.table_plat.setFocus()
 
         search_text = self.search_input.text().lower()

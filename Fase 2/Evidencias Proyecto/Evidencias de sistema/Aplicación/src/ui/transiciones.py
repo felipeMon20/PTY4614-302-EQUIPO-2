@@ -87,7 +87,7 @@ class TransicionCirculo(QWidget):
     """Cambio de tema: la foto de la ventana con el tema anterior tapa todo
     mientras se aplica el nuevo, y luego se abre un círculo desde el botón
     que deja ver la app ya cambiada."""
-    DURACION_MS = 320
+    DURACION_MS = 200
 
     def __init__(self, parent):
         super().__init__(parent)

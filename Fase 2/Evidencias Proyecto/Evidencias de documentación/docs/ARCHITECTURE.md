@@ -1,9 +1,9 @@
-> **Documento histórico (movido a `docs/` el 13-10-2026).** Es la primera descripción de la arquitectura (29-08-2026) y está parcialmente desactualizado (por ejemplo, el archivo maestro hoy es `RM_CONTRATOS.csv` y no un `.xlsx`). Ante cualquier diferencia prevalecen los demás documentos de este Vault, ver [[04. Arquitectura y Patrones del Sistema]].
+> **Documento histórico (movido a `docs/` el 13-10-2026).** Es la primera descripción de la arquitectura (29-08-2026) y está parcialmente desactualizado (por ejemplo, el archivo maestro hoy es `RM_JAVI.csv` y no un `.xlsx`). Ante cualquier diferencia prevalecen los demás documentos de este Vault, ver [[04. Arquitectura y Patrones del Sistema]].
 
-# Arquitectura del Sistema - Gestor SSCC 29/08/2026 (desde el 08-10-2026 la aplicación se llama Gestor SSCC)
+# Arquitectura del Sistema - Volvo Dashboard 29/08/2026 (desde el 08-10-2026 la aplicación se llama Gestor SSCC)
 
 ## 1. Visión General del Proyecto
-El **Gestor SSCC** es una aplicación de escritorio nativa desarrollada en Python (PyQt6) diseñada para centralizar, visualizar y gestionar grandes volúmenes de datos operativos y financieros hecho por Felipe Monsalve Umanzor de Duoc UC.
+El **Volvo Dashboard** es una aplicación de escritorio nativa desarrollada en Python (PyQt6) diseñada para centralizar, visualizar y gestionar grandes volúmenes de datos operativos y financieros hecho por Felipe Monsalve Umanzor de Duoc UC.
 
 La arquitectura del sistema está fuertemente inspirada en el patrón **MVC (Modelo-Vista-Controlador)**, desacoplando la lógica de procesamiento de datos (Pandas/Asincronismo) de la capa de presentación visual. Dada la restricción de infraestructura que prohíbe el uso de bases de datos relacionales (SQL), el sistema utiliza archivos Excel (`.xlsx`) como origen maestro de datos (Single Source of Truth), operando mediante procesos ETL (Extracción, Transformación y Carga) en segundo plano.
 
@@ -40,7 +40,7 @@ La gestión de variables de entorno, rutas de archivos y enlaces externos se man
 Este archivo opera como la capa de persistencia dinámica para las rutas de los repositorios de datos y enlaces externos.
 *   **Almacenamiento Estructural:** Guarda las rutas absolutas hacia los archivos maestros, además de las direcciones web utilizadas por los procesos de sincronización y visualización.
 *   **Portabilidad:** La externalización de estas rutas previene que queden codificadas rígidamente (*hardcoded*) en la lógica de negocio, facilitando la adaptación de la herramienta a la estructura de directorios particular de cada máquina o perfil de usuario.
-*   **Configuración actual:** Entre las claves utilizadas por la aplicación se encuentran `EXCEL_PATH`, `LOG_EXCEL_PATH`, `DELETED_LOG_EXCEL_PATH`, `PROVISION_EXCEL_PATH`, `INSTALACIONES_PATH`, `RM_REPORTE_PATH`, `POWERBI_EXCEL_PATH`, `CONTACTOS_EXCEL_PATH`, `CORREOS_EXCEL_PATH`, `PROVISIONES_SHAREPOINT_URL`, `REPORTE_NOTAS_VENTAS_URL` y `POWERBI_EMBED_URL`. (`CUSTOMER_EXCEL_PATH` fue eliminada el 02-09-2026 junto con `direcciones.xlsx`.)
+*   **Configuración actual:** Entre las claves utilizadas por la aplicación se encuentran `EXCEL_PATH`, `LOG_EXCEL_PATH`, `DELETED_LOG_EXCEL_PATH`, `PROVISION_EXCEL_PATH`, `INSTALACIONES_PATH`, `RM_JAVI_PATH`, `POWERBI_EXCEL_PATH`, `CONTACTOS_EXCEL_PATH`, `CORREOS_EXCEL_PATH`, `PROVISIONES_SHAREPOINT_URL`, `REPORTE_NOTAS_VENTAS_URL` y `POWERBI_EMBED_URL`. (`CUSTOMER_EXCEL_PATH` fue eliminada el 02-09-2026 junto con `direcciones.xlsx`.)
 
 ### `config/settings.py`
 Es el módulo central encargado de actuar como puente entre la persistencia (`app_config.json`) y el resto del software.
@@ -78,7 +78,7 @@ Dado que no se utiliza SQL, las operaciones CRUD (Crear, Leer, Actualizar, Borra
 
 ### 4.4. Integración y Monitoreo Continuo
 *   **`file_watcher.py` (Observador del Sistema):** Implementa un vigía de archivos en segundo plano utilizando `watchdog`. Incorpora un freno de eventos repetidos de 5 segundos y un silenciador de 10 segundos asociado a `dm.is_app_saving`, evitando recargas provocadas por la propia aplicación.
-*   **`sharepoint_sync.py` (Sincronización de Provisiones):** Implementa un trabajador (`SharePointSyncWorker`) que procesa el reporte externo de provisiones. Lee la hoja `2026`, identifica registros nuevos mediante `VIN`, evita duplicados y agrega los contratos faltantes al archivo de provisiones preservando las fórmulas relativas mediante `openpyxl` y `Translator`.
+*   **`sharepoint_sync.py` (Sincronización de Provisiones):** Implementa un trabajador (`SharePointSyncWorker`) que procesa el reporte externo de provisiones. Lee la hoja del año en curso (o la más reciente si aún no existe), identifica registros nuevos mediante `VIN`, evita duplicados y agrega los contratos faltantes al archivo de provisiones preservando las fórmulas relativas mediante `openpyxl` y `Translator`.
 *   **`constants.py`:** Centraliza nombres de columnas, estados y mapas semánticos utilizados transversalmente por los módulos, reduciendo la dependencia de textos repetidos y facilitando cambios estructurales en los reportes.
 
 ---
@@ -117,7 +117,7 @@ Componente modal transaccional (`QDialog`) para altas de nuevos vehículos.
 ### 6.3. Módulo Comercial y Sincronización Maestra (`comercial.py`)
 Es el centro operativo principal para el seguimiento comercial.
 *   **Arquitectura No Bloqueante:** Desacopla las transacciones CRUD hacia hilos en segundo plano (`AddRowThread`, `DeleteRowThread`, `SaveExcelThread`), protegiendo el hilo principal de renderizado durante las escrituras.
-*   **Espejo Inteligente e Hilo de Fusión (`RMReporteSyncWorker`):** Ejecuta un proceso en segundo plano para leer el archivo `RM_CONTRATOS` y fusionar la información necesaria con la base comercial, utilizando copias temporales y mecanismos de respaldo.
+*   **Espejo Inteligente e Hilo de Fusión (`RMJaviSyncWorker`):** Ejecuta un proceso en segundo plano para leer el archivo `RM_JAVI` y fusionar la información necesaria con la base comercial, utilizando copias temporales y mecanismos de respaldo.
 *   **Filtros Avanzados y Menús Persistentes (`KeepOpenMenu`):** Integra filtrado paramétrico por estados, industrias, periodos y ejecutivos, además de controles para seleccionar y ajustar columnas de la tabla.
 *   **Acceso a Reporte de Notas de Venta (actualizado 02-09-2026):** Un botón circular amarillo ("BI") abre el enlace externo configurado mediante `REPORTE_NOTAS_VENTAS_URL` para consulta manual en Power BI. Ya no existe autocompletado automático (`_completar_vin_nv`/"Autocompletar VIN"): fue retirado en vez de adaptarlo al nuevo formato del reporte.
 
@@ -209,11 +209,11 @@ Dado que las políticas de infraestructura restringen el uso de servidores SQL, 
 ### 7.1. Archivos principales utilizados
 
 *   `PruebasFM.xlsx` — Base comercial principal.
-*   `provisionContratos.xlsx` — Información y cálculos de provisiones.
+*   `provisionFelipe.xlsx` — Información y cálculos de provisiones.
 *   `Instalaciones.xlsx` — Reportes consolidados de instalaciones.
 *   `contactos.xlsx` — Directorio de contactos.
 *   `BBDD CLIENTES CM.xlsx` — Fuente externa (Power BI) leída en vivo para el directorio de empresas y direcciones. (`direcciones.xlsx` fue eliminado el 02-09-2026 por ser un archivo local legado y redundante frente a esta fuente.)
-*   `RM_REPORTE_CONECTADOS.xlsx` — Archivo maestro utilizado por la sincronización comercial.
+*   `RM_JAVI_VOLVO CONNECT.xlsx` — Archivo maestro utilizado por la sincronización comercial.
 *   `Correos.xlsx` — Repositorio utilizado por las funciones de correo.
 *   `LogApp.xlsx` — Libro de auditoría de modificaciones.
 *   `RegistroEliminado.xlsx` — Libro de registros eliminados.

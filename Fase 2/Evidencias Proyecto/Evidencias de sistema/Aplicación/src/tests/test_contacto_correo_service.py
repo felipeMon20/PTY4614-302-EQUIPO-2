@@ -16,7 +16,7 @@ def _comercial(**overrides):
 
 
 def _contactos(**overrides):
-    base = {'CDB': '50001', 'Correo electrónico': 'nuevo@empresa.example'}
+    base = {'CDB': '50001', 'Correo electrónico': 'nuevo@empresa.cl'}
     base.update(overrides)
     return pd.DataFrame([base])
 
@@ -39,7 +39,7 @@ class TestActualizarCorreoPorCdb(unittest.TestCase):
                 {"VIN": "VIN0001", "CHASIS": "CHA1", "RAZÓN SOCIAL": "EMPRESA UNO", "RUT": "1-1",
                  "TIPO DE SERVICIO": "FULL", "FECHA TERMINO": "01-01-2027", "CORREO ELECTRÓNICO": ""},
                 {"VIN": "VIN0002", "CHASIS": "CHA2", "RAZÓN SOCIAL": "EMPRESA DOS", "RUT": "2-2",
-                 "TIPO DE SERVICIO": "MEDIO", "FECHA TERMINO": "MENSUAL", "CORREO ELECTRÓNICO": "otra@empresa.example"},
+                 "TIPO DE SERVICIO": "MEDIO", "FECHA TERMINO": "MENSUAL", "CORREO ELECTRÓNICO": "otra@empresa.cl"},
             ])
 
             with patch('src.core.excel_writer.os.getcwd', return_value=tmp):
@@ -54,7 +54,7 @@ class TestActualizarCorreoPorCdb(unittest.TestCase):
             fila1 = df_final[df_final["VIN"] == "VIN0001"].iloc[0]
             fila2 = df_final[df_final["VIN"] == "VIN0002"].iloc[0]
 
-            self.assertEqual(fila1["CORREO ELECTRÓNICO"], "nuevo@empresa.example")
+            self.assertEqual(fila1["CORREO ELECTRÓNICO"], "nuevo@empresa.cl")
             # El resto de columnas de la fila afectada no se pierde
             self.assertEqual(fila1["RAZÓN SOCIAL"], "EMPRESA UNO")
             self.assertEqual(fila1["RUT"], "1-1")
@@ -62,7 +62,7 @@ class TestActualizarCorreoPorCdb(unittest.TestCase):
             self.assertEqual(fila1["FECHA TERMINO"], "01-01-2027")
 
             # La fila de otro CDB queda completamente intacta
-            self.assertEqual(fila2["CORREO ELECTRÓNICO"], "otra@empresa.example")
+            self.assertEqual(fila2["CORREO ELECTRÓNICO"], "otra@empresa.cl")
             self.assertEqual(fila2["RAZÓN SOCIAL"], "EMPRESA DOS")
 
     def test_cdb_sin_camiones_en_comercial_no_actualiza_nada(self):
@@ -101,7 +101,7 @@ class TestActualizarCorreoPorCdb(unittest.TestCase):
             self.assertEqual(set(vins), {"VIN0001", "VIN0002"})
 
             df_final = pd.read_csv(ruta, dtype=str, keep_default_na=False)
-            self.assertTrue((df_final["CORREO ELECTRÓNICO"] == "nuevo@empresa.example").all())
+            self.assertTrue((df_final["CORREO ELECTRÓNICO"] == "nuevo@empresa.cl").all())
 
 
 if __name__ == '__main__':

@@ -8,6 +8,8 @@ from PyQt6.QtGui import (QColor, QFont, QImage, QLinearGradient, QPainter, QPain
                          QPen, QPixmap, QRadialGradient, QTransform)
 from PyQt6.QtWidgets import QWidget
 
+from config.settings import APP_VERSION
+
 ANCHO, ALTO = 760, 430
 RADIO_ESQUINA = 14
 
@@ -16,9 +18,9 @@ FIN_GIRO = 1100
 INICIO_TEXTO, FIN_TEXTO = 850, 1900
 INICIO_CAMION, FIN_CAMION = 1900, 3300
 INICIO_FOCOS = 2700
-INTRO_MINIMA = 3400
 DURACION_LLENADO = 2600
 DURACION_SALIDA = 320
+TOPE_VISUAL = 0.60
 
 LADO_LOGO = 300
 CENTRO_LOGO = QPointF(ANCHO / 2, 138)
@@ -127,7 +129,7 @@ class PantallaInicio(QWidget):
                        for x in (96, 342)] if self._camion else []
 
         self._texto = QPainterPath()
-        self._texto.addText(0, 0, _fuente_marca(84), "EMPRESA")
+        self._texto.addText(0, 0, _fuente_marca(84), "VOLVO")
         caja = self._texto.boundingRect()
         self._texto.translate(-caja.center().x(), -caja.center().y())
 
@@ -169,23 +171,25 @@ class PantallaInicio(QWidget):
     def _tick(self):
         ms = self._ms()
         if self._al_terminar is None:
-            # Avance visual con tope en 95 %: el 100 % lo marca la carga real
-            avance = _ease_out(_tramo(ms, INICIO_TEXTO, INICIO_TEXTO + DURACION_LLENADO)) * 0.95
+            # Avance visual con tope en 70 %: el resto lo marca la carga real
+            # (datos leídos, pantallas armadas) con set_progreso()
+            avance = _ease_out(_tramo(ms, INICIO_TEXTO, INICIO_TEXTO + DURACION_LLENADO)) * TOPE_VISUAL
             self.set_progreso(avance)
-        elif ms >= INTRO_MINIMA:
+        else:
             self._progreso_objetivo = 1.0
 
         dt = ms - self._ultimo_ms
         self._ultimo_ms = ms
         if ms >= FIN_TEXTO or self._progreso_objetivo >= 1.0:
             # Suavizado independiente de los fps
-            self._progreso += (self._progreso_objetivo - self._progreso) * (1 - 0.88 ** (dt / 16))
+            suavizado = 0.88 if self._al_terminar is None else 0.78
+            self._progreso += (self._progreso_objetivo - self._progreso) * (1 - suavizado ** (dt / 16))
 
         if not self._abriendo:
             for umbral, texto in MENSAJES:
                 if self._progreso >= umbral:
                     self._estado = texto
-            if self._al_terminar is None and self._progreso >= 0.94:
+            if self._al_terminar is None and self._progreso >= 0.995:
                 self._estado = "Esperando datos..."
 
         if self._al_terminar is not None and not self._abriendo and self._progreso >= 0.995:
@@ -388,5 +392,5 @@ class PantallaInicio(QWidget):
         p.setFont(f)
         p.setPen(QColor('#5C646E'))
         p.drawText(QRectF(0, ALTO - 24, ANCHO - 18, 16),
-                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "Versión 1.0")
+                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"Versión {APP_VERSION}")
         p.restore()

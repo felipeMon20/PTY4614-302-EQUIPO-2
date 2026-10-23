@@ -1,6 +1,6 @@
 ## 1. Propósito
 
-Este documento describe la fase inicial de ejecución de la aplicación **Gestor SSCC** (antes Gestor SSCC) y su sistema de configuración global.
+Este documento describe la fase inicial de ejecución de la aplicación **Gestor SSCC** (antes Volvo Dashboard) y su sistema de configuración global.
 
 Registra el comportamiento confirmado en el código fuente actualmente auditado, principalmente `main.py` y `config/settings.py`. Su objetivo es documentar cómo se inicia la aplicación, cómo se prepara el entorno gráfico y cómo se obtiene la configuración necesaria para el funcionamiento del sistema.
 
@@ -53,7 +53,7 @@ Esto se utiliza para desactivar el modo oscuro de Windows para la aplicación.
 | Mediano (por defecto, tamaño con el que se diseñó la UI) | `mediano` | 1.0 |
 | Grande | `grande` | 1.25 |
 
-- El nivel se guarda en `QSettings("GestorApp", "Dashboard")`, clave `ui_scale` (registro de Windows, por usuario y por equipo), **no** en `app_config.json`. Un valor desconocido o ausente se trata como `mediano`.
+- El nivel se guarda en `QSettings("VolvoApp", "Dashboard")`, clave `ui_scale` (registro de Windows, por usuario y por equipo), **no** en `app_config.json`. Un valor desconocido o ausente se trata como `mediano`.
 - Qt multiplica por este factor todos los tamaños lógicos: fuentes, px de las hojas de estilo, anchos/altos fijos, íconos, diálogos y el propio Splash. Se suma al escalado de Windows (DPI), que Qt 6 ya aplicaba antes. Ejemplo: en una pantalla 1920×1080 con Windows al 150 %, el área lógica es 1280×720 en Mediano, 1506×847 en Pequeño y 1024×576 en Grande.
 - Qt solo lee `QT_SCALE_FACTOR` al crear `QApplication`, así que un cambio de nivel **requiere reiniciar la aplicación**. La variable se fija siempre, incluso con 1.0, porque el proceso relanzado con `QProcess.startDetached` hereda el entorno del proceso anterior.
 - **Motivo:** la UI tiene cientos de tamaños fijos en px (fuentes, márgenes, anchos). En pantallas con más área lógica (por ejemplo, 1920×1080 al 100 %) todo se veía pequeño y con espacio sobrante. El factor global corrige eso sin reescribir esos valores.
@@ -66,11 +66,11 @@ Se crea la instancia principal de PyQt6 mediante:
 
 Este objeto constituye la base del entorno gráfico sobre el cual se ejecuta la aplicación.
 
-**Instancia única (08-10-2026):** justo después, `_asegurar_instancia_unica()` (`main.py`) intenta conectarse a un `QLocalServer` de nombre fijo (`gestor.sscc.gestion.instancia`). Si responde, ya hay otra aplicación abierta: le envía el mensaje "mostrar" (esa instancia trae su ventana al frente con `_traer_al_frente()`) y la nueva termina sin cargar nada. Si nadie responde, descarta cualquier servidor huérfano de un cierre abrupto y crea el suyo. Vale por sesión de Windows. Solo se probó con un script que simula dos procesos, no con el ejecutable.
+**Instancia única (08-10-2026):** justo después, `_asegurar_instancia_unica()` (`main.py`) intenta conectarse a un `QLocalServer` de nombre fijo (`volvo.dashboard.gestion.instancia`). Si responde, ya hay otra aplicación abierta: le envía el mensaje "mostrar" (esa instancia trae su ventana al frente con `_traer_al_frente()`) y la nueva termina sin cargar nada. Si nadie responde, descarta cualquier servidor huérfano de un cierre abrupto y crea el suyo. Vale por sesión de Windows. Solo se probó con un script que simula dos procesos, no con el ejecutable.
 
 ### 3.3 Configuración visual
 
-La aplicación fuerza el estilo de Qt denominado `Fusion`. **Actualizado (01-10-2026):** la paleta ya no se fija en `main.py`; la aplica `GestorTema` (`src/theme/tema.py`) según el último tema que usó la persona (clave `tema_oscuro` en `QSettings("GestorApp", "Dashboard")`). En modo claro es la misma paleta clara de antes. `windows:darkmode=0` se mantiene: el modo oscuro es de la app, no se toma del de Windows. Detalle en [[03_Vistas_y_Navegacion_UI]] §5.
+La aplicación fuerza el estilo de Qt denominado `Fusion`. **Actualizado (01-10-2026):** la paleta ya no se fija en `main.py`; la aplica `GestorTema` (`src/theme/tema.py`) según el último tema que usó la persona (clave `tema_oscuro` en `QSettings("VolvoApp", "Dashboard")`). En modo claro es la misma paleta clara de antes. `windows:darkmode=0` se mantiene: el modo oscuro es de la app, no se toma del de Windows. Detalle en [[03_Vistas_y_Navegacion_UI]] §5.
 
 ### 3.4 Carga de estilos
 
@@ -92,7 +92,7 @@ Además, se utiliza configuración específica de Windows mediante `ctypes` para
 
 ### 3.6 Splash Screen (rediseñado 01-10-2026)
 
-`CustomSplashScreen` (`main.py`) hereda la animación de `PantallaInicio` (`src/ui/pantalla_inicio.py`) y solo agrega la lógica de carga y cierre. La animación (760×430, sin bordes) se dibuja entera con `QPainter` y colores fijos: no usa hojas de estilo ni la paleta de la app, así que **el modo oscuro no la afecta**. Secuencia: el isotipo gira 360° sobre su eje vertical (0–1,1 s), "EMPRESA" plateado crece desde el fondo junto con el contorno de la barra (0,85–1,9 s), y la barra se llena mientras aparece la silueta del camión (`sidebar_truck.png` oscurecido) con los focos encendidos (1,9–3,3 s). El isotipo se dibuja por código; `splash_logo.png` sigue usándose solo para el ícono (3.5). Detalle visual en [[03_Vistas_y_Navegacion_UI]] §2.
+`CustomSplashScreen` (`main.py`) hereda la animación de `PantallaInicio` (`src/ui/pantalla_inicio.py`) y solo agrega la lógica de carga y cierre. La animación (760×430, sin bordes) se dibuja entera con `QPainter` y colores fijos: no usa hojas de estilo ni la paleta de la app, así que **el modo oscuro no la afecta**. Secuencia: el isotipo gira 360° sobre su eje vertical (0–1,1 s), "VOLVO" plateado crece desde el fondo junto con el contorno de la barra (0,85–1,9 s), y la barra se llena mientras aparece la silueta del camión (`sidebar_truck.png` oscurecido) con los focos encendidos (1,9–3,3 s). El isotipo se dibuja por código; `splash_logo.png` sigue usándose solo para el ícono (3.5). Detalle visual en [[03_Vistas_y_Navegacion_UI]] §2.
 
 ### 3.7 Lectura de datos en paralelo a la animación
 
@@ -104,7 +104,7 @@ Además, se utiliza configuración específica de Windows mediante `ctypes` para
 
 Mientras dura la lectura, `main()` baja el intervalo de cambio de hilo de Python a 1 ms (`INTERVALO_GIL_ARRANQUE`; se restaura a 5 ms al terminar). Motivo y mediciones en [[12. Rendimiento y Optimizaciones de Interfaz]] §12.
 
-La barra avanza sola hasta un **tope de 95 %**; si la lectura sigue después de terminada la animación, queda en 95 % con "Esperando datos...".
+La barra avanza sola (por tiempo) hasta un **tope de 70 %** (`TOPE_VISUAL`, actualizado 22-10-2026; antes 95 %); el resto lo marca la carga real con `set_progreso()`. Si la barra se completa y la lectura sigue, queda con "Esperando datos...".
 
 ### 3.8 Creación de MainWindow e inicio del Event Loop
 
@@ -113,6 +113,10 @@ Cuando la animación llegó al final (3,4 s, `INTRO_MINIMA`) **y** la precarga t
 Si la precarga falla, el error solo se imprime en consola: `MainWindow` hace su propia lectura y muestra su pantalla de error. Si falla la construcción de `MainWindow`, `_manejar_error_fatal` registra el error en `logs/sistema.log` y lo muestra, igual que antes.
 
 El ciclo principal de eventos (`app.exec()`) se inicia después de construir el splash y llamar a `start_animation()`.
+
+**Actualizado (22-10-2026):** `_abrir_aplicacion()` construye `MainWindow(arranque_oculto=True)`: la ventana se muestra con opacidad cero, carga todas sus pantallas mientras el splash sigue animándose (`progreso_arranque` mueve la barra) y, al emitir `arranque_listo`, el splash llama a `MainWindow.revelar()` y se desvanece. Así la pantalla de carga interna no llega a verse. Espera máxima: 120 s (`ESPERA_MAXIMA_ARRANQUE_MS`). Detalle en [[12. Rendimiento y Optimizaciones de Interfaz]] §12b.
+
+**Actualizado (23-10-2026):** `_abrir_aplicacion()` reparte el trabajo en etapas separadas por `PAUSA_ENTRE_ETAPAS_MS` (40 ms): importar pantallas (`_importar_pantallas`), crear la ventana (`_crear_ventana_principal`) y cargar el resto, para que el splash siga animándose. La precarga de pantallas de `MainWindow` espera a que el equipo esté inactivo (`GetLastInputInfo`, `PRECARGA_ESPERA_INACTIVIDAD_MS`) y se aplaza hasta `PRECARGA_MAX_APLAZAMIENTOS` veces. Detalle y lo descartado en [[12. Rendimiento y Optimizaciones de Interfaz]] §15.2.
 
 **Historial:** hasta el 01-10-2026, `start_animation()` construía `MainWindow` de inmediato y el splash cerraba con `data_ready`/`load_error`; esa construcción en el hilo de la interfaz congelaba la animación.
     
@@ -167,11 +171,11 @@ Además de comparar contra `DEFAULT_CONFIG`, `settings.py` deriva en memoria dos
 
 ### 4.3.2 Carpeta de datos (`DATA_DIR`) y asistente de rutas (06-10-2026)
 
-Para que la persona no tenga que escribir una ruta por archivo, la configuración admite una clave `DATA_DIR` (la carpeta donde viven los archivos de datos). `config/rutas.py` guarda el catálogo de **nombres** estándar (`ARCHIVOS_DE_DATOS`: `RM_CONTRATOS.csv`, `LogApp.csv`, `RegistroEliminado.xlsx`, `provisionContratos.xlsx`, `Instalaciones.xlsx`, `contactos.xlsx`, `Correos.csv`, `CasosBajaCM.csv`, `BBDD CLIENTES CM.xlsx`, `facturacionManual.xlsx` y `RM_REPORTE_CONECTADOS.xlsx`); ninguna ruta completa está escrita en el código.
+Para que la persona no tenga que escribir una ruta por archivo, la configuración admite una clave `DATA_DIR` (la carpeta donde viven los archivos de datos). `config/rutas.py` guarda el catálogo de **nombres** estándar (`ARCHIVOS_DE_DATOS`: `RM_JAVI.csv`, `LogApp.csv`, `RegistroEliminado.xlsx`, `provisionFelipe.xlsx`, `Instalaciones.xlsx`, `contactos.xlsx`, `Correos.csv`, `CasosBajaCM.csv`, `BBDD CLIENTES CM.xlsx`, `facturacionManual.xlsx` y `RM_JAVI_VOLVO CONNECT.xlsx`); ninguna ruta completa está escrita en el código.
 
-- **Derivación:** `load_config()` llama a `completar_rutas`, que rellena en memoria las rutas vacías con `DATA_DIR` + nombre estándar. Una ruta ya definida en `app_config.json` siempre gana, así que las configuraciones anteriores siguen funcionando. `RM_REPORTE_PATH` no se deriva (suele vivir en otra carpeta).
-- **Directorio de ejecutivos y modo programador (15-10-2026):** `EJECUTIVOS_PATH` (`Ejecutivos_VC.csv`, opcional) es otra clave de `rutas.ARCHIVOS_DE_DATOS`; `ejecutivos_service.get_ejecutivos_csv_path` la usa si su carpeta existe y, si no, mantiene el comportamiento anterior (carpeta de `EXCEL_PATH`). `settings.MODO_PROGRAMADOR` (constante en `settings.py`, o la variable de entorno `GESTOR_SSCC_PROGRAMADOR=1`) muestra en Configuración la pestaña Avanzado; las claves de `rutas.CLAVES_SOLO_PROGRAMADOR` (hoy `RM_REPORTE_PATH`) no se listan en Archivos.
-- **Autodetección:** `descubrir_archivos(carpeta, subir=2)` busca cada nombre en la carpeta y sus subcarpetas y, si no aparece, en hasta dos niveles hacia arriba (así encuentra el RM de la contraparte comercial en una carpeta hermana). `buscar_carpeta_de_datos(inicio)` recorre desde la carpeta del usuario (hasta 4 niveles, con un máximo de 10 s) buscando la que contiene `RM_CONTRATOS.csv`; ignora carpetas de respaldo y ocultas. **Nombre del archivo (13-10-2026):** el Registro Maestro se llamaba `PruebasFM.csv` y pasó a `RM_CONTRATOS.csv` (mismo contenido; la clave `EXCEL_PATH` no cambia). Una carpeta que aún tenga `PruebasFM.csv` no se autodetecta: hay que renombrar el archivo o apuntar `EXCEL_PATH` a mano.
+- **Derivación:** `load_config()` llama a `completar_rutas`, que rellena en memoria las rutas vacías con `DATA_DIR` + nombre estándar. Una ruta ya definida en `app_config.json` siempre gana, así que las configuraciones anteriores siguen funcionando. `RM_JAVI_PATH` no se deriva (suele vivir en otra carpeta).
+- **Directorio de ejecutivos y modo programador (15-10-2026):** `EJECUTIVOS_PATH` (`Ejecutivos_VC.csv`, opcional) es otra clave de `rutas.ARCHIVOS_DE_DATOS`; `ejecutivos_service.get_ejecutivos_csv_path` la usa si su carpeta existe y, si no, mantiene el comportamiento anterior (carpeta de `EXCEL_PATH`). `settings.MODO_PROGRAMADOR` (constante en `settings.py`, o la variable de entorno `GESTOR_SSCC_PROGRAMADOR=1`) muestra en Configuración la pestaña Avanzado; las claves de `rutas.CLAVES_SOLO_PROGRAMADOR` (hoy `RM_JAVI_PATH`) no se listan en Archivos.
+- **Autodetección:** `descubrir_archivos(carpeta, subir=2)` busca cada nombre en la carpeta y sus subcarpetas y, si no aparece, en hasta dos niveles hacia arriba (así encuentra el RM de Javiera en una carpeta hermana). `buscar_carpeta_de_datos(inicio)` recorre desde la carpeta del usuario (hasta 4 niveles, con un máximo de 10 s) buscando la que contiene `RM_JAVI.csv`; ignora carpetas de respaldo y ocultas. **Nombre del archivo (13-10-2026):** el Registro Maestro se llamaba `PruebasFM.csv` y pasó a `RM_JAVI.csv` (mismo contenido; la clave `EXCEL_PATH` no cambia). Una carpeta que aún tenga `PruebasFM.csv` no se autodetecta: hay que renombrar el archivo o apuntar `EXCEL_PATH` a mano.
 - **Pantalla Configuración:** pestaña "Archivos" con Examinar carpeta, Autodetectar archivos, Abrir carpeta, "¿Cómo me conecto?" (`GuiaConexionDialog`) y una lista de estado (✓/✗, fecha y tamaño por archivo). Las rutas individuales dejaron de editarse a mano: `ConfiguracionModule.path_inputs` sigue existiendo, pero como campos ocultos que completa la carpeta de datos. Ver [[03_Vistas_y_Navegacion_UI]] §3.
 - **Primer arranque:** `main.py` llama a `asistente_rutas.revisar_rutas_al_arrancar()` antes del splash. Si `EXCEL_PATH` no existe, abre un asistente que busca la carpeta sola (o permite elegirla), muestra qué archivos encontró y, al confirmar, guarda `DATA_DIR` y las rutas y reinicia la aplicación. Con "Abrir sin configurar" el arranque sigue como antes.
 - **Limpieza:** `save_config` descarta las claves obsoletas `CUSTOMER_EXCEL_PATH` y `POWERBI_URL` (ver §5.3).
@@ -295,7 +299,7 @@ Ese bloque se encontraba después de una llamada previa a `sys.exit(app.exec())`
 
 Los mensajes de estado del splash ("Cargando motor de datos...", "Sincronizando orígenes de datos...", "Construyendo interfaz...") dependen del avance visual de la barra, no de eventos reales de procesamiento: son cosméticos. Los únicos reales son "Esperando datos..." (animación terminada, lectura en curso) y "Abriendo la aplicación..." (se está construyendo `MainWindow`).
 
-El cierre depende de la precarga y del fin de la animación (ver 3.8), no del avance de la barra; por eso la barra tiene un tope de 95 %.
+El cierre depende de la precarga, de la carga de las pantallas y del fin de la animación (ver 3.8), no del avance de la barra; por eso el avance por tiempo tiene un tope de 60 % (`TOPE_VISUAL`; era 70 % hasta el 22-10-2026, actualizado 23-10-2026).
 
 ### 8.3 Inconsistencia de configuración
 

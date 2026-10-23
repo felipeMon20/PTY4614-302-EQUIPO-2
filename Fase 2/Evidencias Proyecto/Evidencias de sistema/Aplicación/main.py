@@ -7,12 +7,12 @@ import traceback
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QPixmap, QIcon, QImage, QPainter
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
-import PyQt6.QtWebEngineWidgets 
 from src.ui.pantalla_inicio import PantallaInicio
 
 INTERVALO_GIL_ARRANQUE = 0.001
 INTERVALO_GIL_NORMAL = 0.005
-ESPERA_MAXIMA_IMPORTS_MS = 1500
+ESPERA_MAXIMA_ARRANQUE_MS = 120000
+PAUSA_ENTRE_ETAPAS_MS = 40
 
 def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False):
@@ -59,6 +59,9 @@ def _calentar_pandas():
     import openpyxl  # noqa: F401
     from src.core.dataframe_formatter import DataFrameFormatter  # noqa: F401
     from src.core.excel_writer import migrar_historial_legacy  # noqa: F401
+    # MainWindow lo importa al recibir data_ready, con los hilos de fondo ya
+    # compitiendo por el GIL: ahí la misma importación tardaba ~1 s
+    import src.core.file_watcher  # noqa: F401
     df = pd.read_csv(io.StringIO("A,B\n01-02-2024,x\n"), dtype=str, keep_default_na=False)
     fechas = pd.to_datetime(df["A"].str.split().str[0], dayfirst=True, format='mixed', errors='coerce')
     fechas.dt.strftime('%d-%m-%Y')
@@ -69,8 +72,8 @@ class PrecargaDatosThread(QThread):
     falla, MainWindow vuelve a intentarlo y muestra su propia pantalla de
     error."""
 
-    # Importar pandas retiene el GIL en tramos largos: la animación arranca
-    # recién cuando esto termina, con la ventana mostrando solo el fondo
+    # Importar pandas retiene el GIL en tramos largos y la animación puede dar
+    # algún tirón; se prefiere eso a esperar con la ventana mostrando solo el fondo
     importado = pyqtSignal()
 
     def __init__(self):
@@ -100,16 +103,18 @@ class CustomSplashScreen(PantallaInicio):
     def __init__(self):
         super().__init__(get_resource_path(os.path.join('src', 'assets')))
         self.main_window = None
+        self._arranque_terminado = False
         self._precarga = PrecargaDatosThread()
-        self._precarga.importado.connect(self._iniciar_animacion)
         self._precarga.finished.connect(self._on_precarga_lista)
 
     def start_animation(self):
         # El recolector de basura de Python también congela todos los hilos
         # al recorrer los DataFrames recién leídos; se reactiva al terminar
         gc.disable()
+        from src.core.actualizador import ControlActualizacion
+        ControlActualizacion.instancia().buscar()
+        self._iniciar_animacion()
         QTimer.singleShot(30, self._precarga.start)
-        QTimer.singleShot(ESPERA_MAXIMA_IMPORTS_MS, self._iniciar_animacion)
 
     def _iniciar_animacion(self):
         if not self.animando():
@@ -121,16 +126,43 @@ class CustomSplashScreen(PantallaInicio):
         if self._precarga.resultado is not None:
             from src.core.data_manager import DataManager
             DataManager().guardar_precarga_principal(*self._precarga.resultado)
-        self.terminar(self._abrir_aplicacion)
+        QTimer.singleShot(0, self._abrir_aplicacion)
 
     def _abrir_aplicacion(self):
+        """Arma la ventana principal (invisible) y todas sus pantallas con la animación a la vista;
+        recién cuando están listas se muestra, y esta pantalla se desvanece."""
         gc.enable()
+        self.set_progreso(0.64)
+        QTimer.singleShot(PAUSA_ENTRE_ETAPAS_MS, self._importar_pantallas)
+
+    def _importar_pantallas(self):
         try:
-            from src.ui.main_window import MainWindow
-            self.main_window = MainWindow()
-            self.main_window.show()
+            # Vista General (y Comercial, que importa) se cargaba recién al
+            # mostrarla, con los hilos de MainWindow ya compitiendo por el GIL:
+            # ~90 ms aquí, hasta ~1,5 s allá
+            import src.ui.general  # noqa: F401
+            from src.ui.main_window import MainWindow  # noqa: F401
+            self.set_progreso(0.72)
+            QTimer.singleShot(PAUSA_ENTRE_ETAPAS_MS, self._crear_ventana_principal)
         except Exception as e:
             self._manejar_error_fatal(e)
+
+    def _crear_ventana_principal(self):
+        try:
+            from src.ui.main_window import MainWindow
+            self.main_window = MainWindow(arranque_oculto=True)
+            self.main_window.progreso_arranque.connect(self.set_progreso)
+            self.main_window.arranque_listo.connect(self._terminar_arranque)
+            self.main_window.show()
+            QTimer.singleShot(ESPERA_MAXIMA_ARRANQUE_MS, self._terminar_arranque)
+        except Exception as e:
+            self._manejar_error_fatal(e)
+
+    def _terminar_arranque(self):
+        if self._arranque_terminado:
+            return
+        self._arranque_terminado = True
+        self.terminar(self.main_window.revelar)
 
     def _manejar_error_fatal(self, e):
         gc.enable()
@@ -149,7 +181,7 @@ class CustomSplashScreen(PantallaInicio):
         except Exception:
             pass
 
-        # Mostramos el error exacto en pantalla para que la contraparte comercial (o tú) lo vean de inmediato
+        # Mostramos el error exacto en pantalla para que Javiera (o tú) lo vean de inmediato
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setWindowTitle("Error Crítico de Inicialización")
@@ -159,7 +191,7 @@ class CustomSplashScreen(PantallaInicio):
         msg.exec()
         sys.exit(1)
 
-NOMBRE_INSTANCIA_UNICA = "gestor.sscc.gestion.instancia"
+NOMBRE_INSTANCIA_UNICA = "volvo.dashboard.gestion.instancia"
 
 
 def _traer_al_frente():
@@ -234,7 +266,7 @@ def main():
         app.setWindowIcon(app_icon)
         try:
             import ctypes
-            myappid = 'gestor.sscc.gestion.1'
+            myappid = 'volvo.dashboard.gestion.1'
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         except Exception:
             pass

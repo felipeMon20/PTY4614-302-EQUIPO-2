@@ -203,7 +203,7 @@ class TestProvisiones(unittest.TestCase):
         
         self.module.pending_changes = {
             "test_key": {
-                "VIN": "YV2TEST0000900054",
+                "VIN": "YV2TEST0000000001",
                 "AÑO - MES": "2026 - Agosto",
                 "cambios": {"DYNAFLEET": 999999}
             }
@@ -225,7 +225,7 @@ class TestProvisiones(unittest.TestCase):
             
             df_prov_ram = dm.get_provisiones_df()
             if not df_prov_ram.empty:
-                val_ram = df_prov_ram[df_prov_ram['VIN'] == 'YV2TEST0000900054']['DYNAFLEET'].iloc[0]
+                val_ram = df_prov_ram[df_prov_ram['VIN'] == 'YV2TEST0000000001']['DYNAFLEET'].iloc[0]
                 self.assertNotEqual(val_ram, 999999, "Fallo: La RAM no debió actualizarse tras fallo en Provisiones.")
                 
             self.assertFalse(dm.is_app_saving, "Fallo: is_app_saving debe quedar en False tras fallo.")
@@ -242,14 +242,14 @@ class TestProvisiones(unittest.TestCase):
         
         self.module.pending_changes = {
             "test_key": {
-                "VIN": "YV2TEST0000900054",
+                "VIN": "YV2TEST0000000001",
                 "AÑO - MES": "2026 - Agosto",
                 "cambios": {"Plan": "PLAN_FANTASMA"}
             }
         }
         
         dm = self.module.data_manager
-        self._dejar_contrato_en_forma_provision('YV2TEST0000900054')
+        self._dejar_contrato_en_forma_provision('YV2TEST0000000001')
         
         with patch.object(self.module.writer, 'update_cells', side_effect=[True, False]) as mock_writer:
             self.module.confirm_save()
@@ -267,7 +267,7 @@ class TestProvisiones(unittest.TestCase):
             
             df_com_ram = dm.get_comercial_df()
             if not df_com_ram.empty:
-                plan_ram = df_com_ram[df_com_ram['VIN'] == 'YV2TEST0000900054']['TIPO DE SERVICIO'].iloc[0]
+                plan_ram = df_com_ram[df_com_ram['VIN'] == 'YV2TEST0000000001']['TIPO DE SERVICIO'].iloc[0]
                 self.assertNotEqual(plan_ram, "PLAN_FANTASMA", "Fallo: Comercial en RAM no debió actualizarse como si hubiera éxito.")
                 
             self.assertFalse(dm.is_app_saving, "Fallo: is_app_saving debe quedar en False.")
@@ -291,7 +291,7 @@ class TestConstruirRegistroNuevoDesdeProvisiones(unittest.TestCase):
     regla de negocio, ver comercial_agregar.py)."""
 
     def test_defaults_de_unidad_nueva_se_aplican(self):
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "Full", "24", candidato=None)
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "Full", "24", candidato=None)
         self.assertEqual(registro["ESTADO COMERCIAL"], "Revisar")
         self.assertEqual(registro["ESTADO DE ACTIVACIÓN ACTUAL"], "No aplica")
         self.assertEqual(registro["FORMA DE CONTRATO"], "Sin Contrato")
@@ -314,33 +314,33 @@ class TestConstruirRegistroNuevoDesdeProvisiones(unittest.TestCase):
         self.assertEqual(registro["TÉRMINO CONTRATO"], "")
 
     def test_chasis_y_modelo_se_derivan_del_vin(self):
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "Full", "24")
-        self.assertEqual(registro["CHASIS"], "E900018")
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "Full", "24")
+        self.assertEqual(registro["CHASIS"], "E628497")
         self.assertEqual(registro["MODELO"], "FH")
 
     def test_etapa_gestion_se_calcula_con_la_matriz_existente(self):
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "Full", "24")
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "Full", "24")
         self.assertEqual(registro["ETAPA GESTIÓN"], "COMERCIAL")
 
     def test_plan_y_meses_se_copian_de_provisiones(self):
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "Medio", "12")
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "Medio", "12")
         self.assertEqual(registro["TIPO DE SERVICIO"], "Medio")
         self.assertEqual(registro["DURACIÓN (MESES)"], "12")
 
     def test_plan_placeholder_0_no_se_copia(self):
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "0", "12")
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "0", "12")
         self.assertEqual(registro["TIPO DE SERVICIO"], "-")
 
     def test_candidato_comercial_completa_razon_social_rut_cdb_ejecutivo(self):
-        candidato = {"RAZÓN SOCIAL": "Transportes Nihuil Limitada", "RUT": "31.455.522-3", "CDB": "999", "EJECUTIVO": "Juan Perez"}
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "Full", "24", candidato=candidato)
+        candidato = {"RAZÓN SOCIAL": "Transportes Nihuil Limitada", "RUT": "76.123.456-7", "CDB": "999", "EJECUTIVO": "Juan Perez"}
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "Full", "24", candidato=candidato)
         self.assertEqual(registro["RAZÓN SOCIAL"], "Transportes Nihuil Limitada")
-        self.assertEqual(registro["RUT"], "31.455.522-3")
+        self.assertEqual(registro["RUT"], "76.123.456-7")
         self.assertEqual(registro["CDB"], "999")
         self.assertEqual(registro["EJECUTIVO"], "Juan Perez")
 
     def test_sin_candidato_datos_comerciales_quedan_vacios(self):
-        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE900018", "Full", "24", candidato=None)
+        registro = _construir_registro_nuevo_desde_provisiones("9BVRG30C9TE628497", "Full", "24", candidato=None)
         self.assertEqual(registro["RAZÓN SOCIAL"], "")
         self.assertEqual(registro["RUT"], "")
         self.assertEqual(registro["CDB"], "")

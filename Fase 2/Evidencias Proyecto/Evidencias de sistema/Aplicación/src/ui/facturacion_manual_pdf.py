@@ -1,4 +1,4 @@
-"""PDF 'Detalle de facturación EDP – Servicios Conectados' de una flota de
+"""PDF 'Detalle de facturación EDP – Volvo Connect' de una flota de
 Facturación Manual. Se arma con QTextDocument/QPrinter (sin navegador)."""
 import html
 import os
@@ -10,12 +10,12 @@ from PyQt6.QtPrintSupport import QPrinter
 
 from src.services.facturacion_manual_service import MESES_ES
 
-_LOGO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "logo_empresa.png")
+_LOGO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "logo_volvo.png")
 
 FIRMA = [
-    "Ana Ejemplo Demo", "Encargada de Servicios Conectados", "Empresa Demo",
-    "Soluciones de Transporte de Carga | Conectividad", "Tel. +56 9 0000 0000",
-    "Av. Ejemplo 1234 | Ciudad Ejemplo, Chile",
+    "Javiera González Maldonado", "Encargada de Servicios Conectados", "Volvo Chile",
+    "Soluciones de Transporte de Carga | Conectividad", "Tel. +56934128411",
+    "Av. Pdte Eduardo Frei Montalva 8691 | Quilicura, Santiago de Chile",
 ]
 
 
@@ -32,19 +32,25 @@ def construir_html(datos):
     uf, unidades_n, neto_uf, neto_clp y filas = [(flota, rut, vin, plan, precio_uf)]."""
     esc = html.escape
     mes, anio = datos["mes"], datos["anio"]
-    anterior = (anio, mes - 1) if mes > 1 else (anio - 1, 12)
     filas = "".join(
         f"<tr><td>{esc(str(f))}</td><td align='center' nowrap>{esc(str(r))}</td>"
         f"<td align='center' nowrap>{esc(str(v))}</td>"
-        f"<td align='center' nowrap>{esc(str(p))}</td><td align='center'>{_n2(pr)}</td></tr>"
+        f"<td align='center' nowrap>{esc(str(p))}</td><td align='center'>{_n2(pr) if pr is not None else '-'}</td></tr>"
         for f, r, v, p, pr in datos["filas"])
+    if datos.get("precio_fijo"):
+        precios = (
+            f"<tr><td>Modalidad</td><td align='right'>Precio fijo mensual</td></tr>"
+            f"<tr><td>Precio Neto Total CLP</td><td align='right'>{_clp(datos['neto_clp'])}</td></tr>")
+    else:
+        precios = (
+            f"<tr><td>{datos.get('uf_etiqueta', 'UF hoy')}</td><td align='right'>{_n2(datos['uf']) if datos['uf'] else '-'}</td></tr>"
+            f"<tr><td>Precio Neto Total UF</td><td align='right'>{_n2(datos['neto_uf'])}</td></tr>"
+            f"<tr><td>Precio Neto Total CLP</td><td align='right'>{_clp(datos['neto_clp']) if datos['neto_clp'] is not None else '-'}</td></tr>")
     resumen = (
         "<table border='1' cellspacing='0' cellpadding='3' width='55%'>"
         "<tr><td colspan='2' bgcolor='#000000' align='center'><font color='#ffffff'><b>Resumen precios</b></font></td></tr>"
         f"<tr><td>Unidades conectadas</td><td align='right'>{datos['unidades_n']}</td></tr>"
-        f"<tr><td>UF hoy</td><td align='right'>{_n2(datos['uf']) if datos['uf'] else '-'}</td></tr>"
-        f"<tr><td>Precio Neto Total UF</td><td align='right'>{_n2(datos['neto_uf'])}</td></tr>"
-        f"<tr><td>Precio Neto Total CLP</td><td align='right'>{_clp(datos['neto_clp']) if datos['neto_clp'] is not None else '-'}</td></tr>"
+        f"{precios}"
         "</table>")
     detalle = (
         "<table border='1' cellspacing='0' cellpadding='3' width='100%'>"
@@ -55,11 +61,11 @@ def construir_html(datos):
     firma = "<br>".join(f"<b>{esc(t)}</b>" if i < 2 else esc(t) for i, t in enumerate(FIRMA))
     return f"""<html><body style="font-family: Arial; font-size: 10pt;">
 <p align="center"><img src="logo" height="34"></p>
-<h3 align="center">DETALLE DE FACTURACIÓN EDP – SERVICIOS CONECTADOS</h3>
+<h3 align="center">DETALLE DE FACTURACIÓN EDP – VOLVO CONNECT</h3>
 <p align="center"><b>Periodo: {MESES_ES[mes - 1]} {anio}</b></p>
 <p><b>Cliente:</b> {esc(datos['cliente'])}<br><b>Fecha de emisión:</b> {esc(datos['fecha_emision'])}</p>
 <p>Estimado(a) cliente:</p>
-<p>Junto con saludar, por medio del presente se informa el detalle correspondiente a la facturación de los servicios EDP asociados al período de <b>{MESES_ES[anterior[1] - 1].lower()} de {anterior[0]}</b>.</p>
+<p>Junto con saludar, por medio del presente se informa el detalle correspondiente a la facturación de los servicios EDP asociados al período de <b>{MESES_ES[mes - 1].lower()} de {anio}</b>.</p>
 <p><b>1.&nbsp;&nbsp;Detalle de Servicios Facturados</b></p>
 {resumen}
 <p><b>2.&nbsp;&nbsp;Detalle</b></p>
@@ -90,11 +96,12 @@ def generar_pdf(ruta, datos):
     doc.print(impresora)
 
 
-def nombre_sugerido(cliente, anio, mes):
-    limpio = "".join(c.lower() if c.isalnum() else "-" for c in cliente).strip("-")
-    while "--" in limpio:
-        limpio = limpio.replace("--", "-")
-    return f"facturacion-manual-{limpio}-{anio}-{mes:02d}.pdf"
+def nombre_sugerido(cliente, anio=None, mes=None):
+    """Nombre del archivo: la razón social tal como viene; solo se cambian los
+    caracteres que Windows no admite en un nombre de archivo."""
+    limpio = "".join(" " if c in '\\/:*?"<>|' else c for c in str(cliente))
+    limpio = " ".join(limpio.split()).strip(" .") or "Detalle de facturación"
+    return f"{limpio}.pdf"
 
 
 def fecha_emision(hoy=None):

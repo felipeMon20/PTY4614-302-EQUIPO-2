@@ -1,5 +1,5 @@
 @echo off
-title Empaquetador Produccion - Servicios Conectados
+title Empaquetador Produccion - Volvo Connect
 color 0B
 cls
 
@@ -21,7 +21,7 @@ echo =================================================================
 echo.
 
 REM Hemos quitado el silenciador para que veas el progreso y cambiado el icono a .ico
-python -m PyInstaller --noconsole --windowed --onedir --clean --name "Gestor_SSCC" --icon="src/assets/app.ico" --collect-all PyQt6.QtWebEngineWidgets --collect-all qtawesome --collect-all openpyxl --add-data "src/assets;src/assets" main.py
+python -m PyInstaller --noconsole --windowed --onedir --clean --name "Gestor_SSCC" --icon="src/assets/volvo.ico" --collect-all qtawesome --collect-all openpyxl --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.QtWebEngineWidgets --exclude-module PyQt6.QtWebChannel --exclude-module PyQt6.QtQuick --exclude-module PyQt6.QtQml --exclude-module PyQt6.QtQuickWidgets --exclude-module PyQt6.QtPositioning --exclude-module matplotlib --add-data "src/assets;src/assets" main.py
 
 echo.
 echo =================================================================

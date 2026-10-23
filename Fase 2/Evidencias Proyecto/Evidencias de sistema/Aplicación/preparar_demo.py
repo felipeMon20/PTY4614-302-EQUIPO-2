@@ -43,7 +43,7 @@ def escribir_config(forzar):
         return
     config = {
         "DATA_DIR": DESTINO,
-        "RM_REPORTE_PATH": os.path.join(DESTINO, "RM_REPORTE_CONECTADOS.xlsx"),
+        "RM_JAVI_PATH": os.path.join(DESTINO, "RM_JAVI_VOLVO CONNECT.xlsx"),
         "PROVISIONES_SHAREPOINT_URL": "",
         "REPORTE_NOTAS_VENTAS_URL": "",
         "POWERBI_EMBED_URL": "",

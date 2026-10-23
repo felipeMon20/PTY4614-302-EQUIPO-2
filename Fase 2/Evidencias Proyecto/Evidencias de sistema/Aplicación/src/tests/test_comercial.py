@@ -16,7 +16,7 @@ from PyQt6.QtGui import QColor
 
 import config.settings
 from src.ui.comercial import (
-    ComercialModule, _ComercialModuleLegacy, SaveExcelThread, RMReporteSyncWorker, SyncRMReporteDialog,
+    ComercialModule, _ComercialModuleLegacy, SaveExcelThread, RMJaviSyncWorker, SyncRMJaviDialog,
     DialogoAccionCm, COMERCIAL_COL_WIDTH_DEFAULT, COMERCIAL_COL_WIDTH_RAZON_SOCIAL,
     NEW_UI_SUBTAB_COLUMN_WIDTHS, EnviarPapeleraThread,
 )
@@ -90,7 +90,7 @@ class TestComercial(unittest.TestCase):
         
         df_filtrado = self.module.model.get_df()
         self.assertEqual(len(df_filtrado), 1, "Fallo: El buscador trajo datos erróneos.")
-        self.assertEqual(df_filtrado.iloc[0]['VIN'], 'YV2TEST0000900054', "Fallo: El VIN filtrado no es el esperado.")
+        self.assertEqual(df_filtrado.iloc[0]['VIN'], 'YV2TEST0000000001', "Fallo: El VIN filtrado no es el esperado.")
         
         self.module.search_input.setText("")
         self.module.filter_table()
@@ -528,7 +528,7 @@ class TestComercialFiltrosHeader(unittest.TestCase):
 
     def test_columna_extra_del_dataframe_recibe_filtro_sin_tocar_filterheaderview(self):
         """FilterHeaderView no debe conocer nombres de columna: solo pinta el
-        botón para lo que AppTableWidget.set_header_filterable_columns le
+        botón para lo que VolvoTableWidget.set_header_filterable_columns le
         indique. Esta prueba agrega una columna que no existe en ningún otro
         test para demostrar que queda filtrable automáticamente."""
         logger.info("[FiltrosHeader] Una columna nueva del DataFrame recibe filtro sin modificar FilterHeaderView...")
@@ -558,19 +558,19 @@ class TestComercialFiltrosHeader(unittest.TestCase):
                           "Fallo: 'PAGO CM_NUM' es una columna técnica y no debería tener filtro de encabezado, aunque exista en df_base.")
 
 
-class TestRMReporteSyncActualizaHistorial(unittest.TestCase):
+class TestRMJaviSyncActualizaHistorial(unittest.TestCase):
     """Problema 1 (post-migracion a LogApp.csv): tras una sincronizacion
-    RM_CONTRATOS que genera cambios, el historial (LogApp.csv + DataManager.df_logs)
+    RM_JAVI que genera cambios, el historial (LogApp.csv + DataManager.df_logs)
     debe quedar actualizado y Historial debe refrescarse solo, sin que el
     usuario tenga que presionar 'Actualizar'. La lectura de LogApp.csv debe
-    ocurrir en el hilo de fondo (RMReporteSyncWorker), no en el hilo principal."""
+    ocurrir en el hilo de fondo (RMJaviSyncWorker), no en el hilo principal."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
 
-        self.excel_path = os.path.join(self.temp_dir.name, "RMReporteTest_PruebasFM.xlsx")
-        self.rm_reporte_path = os.path.join(self.temp_dir.name, "RMReporteTest_RM.xlsx")
-        self.log_csv_path = os.path.join(self.temp_dir.name, "RMReporteTest_LogApp.csv")
+        self.excel_path = os.path.join(self.temp_dir.name, "RMJaviTest_PruebasFM.xlsx")
+        self.rm_javi_path = os.path.join(self.temp_dir.name, "RMJaviTest_RM.xlsx")
+        self.log_csv_path = os.path.join(self.temp_dir.name, "RMJaviTest_LogApp.csv")
 
         # VIN_CLEAN("YV2AAA111")[-7:] = "2AAA111": CHASIS se fija igual al
         # que el propio worker recalcula siempre, para no generar un
@@ -579,15 +579,15 @@ class TestRMReporteSyncActualizaHistorial(unittest.TestCase):
         with pd.ExcelWriter(self.excel_path, engine='openpyxl') as w:
             df_pruebas.to_excel(w, sheet_name='BBDD (2)', index=False)
 
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FMX"]})  # MODELO distinto -> 1 cambio detectable
-        with pd.ExcelWriter(self.rm_reporte_path, engine='openpyxl') as w:
-            df_reporte.to_excel(w, sheet_name='BBDD', index=False)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FMX"]})  # MODELO distinto -> 1 cambio detectable
+        with pd.ExcelWriter(self.rm_javi_path, engine='openpyxl') as w:
+            df_javi.to_excel(w, sheet_name='BBDD', index=False)
 
         self._patches = [
             patch.object(config.settings, 'EXCEL_PATH', self.excel_path),
             patch.object(config.settings, 'LOG_CSV_PATH', self.log_csv_path),
             patch.object(config.settings, 'LOG_EXCEL_PATH', ""),
-            patch('src.ui.comercial.RM_REPORTE_PATH', self.rm_reporte_path),
+            patch('src.ui.comercial.RM_JAVI_PATH', self.rm_javi_path),
         ]
         for p in self._patches:
             p.start()
@@ -598,17 +598,17 @@ class TestRMReporteSyncActualizaHistorial(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _run_worker_sync(self):
-        """Ejecuta RMReporteSyncWorker.run() de forma sincronica (sin QThread real,
+        """Ejecuta RMJaviSyncWorker.run() de forma sincronica (sin QThread real,
         mismo patron que test_data_manager_lee_solo_logapp_csv_tras_migracion
         en test_excel_writer.py) capturando lo que success_signal emitiria."""
-        worker = RMReporteSyncWorker()
+        worker = RMJaviSyncWorker()
         capturado = {}
         worker.success_signal.connect(lambda msg, df_final, df_logs: capturado.update(
             msg=msg, df_final=df_final, df_logs=df_logs))
         errores = []
         worker.error_signal.connect(lambda e: errores.append(e))
         worker.run()
-        self.assertFalse(errores, f"Fallo: la sincronización RM_CONTRATOS lanzó un error: {errores}")
+        self.assertFalse(errores, f"Fallo: la sincronización RM_JAVI lanzó un error: {errores}")
         self.assertIn('msg', capturado, "Fallo: la sincronización no emitió success_signal.")
         return capturado
 
@@ -634,7 +634,7 @@ class TestRMReporteSyncActualizaHistorial(unittest.TestCase):
 
         capturado = self._run_worker_sync()
 
-        dialog = SyncRMReporteDialog.__new__(SyncRMReporteDialog)  # sin __init__: solo probamos handle_success
+        dialog = SyncRMJaviDialog.__new__(SyncRMJaviDialog)  # sin __init__: solo probamos handle_success
         dialog.btn_cancel = type('FakeBtn', (), {'setEnabled': lambda self, v: None})()
         with patch('src.ui.comercial.QMessageBox.information'), patch.object(dialog, 'accept', create=True):
             dialog.handle_success(capturado['msg'], capturado['df_final'], capturado['df_logs'])
@@ -692,11 +692,11 @@ class TestRMReporteSyncActualizaHistorial(unittest.TestCase):
                 self._desconectar_historial(dm, modulo)
 
 
-class TestRMReporteSyncValidacionFormaContratoTipoFacturacion(unittest.TestCase):
-    """24-09-2026, a pedido explícito: tras sincronizar, RMReporteSyncWorker debe:
+class TestRMJaviSyncValidacionFormaContratoTipoFacturacion(unittest.TestCase):
+    """24-09-2026, a pedido explícito: tras sincronizar, RMJaviSyncWorker debe:
     (1) normalizar automáticamente TIPO DE FACTURACION cuando está sin
     asignar y la matriz tiene una única opción válida (escribe a
-    RM_CONTRATOS.csv); (2) avisar -- solo informativo, nunca corregir -- cuántas
+    RM_JAVI.csv); (2) avisar -- solo informativo, nunca corregir -- cuántas
     combinaciones reales quedan incompatibles con la matriz; (3) avisar
     cuántas unidades siguen sin asignar porque la matriz permite más de una
     opción. Reutiliza tal cual comercial_services.detectar_inconsistencias_
@@ -706,9 +706,9 @@ class TestRMReporteSyncValidacionFormaContratoTipoFacturacion(unittest.TestCase)
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.excel_path = os.path.join(self.temp_dir.name, "RMReporteValidacion_PruebasFM.xlsx")
-        self.rm_reporte_path = os.path.join(self.temp_dir.name, "RMReporteValidacion_RM.xlsx")
-        self.log_csv_path = os.path.join(self.temp_dir.name, "RMReporteValidacion_LogApp.csv")
+        self.excel_path = os.path.join(self.temp_dir.name, "RMJaviValidacion_PruebasFM.xlsx")
+        self.rm_javi_path = os.path.join(self.temp_dir.name, "RMJaviValidacion_RM.xlsx")
+        self.log_csv_path = os.path.join(self.temp_dir.name, "RMJaviValidacion_LogApp.csv")
 
         df_pruebas = pd.DataFrame({
             "VIN": ["YV2A111", "YV2B222", "YV2C333", "YV2D444"],
@@ -724,19 +724,19 @@ class TestRMReporteSyncValidacionFormaContratoTipoFacturacion(unittest.TestCase)
         #    SI se normaliza automaticamente.
         # D: Venta + '-' -> 2 opciones validas (Cliente/Facturacion Manual),
         #    ambiguo, sigue "sin asignar".
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2A111", "YV2B222", "YV2C333", "YV2D444"],
             "FORMA DE CONTRATO": ["CMG", "Demo", "Sin Contrato", "Venta"],
             "TIPO DE FACTURACION": ["CM", "Cliente", "", "-"],
         })
-        with pd.ExcelWriter(self.rm_reporte_path, engine='openpyxl') as w:
-            df_reporte.to_excel(w, sheet_name='BBDD', index=False)
+        with pd.ExcelWriter(self.rm_javi_path, engine='openpyxl') as w:
+            df_javi.to_excel(w, sheet_name='BBDD', index=False)
 
         self._patches = [
             patch.object(config.settings, 'EXCEL_PATH', self.excel_path),
             patch.object(config.settings, 'LOG_CSV_PATH', self.log_csv_path),
             patch.object(config.settings, 'LOG_EXCEL_PATH', ""),
-            patch('src.ui.comercial.RM_REPORTE_PATH', self.rm_reporte_path),
+            patch('src.ui.comercial.RM_JAVI_PATH', self.rm_javi_path),
         ]
         for p in self._patches:
             p.start()
@@ -747,7 +747,7 @@ class TestRMReporteSyncValidacionFormaContratoTipoFacturacion(unittest.TestCase)
         self.temp_dir.cleanup()
 
     def _run_worker_sync(self):
-        worker = RMReporteSyncWorker()
+        worker = RMJaviSyncWorker()
         capturado = {}
         worker.success_signal.connect(lambda msg, df_final, df_logs: capturado.update(
             msg=msg, df_final=df_final, df_logs=df_logs))
@@ -809,23 +809,23 @@ class TestRMReporteSyncValidacionFormaContratoTipoFacturacion(unittest.TestCase)
         self.assertEqual(fila_b['TIPO DE FACTURACION'], 'Cliente')  # se mantiene tal cual, sin corregir
 
 
-class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
-    """Cubre el esquema explícito de columnas de RMReporteSyncWorker
-    (RM_CONTRATOS_COLUMNAS_AUTORIZADAS / PRUEBAS_FM_COLUMNAS_LOCALES / COLUMNAS_TECNICAS_SYNC):
+class TestRMJaviSyncColumnasAutorizadas(unittest.TestCase):
+    """Cubre el esquema explícito de columnas de RMJaviSyncWorker
+    (RM_JAVI_COLUMNAS_AUTORIZADAS / PRUEBAS_FM_COLUMNAS_LOCALES / COLUMNAS_TECNICAS_SYNC):
     la sincronización ya no debe depender de list(df_pruebas.columns) para decidir qué
     columnas del RM sobreviven, ni preservar columnas locales legacy no autorizadas."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.excel_path = os.path.join(self.temp_dir.name, "ColsTest_PruebasFM.xlsx")
-        self.rm_reporte_path = os.path.join(self.temp_dir.name, "ColsTest_RM.xlsx")
+        self.rm_javi_path = os.path.join(self.temp_dir.name, "ColsTest_RM.xlsx")
         self.log_csv_path = os.path.join(self.temp_dir.name, "ColsTest_LogApp.csv")
 
         self._patches = [
             patch.object(config.settings, 'EXCEL_PATH', self.excel_path),
             patch.object(config.settings, 'LOG_CSV_PATH', self.log_csv_path),
             patch.object(config.settings, 'LOG_EXCEL_PATH', ""),
-            patch('src.ui.comercial.RM_REPORTE_PATH', self.rm_reporte_path),
+            patch('src.ui.comercial.RM_JAVI_PATH', self.rm_javi_path),
         ]
         for p in self._patches:
             p.start()
@@ -835,21 +835,21 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
             p.stop()
         self.temp_dir.cleanup()
 
-    def _preparar(self, df_pruebas, df_reporte):
+    def _preparar(self, df_pruebas, df_javi):
         with pd.ExcelWriter(self.excel_path, engine='openpyxl') as w:
             df_pruebas.to_excel(w, sheet_name='BBDD (2)', index=False)
-        with pd.ExcelWriter(self.rm_reporte_path, engine='openpyxl') as w:
-            df_reporte.to_excel(w, sheet_name='BBDD', index=False)
+        with pd.ExcelWriter(self.rm_javi_path, engine='openpyxl') as w:
+            df_javi.to_excel(w, sheet_name='BBDD', index=False)
 
     def _run_worker_sync(self):
-        worker = RMReporteSyncWorker()
+        worker = RMJaviSyncWorker()
         capturado = {}
         worker.success_signal.connect(lambda msg, df_final, df_logs: capturado.update(
             msg=msg, df_final=df_final, df_logs=df_logs))
         errores = []
         worker.error_signal.connect(lambda e: errores.append(e))
         worker.run()
-        self.assertFalse(errores, f"Fallo: la sincronización RM_CONTRATOS lanzó un error: {errores}")
+        self.assertFalse(errores, f"Fallo: la sincronización RM_JAVI lanzó un error: {errores}")
         self.assertIn('msg', capturado, "Fallo: la sincronización no emitió success_signal.")
         return capturado
 
@@ -858,20 +858,20 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_etapa_gestion_se_calcula_localmente_e_ignora_el_valor_del_rm(self):
         """25-09-2026, corrección de un bug real de datos: ETAPA GESTIÓN salió
-        de RM_CONTRATOS_COLUMNAS_AUTORIZADAS y pasó a PRUEBAS_FM_COLUMNAS_LOCALES
-        (constants.py) -- el RM_CONTRATOS.xlsx real tenía filas con el número de
+        de RM_JAVI_COLUMNAS_AUTORIZADAS y pasó a PRUEBAS_FM_COLUMNAS_LOCALES
+        (constants.py) -- el RM_JAVI.xlsx real tenía filas con el número de
         CHASIS pegado por error en esa columna (y miles con el valor legado
         'CLIENTE'), y ese valor crudo se reintroducía en PruebasFM en cada
         sincronización, pisando el cálculo local. Ahora se ignora el valor
         del RM y se recalcula con la matriz de negocio (Vigente + Conectado
         -> COMERCIAL) antes de escribir a disco."""
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"],
             "ESTADO COMERCIAL": ["Vigente"], "ESTADO DE ACTIVACIÓN ACTUAL": ["Conectado"],
-            "ETAPA GESTIÓN": ["949020"],  # valor corrupto real encontrado en RM_CONTRATOS.xlsx -- debe ignorarse
+            "ETAPA GESTIÓN": ["949020"],  # valor corrupto real encontrado en RM_JAVI.xlsx -- debe ignorarse
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertIn("ETAPA GESTIÓN", df_resultado.columns)
@@ -879,8 +879,8 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_fecha_de_baja_se_sincroniza_desde_rm(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "FECHA DE BAJA": ["15-08-2026"]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "FECHA DE BAJA": ["15-08-2026"]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertIn("FECHA DE BAJA", df_resultado.columns)
@@ -889,8 +889,8 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_n_contrato_3pc_se_sincroniza_desde_rm(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "N CONTRATO 3PC": ["3PC-001"]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "N CONTRATO 3PC": ["3PC-001"]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertIn("N CONTRATO 3PC", df_resultado.columns)
@@ -898,12 +898,12 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_columnas_no_autorizadas_del_rm_no_entran(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"],
             "COSTOS": ["9999"], "MEMBRESÍA": ["X"], "Column3": ["Y"],
             "ESTADO DE ACTIVACIÓN RM Servicios": ["W"],
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         # CDB FLOTA ya no está aquí: desde el 08-10-2026 es una columna autorizada del RM.
@@ -912,8 +912,8 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_provision_deja_de_persistirse(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"], "PROVISION": ["algo"]})
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertNotIn("PROVISION", df_resultado.columns)
@@ -922,10 +922,10 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
         df_pruebas = pd.DataFrame({
             "VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"],
             "CONTRATO RM": ["X"], "NOMBRE CONTACTO": ["Juan"],
-            "CORREO CONTACTO": ["juan@test.example"], "TELEFONO CONTACTO": ["+56911111111"],
+            "CORREO CONTACTO": ["juan@test.cl"], "TELEFONO CONTACTO": ["+56911111111"],
         })
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         for col in ["CONTRATO RM", "NOMBRE CONTACTO", "CORREO CONTACTO", "TELEFONO CONTACTO"]:
@@ -933,16 +933,16 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_vin_clean_nunca_se_persiste(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertNotIn("VIN_CLEAN", df_resultado.columns)
 
     def test_celda_vacia_termina_como_guion_y_cero_se_conserva(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "FLOTA VC": [None], "PAGO CM": [0]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "FLOTA VC": [None], "PAGO CM": [0]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertEqual(df_resultado.iloc[0]["FLOTA VC"], "-", "Fallo: una celda vacía debía convertirse en '-'.")
@@ -950,14 +950,14 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_alias_de_nombres_siguen_funcionando(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"],
             "OPERACION": ["MINERIA"],
             "FECHA INICIO FACTURACIÓN": ["01-08-2026"],
             "FECHA TÉRMINO FACTURACIÓN": ["01-08-2027"],
             "PAGO CM 08/2026": [150000],
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertIn("INDUSTRIA", df_resultado.columns)
@@ -969,7 +969,7 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_duracion_mensual_del_rm_reemplaza_duracion_y_termino_antiguos(self):
         # Regla confirmada: DURACION (MESES) y TERMINO CONTRATO vienen del RM
-        # (estan en RM_CONTRATOS_COLUMNAS_AUTORIZADAS, no en PRUEBAS_FM_COLUMNAS_LOCALES),
+        # (estan en RM_JAVI_COLUMNAS_AUTORIZADAS, no en PRUEBAS_FM_COLUMNAS_LOCALES),
         # asi que un contrato que en PruebasFM tenia duracion numerica y fecha real
         # debe terminar en '-'/'MENSUAL' cuando el RM ya lo marca como mensual, sin
         # que el merge recupere el dato antiguo.
@@ -977,11 +977,11 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
             "VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"],
             "DURACIÓN (MESES)": ["12"], "TÉRMINO CONTRATO": ["15-03-2027"],
         })
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"],
             "DURACIÓN (MESES)": ["-"], "TÉRMINO CONTRATO": ["MENSUAL"],
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         capturado = self._run_worker_sync()
 
         df_final = capturado["df_final"]
@@ -999,16 +999,16 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_duracion_vacia_en_rm_no_se_convierte_en_guion_ni_mensual(self):
         # Regla confirmada: DURACIÓN (MESES) vacia en el RM significa que
-        # la contraparte comercial todavia no gestiono ese dato -- a diferencia del resto de
+        # Javiera todavia no gestiono ese dato -- a diferencia del resto de
         # columnas (ver test_celda_vacia_termina_como_guion_y_cero_se_conserva),
         # NO debe convertirse en '-' durante la sincronizacion, porque eso la
         # haria interpretarse como mensual en DataFrameFormatter.clean().
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"],
             "DURACIÓN (MESES)": [None], "TÉRMINO CONTRATO": [None],
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         capturado = self._run_worker_sync()
 
         df_final = capturado["df_final"]
@@ -1029,7 +1029,7 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
     def test_duracion_existente_en_pruebasfm_se_pierde_si_rm_llega_vacia(self):
         # Complemento del test anterior: si un VIN que YA tenia un contrato
         # numerico (12 / 15-03-2027) llega desde el RM con DURACIÓN (MESES)
-        # vacia (p. ej. la contraparte comercial reseteo el dato para volver a gestionarlo), el
+        # vacia (p. ej. Javiera reseteo el dato para volver a gestionarlo), el
         # resultado debe quedar vacio -- ni conserva el "12/15-03-2027"
         # antiguo (DURACIÓN (MESES) no es columna local, ver
         # PRUEBAS_FM_COLUMNAS_LOCALES) ni lo interpreta como MENSUAL.
@@ -1037,11 +1037,11 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
             "VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"],
             "DURACIÓN (MESES)": ["12"], "TÉRMINO CONTRATO": ["15-03-2027"],
         })
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"],
             "DURACIÓN (MESES)": [None], "TÉRMINO CONTRATO": [None],
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         capturado = self._run_worker_sync()
 
         df_final = capturado["df_final"]
@@ -1053,18 +1053,18 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
         self.assertNotEqual(valor_termino, "MENSUAL")
 
     def test_vin_nuevo_con_guion_guion_en_rm_no_se_interpreta_como_mensual(self):
-        # Caso reportado: VIN NUEVO que aparece por primera vez en RM_CONTRATOS con
-        # DURACIÓN (MESES)='-' y TÉRMINO CONTRATO='-' (la contraparte comercial aun no informo/
+        # Caso reportado: VIN NUEVO que aparece por primera vez en RM_JAVI con
+        # DURACIÓN (MESES)='-' y TÉRMINO CONTRATO='-' (Javiera aun no informo/
         # gestiono el dato de ese contrato). Debe llegar a PruebasFM y a
         # dm.df_master como '-'/'-', NO como '-'/'MENSUAL'. Se verifica tanto
         # el resultado crudo del sync (df_final) como el resultado tras
         # DataFrameFormatter.clean() (lo que realmente queda en dm.df_master).
         df_pruebas = pd.DataFrame({"VIN": [], "CHASIS": [], "MODELO": []})
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2NUEVO001"], "MODELO": ["FH"],
             "DURACIÓN (MESES)": ["-"], "TÉRMINO CONTRATO": ["-"],
         })
-        self._preparar(df_pruebas, df_reporte)
+        self._preparar(df_pruebas, df_javi)
         capturado = self._run_worker_sync()
 
         df_final = capturado["df_final"]
@@ -1080,8 +1080,8 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
 
     def test_pago_cm_variante_no_oficial_no_se_mapea_automaticamente(self):
         df_pruebas = pd.DataFrame({"VIN": ["YV2AAA111"], "CHASIS": ["2AAA111"], "MODELO": ["FH"]})
-        df_reporte = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "PAGO CM PRUEBA": [999]})
-        self._preparar(df_pruebas, df_reporte)
+        df_javi = pd.DataFrame({"VIN": ["YV2AAA111"], "MODELO": ["FH"], "PAGO CM PRUEBA": [999]})
+        self._preparar(df_pruebas, df_javi)
         self._run_worker_sync()
         df_resultado = self._leer_resultado()
         self.assertNotIn("PAGO CM PRUEBA", df_resultado.columns)
@@ -1091,23 +1091,23 @@ class TestRMReporteSyncColumnasAutorizadas(unittest.TestCase):
         self.assertEqual(df_resultado.iloc[0]["PAGO CM"], "-")
 
 
-class TestRMReporteSyncNormalizaEstadoComercial(unittest.TestCase):
-    """Regla confirmada con la contraparte comercial: 'ACTIVO' es un error de digitacion, no
+class TestRMJaviSyncNormalizaEstadoComercial(unittest.TestCase):
+    """Regla confirmada con Javiera: 'ACTIVO' es un error de digitacion, no
     un ESTADO COMERCIAL valido -- el dato correcto es 'VIGENTE'. La
-    correccion debe ocurrir en RMReporteSyncWorker, ANTES de escribir a
+    correccion debe ocurrir en RMJaviSyncWorker, ANTES de escribir a
     PruebasFM, sin alterar ningun otro valor de la columna."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.excel_path = os.path.join(self.temp_dir.name, "EstadoComTest_PruebasFM.xlsx")
-        self.rm_reporte_path = os.path.join(self.temp_dir.name, "EstadoComTest_RM.xlsx")
+        self.rm_javi_path = os.path.join(self.temp_dir.name, "EstadoComTest_RM.xlsx")
         self.log_csv_path = os.path.join(self.temp_dir.name, "EstadoComTest_LogApp.csv")
 
         self._patches = [
             patch.object(config.settings, 'EXCEL_PATH', self.excel_path),
             patch.object(config.settings, 'LOG_CSV_PATH', self.log_csv_path),
             patch.object(config.settings, 'LOG_EXCEL_PATH', ""),
-            patch('src.ui.comercial.RM_REPORTE_PATH', self.rm_reporte_path),
+            patch('src.ui.comercial.RM_JAVI_PATH', self.rm_javi_path),
         ]
         for p in self._patches:
             p.start()
@@ -1122,13 +1122,13 @@ class TestRMReporteSyncNormalizaEstadoComercial(unittest.TestCase):
         with pd.ExcelWriter(self.excel_path, engine='openpyxl') as w:
             df_pruebas.to_excel(w, sheet_name='BBDD (2)', index=False)
 
-        df_reporte = pd.DataFrame({
+        df_javi = pd.DataFrame({
             "VIN": ["YV2AAA111"], "MODELO": ["FH"], "ESTADO COMERCIAL": [estado_comercial_rm],
         })
-        with pd.ExcelWriter(self.rm_reporte_path, engine='openpyxl') as w:
-            df_reporte.to_excel(w, sheet_name='BBDD', index=False)
+        with pd.ExcelWriter(self.rm_javi_path, engine='openpyxl') as w:
+            df_javi.to_excel(w, sheet_name='BBDD', index=False)
 
-        worker = RMReporteSyncWorker()
+        worker = RMJaviSyncWorker()
         errores = []
         worker.error_signal.connect(lambda e: errores.append(e))
         worker.run()
@@ -1166,7 +1166,7 @@ class TestRMReporteSyncNormalizaEstadoComercial(unittest.TestCase):
 
 
 class TestReglaSinContrato(unittest.TestCase):
-    """Regla confirmada con la contraparte comercial: en Vista Completa (_ComercialModuleLegacy),
+    """Regla confirmada con Javiera: en Vista Completa (_ComercialModuleLegacy),
     al editar manualmente FORMA DE CONTRATO a 'Sin Contrato', se limpian a
     '-' TIPO DE SERVICIO, INICIO CONTRATO, DURACIÓN (MESES) y TÉRMINO
     CONTRATO de esa fila. Se dispara únicamente en
@@ -1308,11 +1308,9 @@ class TestReglaSinContrato(unittest.TestCase):
 
 
 class TestReglaTerminatedCm(unittest.TestCase):
-    """Regla confirmada: en Vista Completa (_ComercialModuleLegacy), al
-    editar manualmente ESTADO DEL CM a 'Terminated', se limpian a '-'
-    N CONTRATO 3PC, FECHA INICIO CM, FECHA TERMINO CM, TIPO DE CM y PAGO CM
-    de esa fila. Mismo mecanismo de pending_changes que cualquier otra
-    edición manual (ver TestReglaSinContrato); no hay regla inversa."""
+    """En Vista Completa (_ComercialModuleLegacy), al editar manualmente
+    ESTADO DEL CM a 'Terminated' solo cambia ese campo: N CONTRATO 3PC,
+    fechas, tipo y pago del CM se conservan como historial del contrato."""
 
     @classmethod
     def setUpClass(cls):
@@ -1334,48 +1332,21 @@ class TestReglaTerminatedCm(unittest.TestCase):
         modulo.pending_changes = {}  # nos interesa solo el cambio posterior a 'Terminated'
         return modulo, vin
 
-    def _assert_cinco_campos_limpios(self, modulo, vin):
+    def _assert_solo_cambia_estado_cm(self, modulo, vin):
         cambios = modulo.pending_changes[vin]['cambios']
-        self.assertEqual(cambios.get('N CONTRATO 3PC'), '-')
-        self.assertEqual(cambios.get('FECHA INICIO CM'), '-')
-        self.assertEqual(cambios.get('FECHA TERMINO CM'), '-')
-        self.assertEqual(cambios.get('TIPO DE CM'), '-')
-        self.assertEqual(cambios.get('PAGO CM'), '-')
         self.assertEqual(cambios.get('ESTADO DEL CM'), 'Terminated')
+        for col in ('N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM'):
+            self.assertNotIn(col, cambios, f"{col} no debe limpiarse al poner Terminated.")
 
-        df_actual = modulo.model.get_df()
-        fila = df_actual[df_actual['VIN'].astype(str).str.strip().str.upper() == vin].iloc[0]
-        self.assertEqual(fila['N CONTRATO 3PC'], '-')
-        self.assertEqual(fila['FECHA INICIO CM'], '-')
-        self.assertEqual(fila['FECHA TERMINO CM'], '-')
-        self.assertEqual(fila['TIPO DE CM'], '-')
-        self.assertEqual(fila['PAGO CM'], '-')
-
-    def test_running_a_terminated_limpia_cinco_campos(self):
+    def test_running_a_terminated_conserva_datos_del_cm(self):
         modulo, vin = self._modulo_con_fila('Running')
         modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
-        self._assert_cinco_campos_limpios(modulo, vin)
+        self._assert_solo_cambia_estado_cm(modulo, vin)
 
-    def test_expired_a_terminated_limpia_cinco_campos(self):
+    def test_expired_a_terminated_conserva_datos_del_cm(self):
         modulo, vin = self._modulo_con_fila('Expired')
         modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
-        self._assert_cinco_campos_limpios(modulo, vin)
-
-    def test_terminated_a_otro_valor_no_restaura_datos(self):
-        modulo, vin = self._modulo_con_fila('Running')
-        modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
-        self._assert_cinco_campos_limpios(modulo, vin)
-
-        # Ahora el usuario vuelve a cambiar ESTADO DEL CM a otro valor: NO
-        # debe existir regla inversa que reconstruya los 5 campos.
-        modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Running')
-        cambios = modulo.pending_changes[vin]['cambios']
-        self.assertEqual(cambios.get('ESTADO DEL CM'), 'Running')
-        self.assertEqual(cambios.get('N CONTRATO 3PC'), '-')
-        self.assertEqual(cambios.get('FECHA INICIO CM'), '-')
-        self.assertEqual(cambios.get('FECHA TERMINO CM'), '-')
-        self.assertEqual(cambios.get('TIPO DE CM'), '-')
-        self.assertEqual(cambios.get('PAGO CM'), '-')
+        self._assert_solo_cambia_estado_cm(modulo, vin)
 
 
 class TestReconciliacionEstadoExpiredAlGuardarEnComercial(unittest.TestCase):
@@ -1446,10 +1417,13 @@ class TestReconciliacionEstadoExpiredAlGuardarEnComercial(unittest.TestCase):
         self.assertEqual(len(caso), 1)
         self.assertEqual(caso.iloc[0]['ESTADO_CASO'], ESTADO_CASO_REAPARECIDO)
 
-    def test_expired_a_terminated_guardado_resuelve_el_caso_y_limpia_campos(self):
+    def test_expired_a_terminated_guardado_resuelve_el_caso_y_conserva_campos(self):
         modulo, vin = self._modulo_con_fila()
         modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Expired')
         modulo._on_save_finished(True)
+        df_master = modulo.data_manager.df_master
+        antes = df_master[df_master['VIN'].astype(str).str.strip().str.upper() == vin].iloc[0]
+        n_contrato_antes, pago_antes = antes['N CONTRATO 3PC'], antes['PAGO CM']
 
         modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
         modulo._on_save_finished(True)
@@ -1462,8 +1436,8 @@ class TestReconciliacionEstadoExpiredAlGuardarEnComercial(unittest.TestCase):
 
         fila = modulo.data_manager.df_master[modulo.data_manager.df_master['VIN'].astype(str).str.strip().str.upper() == vin].iloc[0]
         self.assertEqual(fila['ESTADO DEL CM'], 'Terminated')
-        self.assertEqual(fila['N CONTRATO 3PC'], '-')
-        self.assertEqual(fila['PAGO CM'], '-')
+        self.assertEqual(fila['N CONTRATO 3PC'], n_contrato_antes)
+        self.assertEqual(fila['PAGO CM'], pago_antes)
 
     def test_no_duplica_si_se_guarda_dos_veces_sin_cambiar_el_estado(self):
         modulo, vin = self._modulo_con_fila()
@@ -1830,7 +1804,7 @@ class TestComercialTabsEstructura(unittest.TestCase):
             "EJECUTIVO": ["E1", "E2"],
             "RAZÓN SOCIAL": ["EMPRESA UNO", "EMPRESA DOS"],
             "VIN": ["YV2ABCDEF0000001", "YV2ABCDEF0000002"],
-            "CHASIS": ["0900054", "0900055"],
+            "CHASIS": ["0000001", "0000002"],
             "FORMA DE CONTRATO": ["CMG", "CMG"],
             "TIPO DE SERVICIO": ["Full", "Full"],
             "ESTADO COMERCIAL": ["VIGENTE", "VIGENTE"],
@@ -1850,7 +1824,7 @@ class TestComercialTabsEstructura(unittest.TestCase):
 
         df = modulo.new_ui_model.get_df()
         self.assertNotIn("VIN", df.columns, "Fallo: VIN no debe ser columna visible de Renovar contratos.")
-        self.assertEqual(df["CHASIS"].tolist(), ["0900055"])
+        self.assertEqual(df["CHASIS"].tolist(), ["0000002"])
     def test_14_busqueda_global_encuentra_por_razon_social_y_chasis(self):
         modulo = ComercialModule()
         fecha_por_vencer = (datetime.now().date() + timedelta(days=10)).strftime('%d-%m-%Y')
@@ -1858,7 +1832,7 @@ class TestComercialTabsEstructura(unittest.TestCase):
             "EJECUTIVO": ["E1", "E2"],
             "RAZÓN SOCIAL": ["EMPRESA UNO", "EMPRESA DOS"],
             "VIN": ["V1", "V2"],
-            "CHASIS": ["0900054", "0900055"],
+            "CHASIS": ["0000001", "0000002"],
             "FORMA DE CONTRATO": ["CMG", "CMG"],
             "ESTADO COMERCIAL": ["VIGENTE", "VIGENTE"],
             "TÉRMINO CONTRATO": [fecha_por_vencer, fecha_por_vencer],
@@ -1868,9 +1842,9 @@ class TestComercialTabsEstructura(unittest.TestCase):
 
         modulo.new_ui_tab.search_input.setText("empresa dos")
         modulo.new_ui_tab.filter_table()
-        self.assertEqual(modulo.new_ui_model.get_df()["CHASIS"].tolist(), ["0900055"])
+        self.assertEqual(modulo.new_ui_model.get_df()["CHASIS"].tolist(), ["0000002"])
 
-        modulo.new_ui_tab.search_input.setText("0900054")
+        modulo.new_ui_tab.search_input.setText("0000001")
         modulo.new_ui_tab.filter_table()
         self.assertEqual(modulo.new_ui_model.get_df()["RAZÓN SOCIAL"].tolist(), ["EMPRESA UNO"])
     def test_15_busqueda_global_respeta_subpestana_activa(self):
@@ -1882,7 +1856,7 @@ class TestComercialTabsEstructura(unittest.TestCase):
             "EJECUTIVO": ["E1", "E2"],
             "RAZÓN SOCIAL": ["EMPRESA UNO", "EMPRESA UNO"],
             "VIN": ["V1", "V2"],
-            "CHASIS": ["0900054", "0900055"],
+            "CHASIS": ["0000001", "0000002"],
             "FORMA DE CONTRATO": ["CMG", "CMG"],
             "ESTADO COMERCIAL": ["VIGENTE", "BAJA"],
             "ESTADO DE ACTIVACIÓN ACTUAL": ["CONECTADO", "DESCONECTADO"],
@@ -1894,12 +1868,12 @@ class TestComercialTabsEstructura(unittest.TestCase):
 
         modulo._on_new_ui_subtab_changed(1)  # "Recuperar clientes": solo bajas Desconectadas, etc.
         modulo.new_ui_tab.filter_table()
-        self.assertEqual(modulo.new_ui_model.get_df()["CHASIS"].tolist(), ["0900055"])
+        self.assertEqual(modulo.new_ui_model.get_df()["CHASIS"].tolist(), ["0000002"])
 
-        # "Renovar contratos": solo 0900054 (Vigente y Conectada); 0900055 es una baja
+        # "Renovar contratos": solo 0000001 (Vigente y Conectada); 0000002 es una baja
         modulo._on_new_ui_subtab_changed(0)
         modulo.new_ui_tab.filter_table()
-        self.assertEqual(modulo.new_ui_model.get_df()["CHASIS"].tolist(), ["0900054"])
+        self.assertEqual(modulo.new_ui_model.get_df()["CHASIS"].tolist(), ["0000001"])
     def test_16_busqueda_global_usa_construir_mascara_busqueda(self):
         """No debe existir una segunda implementación del algoritmo de
         búsqueda: la Nueva interfaz debe delegar en la misma función
@@ -1927,7 +1901,7 @@ class TestComercialTabsEstructura(unittest.TestCase):
     def test_17_ordenar_columna_reordena_la_bandeja(self):
         """Elegir 'Ordenar A -> Z'/'Z -> A' en el menú de encabezado de la
         bandeja de la Nueva interfaz debe reordenar las filas (mismo
-        mecanismo que dispara el menú: AppTableWidget._set_sort())."""
+        mecanismo que dispara el menú: VolvoTableWidget._set_sort())."""
         modulo = ComercialModule()
         modulo.legacy.df_base = pd.DataFrame({
             "EJECUTIVO": ["C", "A", "B"],
@@ -2113,7 +2087,7 @@ class TestComercialRevisionCM(unittest.TestCase):
 
     def test_03_casos_reaparecido_mantenido_confirmada_baja_no_vuelven_a_aparecer(self):
         """Reaparecido ya no requiere revisión (el contrato volvió a
-        aparecer); Mantenido/Confirmada baja son decisiones de la contraparte comercial ya
+        aparecer); Mantenido/Confirmada baja son decisiones de Javiera ya
         tomadas y deben respetarse, no volver como pendientes."""
         self.modulo._on_new_ui_subtab_changed(self.REVISION_CM_INDEX)
         razones = self.modulo.new_ui_model.get_df()['RAZÓN SOCIAL'].tolist()
@@ -2411,7 +2385,8 @@ class TestEnviarCorreoOtrasSubpestanas(unittest.TestCase):
     _on_accion_cm_enviar_correo_clicked y _obtener_vins_seleccionados):
     mismo flujo que en "Gestionar CM" (TestEnviarCorreoCM), pero resolviendo
     la selección contra _new_ui_bandeja_actual_df (subset de df_base) en vez
-    de _new_ui_revision_cm_df, y SIN plantilla preseleccionada. No abre un
+    de _new_ui_revision_cm_df, con "Conoce Volvo Connect" preseleccionada
+    (Nuevas oportunidades, 21-10-2026; antes sin plantilla). No abre un
     MailDialog real: parchea MailDialog y el chequeo de VIN faltantes."""
 
     POR_GESTIONAR_INDEX = 2  # "Nuevas oportunidades"
@@ -2452,7 +2427,7 @@ class TestEnviarCorreoOtrasSubpestanas(unittest.TestCase):
             seleccion.select(modelo.index(row, 0), modelo.index(row, ultima_columna))
         sel_model.select(seleccion, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
 
-    def test_01_un_vin_abre_mail_dialog_sin_plantilla_preseleccionada(self):
+    def test_01_un_vin_abre_mail_dialog_con_conoce_volvo_connect_preseleccionada(self):
         self._seleccionar_filas([0])
         with patch('src.ui.comercial.mail_sync_service.vins_faltantes_en_correos', return_value=[]) as mock_check, \
              patch('src.ui.comercial.MailDialog') as mock_mail_dialog:
@@ -2461,11 +2436,11 @@ class TestEnviarCorreoOtrasSubpestanas(unittest.TestCase):
 
         mock_check.assert_called_once_with(['VIN_UNO'], config.settings.CORREOS_EXCEL_PATH)
         mock_mail_dialog.assert_called_once_with(
-            parent=self.modulo, vins_preseleccionados=['VIN_UNO'], plantilla_inicial=None
+            parent=self.modulo, vins_preseleccionados=['VIN_UNO'], plantilla_inicial="Conoce Volvo Connect"
         )
         mock_mail_dialog.return_value.exec.assert_called_once()
 
-    def test_02_multiples_vin_se_entregan_todos_sin_plantilla(self):
+    def test_02_multiples_vin_se_entregan_todos_con_su_plantilla(self):
         self._seleccionar_filas([0, 1])
         with patch('src.ui.comercial.mail_sync_service.vins_faltantes_en_correos', return_value=[]), \
              patch('src.ui.comercial.MailDialog') as mock_mail_dialog:
@@ -2473,7 +2448,7 @@ class TestEnviarCorreoOtrasSubpestanas(unittest.TestCase):
             self.modulo.btn_accion_cm_enviar_correo.click()
 
         mock_mail_dialog.assert_called_once_with(
-            parent=self.modulo, vins_preseleccionados=['VIN_UNO', 'VIN_DOS'], plantilla_inicial=None,
+            parent=self.modulo, vins_preseleccionados=['VIN_UNO', 'VIN_DOS'], plantilla_inicial="Conoce Volvo Connect",
         )
 
     def test_03_gestionar_cm_conserva_su_plantilla_preseleccionada(self):
@@ -2676,7 +2651,7 @@ class TestAgregarContactoComercial(unittest.TestCase):
         self.modulo.legacy.data_manager.df_contactos = pd.DataFrame({
             'ID': [1], 'CDB': ['CDB_UNO'], 'Flota': ['Empresa Uno'],
             'Nombre': ['Pedro'], 'Apellidos': ['Prueba'],
-            'Correo electrónico': ['pedro@empresa.example'], 'Número móvil': ['+56911111111'],
+            'Correo electrónico': ['pedro@empresa.cl'], 'Número móvil': ['+56911111111'],
         })
         self.modulo._on_new_ui_subtab_changed(self.POR_GESTIONAR_INDEX)
 
@@ -2733,7 +2708,7 @@ class TestAgregarContactoComercial(unittest.TestCase):
         self._seleccionar_filas([1])
         nuevos_datos = {
             'CDB': 'CDB_DOS', 'Flota': 'Empresa Dos', 'Nombre': 'Ana', 'Apellidos': 'Test',
-            'Correo electrónico': 'ana@empresa.example', 'Número móvil': '+56922222222',
+            'Correo electrónico': 'ana@empresa.cl', 'Número móvil': '+56922222222',
             'Rol': 'Administrador de flota',
         }
         with patch('src.ui.comercial.ContactosAddDialog') as mock_dialog, \
@@ -2754,7 +2729,7 @@ class TestAgregarContactoComercial(unittest.TestCase):
         self._seleccionar_filas([1])
         nuevos_datos = {
             'CDB': 'CDB_DOS', 'Flota': 'Empresa Dos', 'Nombre': 'Pedro', 'Apellidos': 'Prueba',
-            'Correo electrónico': 'pedro@empresa.example',  # mismo correo que el contacto de CDB_UNO
+            'Correo electrónico': 'pedro@empresa.cl',  # mismo correo que el contacto de CDB_UNO
             'Número móvil': '+56911111111', 'Rol': 'Administrador de flota',
         }
         with patch('src.ui.comercial.ContactosAddDialog') as mock_dialog, \
@@ -2764,7 +2739,7 @@ class TestAgregarContactoComercial(unittest.TestCase):
             self.modulo.btn_accion_agregar_contacto.click()
 
         thread_usado = self.modulo._add_contacto_thread_comercial
-        self.assertEqual(thread_usado.new_data['Correo electrónico'], 'pedro@empresa.example')
+        self.assertEqual(thread_usado.new_data['Correo electrónico'], 'pedro@empresa.cl')
 
 
 class TestConfirmarBajaCM(unittest.TestCase):
@@ -2934,8 +2909,9 @@ class TestConfirmarBajaCM(unittest.TestCase):
 
         fila = self._fila_master(self.vins[0])
         self.assertEqual(fila['ESTADO DEL CM'], 'Terminated')
-        for col in comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM:
-            self.assertEqual(fila[col], '-', f"Fallo: la columna '{col}' no quedó limpia.")
+        self.assertEqual(fila['ESTADO COMERCIAL'], 'BAJA')
+        for col in ('N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM'):
+            self.assertEqual(fila[col], self.df_master_original.iloc[0][col], f"Fallo: '{col}' debe conservarse.")
 
         self.assertEqual(self._caso(self.caso_ids[0])['ESTADO_CASO'], ESTADO_CASO_CONFIRMADA_BAJA)
 
@@ -2954,8 +2930,9 @@ class TestConfirmarBajaCM(unittest.TestCase):
         for vin, caso_id in zip(self.vins, self.caso_ids):
             fila = self._fila_master(vin)
             self.assertEqual(fila['ESTADO DEL CM'], 'Terminated', f"Fallo: {vin} no quedó Terminated.")
-            for col in comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM:
-                self.assertEqual(fila[col], '-', f"Fallo: {vin}.{col} no quedó limpio.")
+            self.assertEqual(fila['ESTADO COMERCIAL'], 'BAJA', f"Fallo: {vin} no quedó en BAJA.")
+            for col in ('N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM'):
+                self.assertEqual(fila[col], self.df_master_original.iloc[0][col], f"Fallo: {vin}.{col} debe conservarse.")
             self.assertEqual(self._caso(caso_id)['ESTADO_CASO'], ESTADO_CASO_CONFIRMADA_BAJA,
                               f"Fallo: caso {caso_id} no quedó CONFIRMADA_BAJA.")
 
@@ -3121,7 +3098,8 @@ class TestConfirmarBajaCmFlujoRealDeGuardado(unittest.TestCase):
         cls.df_master_original = cls.dm.df_master.copy()
         cls.df_logs_original = cls.dm.df_logs.copy()
 
-    COLUMNAS_EXCEL = ['VIN'] + ['ESTADO DEL CM'] + comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM
+    COLUMNAS_EXCEL = ['VIN', 'ESTADO DEL CM', 'ESTADO COMERCIAL', 'ETAPA GESTIÓN',
+                      'N CONTRATO 3PC', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'TIPO DE CM', 'PAGO CM']
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -3247,10 +3225,10 @@ class TestConfirmarBajaCmFlujoRealDeGuardado(unittest.TestCase):
 
     @patch('src.ui.comercial.QMessageBox.information')  # no interviene, pero por si acaso
     def test_un_vin_flujo_real_completo(self, _mock_info):
-        vin = 'YV2REAL0000900054'
+        vin = 'YV2REAL0000000001'
         self._crear_excel_pruebas_fm([
-            {'VIN': vin, 'ESTADO DEL CM': 'Expired', 'N CONTRATO 3PC': '3PC-1',
-             'FECHA INICIO CM': '01-01-2025', 'FECHA TERMINO CM': '01-01-2026',
+            {'VIN': vin, 'ESTADO DEL CM': 'Expired', 'ESTADO COMERCIAL': 'Vigente', 'ETAPA GESTIÓN': 'PENDIENTE_TEST',
+             'N CONTRATO 3PC': '3PC-1', 'FECHA INICIO CM': '01-01-2025', 'FECHA TERMINO CM': '01-01-2026',
              'TIPO DE CM': 'Silver', 'PAGO CM': '15000'},
         ])
         self._crear_casos_pendientes([(vin, '10')])
@@ -3263,14 +3241,16 @@ class TestConfirmarBajaCmFlujoRealDeGuardado(unittest.TestCase):
         self._abrir_bandeja_cm()
         self._seleccionar_y_confirmar([0])
 
-        # 1) PruebasFM.xlsx (temporal, real): Expired -> Terminated + limpieza.
+        # 1) PruebasFM.xlsx (temporal, real): Expired -> Terminated, contrato en BAJA y datos del CM intactos.
         self.assertEqual(self._leer_celda_excel(vin, 'ESTADO DEL CM'), 'Terminated')
-        for col in comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM:
-            self.assertEqual(self._leer_celda_excel(vin, col), '-', f"Fallo real en Excel: {col} no quedó limpio.")
+        self.assertEqual(self._leer_celda_excel(vin, 'ESTADO COMERCIAL'), 'BAJA')
+        self.assertEqual(self._leer_celda_excel(vin, 'N CONTRATO 3PC'), '3PC-1')
+        self.assertEqual(self._leer_celda_excel(vin, 'TIPO DE CM'), 'Silver')
+        self.assertEqual(self._leer_celda_excel(vin, 'PAGO CM'), '15000')
 
         # 2) LogApp.csv (temporal, real): una línea por columna que cambió.
         df_log = self._leer_log()
-        self.assertEqual(len(df_log), 6, "Fallo: deben quedar 6 líneas de log (ESTADO DEL CM + 5 columnas de limpieza).")
+        self.assertEqual(len(df_log), 3, "Fallo: deben quedar 3 líneas de log (ESTADO DEL CM, ESTADO COMERCIAL y ETAPA GESTIÓN).")
         fila_estado = df_log[df_log['CAMPO MODIFICADO'] == 'ESTADO DEL CM'].iloc[0]
         self.assertEqual(fila_estado['IDENTIFICADOR'], vin)
         self.assertEqual(fila_estado['MÓDULO'], 'Comercial')
@@ -3283,11 +3263,11 @@ class TestConfirmarBajaCmFlujoRealDeGuardado(unittest.TestCase):
 
     @patch('src.ui.comercial.QMessageBox.information')
     def test_multiples_vin_flujo_real_una_sola_escritura(self, _mock_info):
-        vins = ['YV2REAL0000900055', 'YV2REAL0000900073', 'YV2REAL0000900074']
-        vin_no_seleccionado = 'YV2REAL0000900075'
+        vins = ['YV2REAL0000000002', 'YV2REAL0000000003', 'YV2REAL0000000004']
+        vin_no_seleccionado = 'YV2REAL0000000005'
         filas_excel = [
-            {'VIN': v, 'ESTADO DEL CM': 'Expired', 'N CONTRATO 3PC': f'3PC-{i}',
-             'FECHA INICIO CM': '01-01-2025', 'FECHA TERMINO CM': '01-01-2026',
+            {'VIN': v, 'ESTADO DEL CM': 'Expired', 'ESTADO COMERCIAL': 'Vigente', 'ETAPA GESTIÓN': 'PENDIENTE_TEST',
+             'N CONTRATO 3PC': f'3PC-{i}', 'FECHA INICIO CM': '01-01-2025', 'FECHA TERMINO CM': '01-01-2026',
              'TIPO DE CM': 'Silver', 'PAGO CM': str(10000 * (i + 1))}
             for i, v in enumerate(vins + [vin_no_seleccionado])
         ]
@@ -3319,18 +3299,19 @@ class TestConfirmarBajaCmFlujoRealDeGuardado(unittest.TestCase):
         # 1) PruebasFM.xlsx real: los 3 seleccionados cambian.
         for vin in vins:
             self.assertEqual(self._leer_celda_excel(vin, 'ESTADO DEL CM'), 'Terminated')
-            for col in comercial_services.COLUMNAS_LIMPIEZA_TERMINATED_CM:
-                self.assertEqual(self._leer_celda_excel(vin, col), '-')
+            self.assertEqual(self._leer_celda_excel(vin, 'ESTADO COMERCIAL'), 'BAJA')
+            self.assertNotEqual(self._leer_celda_excel(vin, 'N CONTRATO 3PC'), '-')
 
         # El VIN no seleccionado permanece intacto en el Excel real.
         self.assertEqual(self._leer_celda_excel(vin_no_seleccionado, 'ESTADO DEL CM'), 'Expired')
+        self.assertEqual(self._leer_celda_excel(vin_no_seleccionado, 'ESTADO COMERCIAL'), 'Vigente')
         self.assertEqual(self._leer_celda_excel(vin_no_seleccionado, 'PAGO CM'), str(10000 * 4))
 
-        # 2) LogApp.csv real: 6 líneas por cada VIN seleccionado, ninguna del no seleccionado.
+        # 2) LogApp.csv real: 3 líneas por cada VIN seleccionado, ninguna del no seleccionado.
         df_log = self._leer_log()
-        self.assertEqual(len(df_log), 18, "Fallo: 3 VIN x 6 columnas = 18 líneas de log.")
+        self.assertEqual(len(df_log), 9, "Fallo: 3 VIN x 3 columnas = 9 líneas de log.")
         for vin in vins:
-            self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == vin]), 6)
+            self.assertEqual(len(df_log[df_log['IDENTIFICADOR'] == vin]), 3)
         self.assertNotIn(vin_no_seleccionado, df_log['IDENTIFICADOR'].tolist())
 
         # 3) CasosBajaCM.csv real: los 3 seleccionados a CONFIRMADA_BAJA, el resto pendiente.

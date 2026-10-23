@@ -19,12 +19,12 @@ class DialogoAccion(QDialog):
 
     def __init__(self, parent, titulo_ventana, icon_name, icon_color, icon_bg_color,
                  titulo, subtitulo, descripcion, items=None, botones=None,
-                 titulo_items="VIN seleccionados"):
+                 titulo_items="VIN seleccionados", widget_extra=None, ancho=None):
         super().__init__(parent)
         self.setWindowTitle(titulo_ventana)
         self.setModal(True)
         # Más ancho cuando hay 3 o más botones, para que no se aprieten
-        self.setFixedWidth(max(420, 150 * len(botones or []) + 100))
+        self.setFixedWidth(ancho or max(420, 150 * len(botones or []) + 100))
         self.setStyleSheet(f"QDialog {{ background-color: {BACKGROUND}; }}")
 
         layout = QVBoxLayout(self)
@@ -63,6 +63,9 @@ class DialogoAccion(QDialog):
             desc_lbl.setWordWrap(True)
             desc_lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 12px; background: transparent; border: none;")
             card_layout.addWidget(desc_lbl)
+
+        if widget_extra is not None:
+            card_layout.addWidget(widget_extra)
 
         self.lista_items = None
         if items:

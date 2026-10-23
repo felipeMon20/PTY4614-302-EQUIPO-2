@@ -255,7 +255,7 @@ class TestMainDataLoaderThreadLecturaExcelPrincipal(unittest.TestCase):
         # el valor correcto (25-09-2026, fix de dataframe_formatter.py --
         # antes 'INICIO'/'TERMINO'/'ESTADO DE ENTREGA' no estaban en la lista
         # date_columns de DataFrameFormatter.clean(), que tenía los nombres
-        # de columna de ANTES del renombrado RM_CONTRATOS_COLUMN_ALIASES y nunca
+        # de columna de ANTES del renombrado RM_JAVI_COLUMN_ALIASES y nunca
         # calzaban). Antes del fix, clean() no tocaba esta columna y el
         # Timestamp crudo llegaba tal cual a formatear_columna_fecha_legado(),
         # que sí re-parsea vía pd.to_datetime(dayfirst=True, format='mixed')

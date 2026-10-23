@@ -417,7 +417,7 @@ class TestErrorDeEscrituraNoRompeElResto(QualitySyncTestCase):
 
 
 class TestVolskipQualitySyncOmite(QualitySyncTestCase):
-    """El escape hatch BRAND_SKIP_QUALITY_SYNC debe omitir todo sin tocar
+    """El escape hatch VOLVO_SKIP_QUALITY_SYNC debe omitir todo sin tocar
     ningun archivo."""
 
     def test_skip_omite_todo(self):
@@ -426,12 +426,12 @@ class TestVolskipQualitySyncOmite(QualitySyncTestCase):
             with open(os.path.join(self.tmpdir, name), "rb") as f:
                 antes[name] = f.read()
 
-        os.environ["BRAND_SKIP_QUALITY_SYNC"] = "1"
+        os.environ["VOLVO_SKIP_QUALITY_SYNC"] = "1"
         try:
             data = _make_data([_test_record("test_zzz_skip.py", "TestZzzSkip", "test_uno")])
             report = quality_sync.sync(data, PROJECT_ROOT, calidad_dir=self.tmpdir)
         finally:
-            del os.environ["BRAND_SKIP_QUALITY_SYNC"]
+            del os.environ["VOLVO_SKIP_QUALITY_SYNC"]
 
         self.assertTrue(report["skipped"])
         self.assertTrue(report["ok"])

@@ -8,16 +8,16 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication, QMenu
 
 import config.settings
-from src.ui.custom_table import AppTableWidget, PandasTableModel
+from src.ui.custom_table import VolvoTableWidget, PandasTableModel
 from src.services import comercial_services
 from src.theme.colors import SUCCESS, DANGER, WARNING, TEXT_MUTED
 
 logger = logging.getLogger("TestRunner")
 
 
-class TestAppTableWidgetSorting(unittest.TestCase):
+class TestVolvoTableWidgetSorting(unittest.TestCase):
     """Pruebas puras (sin Excel/DataManager) del ordenamiento tipo Excel
-    agregado a AppTableWidget: apply_sort() y el ciclo asc -> desc ->
+    agregado a VolvoTableWidget: apply_sort() y el ciclo asc -> desc ->
     orden original disparado por clic de encabezado."""
 
     @classmethod
@@ -26,7 +26,7 @@ class TestAppTableWidgetSorting(unittest.TestCase):
             cls._app = QApplication([])
 
     def _make_table(self, df):
-        table = AppTableWidget()
+        table = VolvoTableWidget()
         model = PandasTableModel()
         model.set_data(df)
         table.setModel(model)
@@ -164,7 +164,7 @@ class TestAppTableWidgetSorting(unittest.TestCase):
         self.assertEqual(list(table.apply_sort(df2)['Nombre']), ['Ana', 'Zoe'])
 
 
-class TestAppTableWidgetMenuEliminados(unittest.TestCase):
+class TestVolvoTableWidgetMenuEliminados(unittest.TestCase):
     """menu_type='eliminados' (pestaña Papelera de Historial) debe ofrecer
     'Restaurar Fila' deshabilitada: ExcelWriter no implementa restore_row, y
     antes esta acción quedaba habilitada aunque terminara lanzando
@@ -177,7 +177,7 @@ class TestAppTableWidgetMenuEliminados(unittest.TestCase):
 
     def test_restaurar_fila_esta_deshabilitada(self):
         df = pd.DataFrame({"VIN": ["YV2AAA"], "MODELO": ["FM"]})
-        table = AppTableWidget()
+        table = VolvoTableWidget()
         table.menu_type = "eliminados"
         model = PandasTableModel()
         model.set_data(df)
@@ -227,7 +227,7 @@ class TestInstalacionesMenuType(unittest.TestCase):
 class TestPandasTableModelHeaderData(unittest.TestCase):
     """Bug real reportado: al abrir Comercial con el Excel real (columnas
     reducidas de 34 a 33 respecto a la última vez que se guardó el estado
-    del header con AppTableWidget.set_table_id), Qt seguía pidiendo
+    del header con VolvoTableWidget.set_table_id), Qt seguía pidiendo
     headerData(33, ...) -- fuera de rango para un DataFrame de 33 columnas
     -- y PandasTableModel.headerData() indexaba directo sobre
     self._df.columns sin validar el rango, crasheando con IndexError."""
@@ -341,7 +341,7 @@ class TestPandasTableModelTerminoContratoForeground(unittest.TestCase):
 
 
 class TestSetTableIdDescartaEstadoDesactualizado(unittest.TestCase):
-    """AppTableWidget.set_table_id(): si el estado de columnas guardado en
+    """VolvoTableWidget.set_table_id(): si el estado de columnas guardado en
     QSettings quedó con más columnas de las que tiene el modelo actual --
     p.ej. el Excel real perdió una columna desde la última vez que se
     guardó ese estado -- restaurarlo no debe dejar el header con secciones
@@ -354,7 +354,7 @@ class TestSetTableIdDescartaEstadoDesactualizado(unittest.TestCase):
             cls._app = QApplication([])
 
     def _make_table(self, df):
-        table = AppTableWidget()
+        table = VolvoTableWidget()
         model = PandasTableModel()
         model.set_data(df)
         table.setModel(model)
