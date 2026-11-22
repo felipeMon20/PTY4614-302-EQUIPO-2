@@ -14,6 +14,7 @@ archivo dentro del mismo proceso (misma proteccion que WorkbookCache.lock_para
 le da a la rama .xlsx, sin el cacheo de Workbook)."""
 
 from src.core.normalizacion import normalizar_para_escritura
+from src.core.columnas_opcionales import asegurar_columnas_opcionales
 import os
 import threading
 import time
@@ -192,6 +193,7 @@ def update_cells_csv(writer, target_file, changes_dict, module_name="Sistema"):
             logger.warning(f"No se encontro '{os.path.basename(target_file)}' para actualizar.")
             return False
 
+        df = asegurar_columnas_opcionales(df, solo_las_de=changes_dict)
         logs_to_write = []
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         indice_vin = None
@@ -217,7 +219,7 @@ def update_cells_csv(writer, target_file, changes_dict, module_name="Sistema"):
                 identificador_log = target_vin
 
             if row_idx is None:
-                print(f"No se encontró la fila objetivo para guardar: {identificador_log}")
+                logger.warning(f"No se encontró la fila objetivo para guardar: {identificador_log}")
                 # Mismo criterio conservador que la rama .xlsx: si una fila
                 # de este mismo changes_dict ya no se encuentra, se aborta
                 # todo el lote sin escribir nada (ninguna mutacion parcial).
@@ -248,10 +250,10 @@ def update_cells_csv(writer, target_file, changes_dict, module_name="Sistema"):
         return True
 
     except PermissionError:
-        print(f"El CSV {os.path.basename(target_file)} está bloqueado.")
+        logger.warning(f"El CSV {os.path.basename(target_file)} está bloqueado.")
         return False
     except Exception as e:
-        print(f"Fallo inesperado al guardar CSV: {e}")
+        logger.error(f"Fallo inesperado al guardar CSV: {e}", exc_info=True)
         return False
     finally:
         lock.release()
@@ -312,10 +314,10 @@ def add_new_row_csv(writer, target_file, new_data_dict, module_name="Sistema"):
         return True
 
     except PermissionError:
-        print(f"El CSV {os.path.basename(target_file)} está bloqueado.")
+        logger.warning(f"El CSV {os.path.basename(target_file)} está bloqueado.")
         return False
     except Exception as e:
-        print(f"Fallo inesperado al añadir fila en CSV: {e}")
+        logger.error(f"Fallo inesperado al añadir fila en CSV: {e}", exc_info=True)
         return False
     finally:
         lock.release()
@@ -379,10 +381,10 @@ def add_new_rows_batch_csv(writer, target_file, new_data_dicts, module_name="Sis
         return True
 
     except PermissionError:
-        print(f"El CSV {os.path.basename(target_file)} está bloqueado.")
+        logger.warning(f"El CSV {os.path.basename(target_file)} está bloqueado.")
         return False
     except Exception as e:
-        print(f"Fallo inesperado al añadir el lote de filas en CSV: {e}")
+        logger.error(f"Fallo inesperado al añadir el lote de filas en CSV: {e}", exc_info=True)
         return False
     finally:
         lock.release()
@@ -431,10 +433,10 @@ def delete_row_csv(writer, target_file, primary_key_val=None, module_name="Siste
         return False
 
     except PermissionError:
-        print(f"El CSV {os.path.basename(target_file)} está bloqueado.")
+        logger.warning(f"El CSV {os.path.basename(target_file)} está bloqueado.")
         return False
     except Exception as e:
-        print(f"Fallo inesperado al eliminar fila en CSV: {e}")
+        logger.error(f"Fallo inesperado al eliminar fila en CSV: {e}", exc_info=True)
         return False
     finally:
         lock.release()

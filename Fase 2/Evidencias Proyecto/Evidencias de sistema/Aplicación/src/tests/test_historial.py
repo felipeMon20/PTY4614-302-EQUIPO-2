@@ -10,7 +10,7 @@ import pandas as pd
 
 import config.settings
 from src.core.data_manager import DataManager
-from src.ui.historial import HistorialModule
+from src.ui.administracion.historial import HistorialModule
 
 
 def _read_excel_con_reintento(path, intentos=5, espera_seg=0.3, **kwargs):
@@ -98,8 +98,8 @@ class TestVaciarLogsModificacionesConBackup(unittest.TestCase):
     def _confirmar_dialogo_y_vaciar(self):
         from PyQt6.QtWidgets import QMessageBox
         with patch.object(QMessageBox, 'exec', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.historial.QMessageBox.information'), \
-             patch('src.ui.historial.QMessageBox.warning'):
+             patch('src.ui.administracion.historial.QMessageBox.information'), \
+             patch('src.ui.administracion.historial.QMessageBox.warning'):
             self.modulo.tabs.setCurrentIndex(0)  # pestaña "Logs de Modificaciones"
             self.modulo._clear_logs()
 
@@ -133,8 +133,8 @@ class TestVaciarLogsModificacionesConBackup(unittest.TestCase):
 
         from PyQt6.QtWidgets import QMessageBox
         with patch.object(QMessageBox, 'exec', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.historial.QMessageBox.information'), \
-             patch('src.ui.historial.QMessageBox.warning') as mock_warning, \
+             patch('src.ui.administracion.historial.QMessageBox.information'), \
+             patch('src.ui.administracion.historial.QMessageBox.warning') as mock_warning, \
              patch.object(self.modulo.writer, '_crear_backup', return_value=False):
             self.modulo.tabs.setCurrentIndex(0)
             self.modulo._clear_logs()
@@ -149,8 +149,8 @@ class TestVaciarLogsModificacionesConBackup(unittest.TestCase):
         self._confirmar_dialogo_y_vaciar()
         from PyQt6.QtWidgets import QMessageBox
         with patch.object(QMessageBox, 'exec', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.historial.QMessageBox.information') as mock_info, \
-             patch('src.ui.historial.QMessageBox.warning') as mock_warning:
+             patch('src.ui.administracion.historial.QMessageBox.information') as mock_info, \
+             patch('src.ui.administracion.historial.QMessageBox.warning') as mock_warning:
             self.modulo.tabs.setCurrentIndex(0)
             self.modulo._clear_logs()
         mock_warning.assert_not_called()
@@ -213,8 +213,8 @@ class TestVaciarPapeleraConBackupYMultiplesHojas(unittest.TestCase):
         # interacción real.
         from PyQt6.QtWidgets import QMessageBox
         with patch.object(QMessageBox, 'exec', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.historial.QMessageBox.information'), \
-             patch('src.ui.historial.QMessageBox.warning'):
+             patch('src.ui.administracion.historial.QMessageBox.information'), \
+             patch('src.ui.administracion.historial.QMessageBox.warning'):
             self.modulo.tabs.setCurrentIndex(1)  # pestaña "Papelera"
             self.modulo._clear_logs()
 
@@ -255,8 +255,8 @@ class TestVaciarPapeleraConBackupYMultiplesHojas(unittest.TestCase):
 
         from PyQt6.QtWidgets import QMessageBox
         with patch.object(QMessageBox, 'exec', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.historial.QMessageBox.information'), \
-             patch('src.ui.historial.QMessageBox.warning') as mock_warning, \
+             patch('src.ui.administracion.historial.QMessageBox.information'), \
+             patch('src.ui.administracion.historial.QMessageBox.warning') as mock_warning, \
              patch.object(self.modulo.writer, '_crear_backup', return_value=False):
             self.modulo.tabs.setCurrentIndex(1)
             self.modulo._clear_logs()
@@ -286,8 +286,8 @@ class TestVaciarPapeleraConBackupYMultiplesHojas(unittest.TestCase):
         # Segunda pasada: ya no hay filas de datos en ninguna hoja.
         from PyQt6.QtWidgets import QMessageBox
         with patch.object(QMessageBox, 'exec', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.historial.QMessageBox.information') as mock_info, \
-             patch('src.ui.historial.QMessageBox.warning') as mock_warning:
+             patch('src.ui.administracion.historial.QMessageBox.information') as mock_info, \
+             patch('src.ui.administracion.historial.QMessageBox.warning') as mock_warning:
             self.modulo.tabs.setCurrentIndex(1)
             self.modulo._clear_logs()
         mock_warning.assert_not_called()
@@ -346,7 +346,7 @@ class TestPapeleraPorModulo(unittest.TestCase):
         self.assertNotIn("VIN", self.modulo.filtered_del.columns, "Fallo: no debe traer columnas de Comercial.")
 
     def test_handle_restaurar_no_crashea_y_avisa_que_no_esta_disponible(self):
-        with patch('src.ui.historial.QMessageBox.information') as mock_info:
+        with patch('src.ui.administracion.historial.QMessageBox.information') as mock_info:
             self.modulo._handle_restaurar(0, "YV2AAA")
         mock_info.assert_called_once()
 

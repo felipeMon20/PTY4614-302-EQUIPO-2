@@ -40,7 +40,6 @@ class TestBackupManagerSnapshot(unittest.TestCase):
             patch.object(config.settings, 'DELETED_LOG_EXCEL_PATH', self.deleted_path),
             patch.object(config.settings, 'PROVISION_EXCEL_PATH', self.prov_path),
             patch.object(config.settings, 'INSTALACIONES_PATH', ""),
-            patch.object(config.settings, 'RM_JAVI_PATH', ""),
             patch.object(config.settings, 'POWERBI_EXCEL_PATH', ""),
             patch.object(config.settings, 'CONTACTOS_EXCEL_PATH', ""),
             patch.object(config.settings, 'CORREOS_EXCEL_PATH', ""),
@@ -128,8 +127,8 @@ class TestBackupManagerSnapshot(unittest.TestCase):
 
 
 class TestBackupManagerRetencionYProgramacion(unittest.TestCase):
-    """Retencion de 5 snapshots automaticos y disparo semanal (solo viernes,
-    maximo uno por semana ISO)."""
+    """Retencion de 5 snapshots automaticos y disparo semanal (maximo uno por
+    semana ISO, en la primera apertura de la semana)."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -152,7 +151,6 @@ class TestBackupManagerRetencionYProgramacion(unittest.TestCase):
             patch.object(config.settings, 'DELETED_LOG_EXCEL_PATH', ""),
             patch.object(config.settings, 'PROVISION_EXCEL_PATH', ""),
             patch.object(config.settings, 'INSTALACIONES_PATH', ""),
-            patch.object(config.settings, 'RM_JAVI_PATH', ""),
             patch.object(config.settings, 'POWERBI_EXCEL_PATH', ""),
             patch.object(config.settings, 'CONTACTOS_EXCEL_PATH', ""),
             patch.object(config.settings, 'CORREOS_EXCEL_PATH', ""),
@@ -188,10 +186,10 @@ class TestBackupManagerRetencionYProgramacion(unittest.TestCase):
         esperados = sorted([os.path.basename(c) for c in carpetas[2:]])  # los 5 mas recientes
         self.assertEqual(restantes, esperados)
 
-    def test_backup_semanal_no_pendiente_si_no_es_viernes(self):
+    def test_backup_semanal_pendiente_cualquier_dia_sin_backup_previo(self):
         with patch('src.core.backup_manager.datetime') as mock_dt:
             mock_dt.now.return_value = datetime(2026, 9, 7, 10, 0, 0)  # lunes
-            self.assertFalse(self.manager.backup_semanal_pendiente())
+            self.assertTrue(self.manager.backup_semanal_pendiente())
 
     def test_backup_semanal_pendiente_el_viernes_sin_backup_previo(self):
         with patch('src.core.backup_manager.datetime') as mock_dt:

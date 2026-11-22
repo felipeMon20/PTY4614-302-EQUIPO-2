@@ -747,15 +747,19 @@ class TestComercialAgregarDialogJustTimeCM(unittest.TestCase):
         dialog = self._make_dialog()
         dialog.inputs['FORMA DE CONTRATO'].setCurrentText('Venta')  # unico grupo que admite 'Cliente'
         self._elegir_tipo_facturacion(dialog, 'Cliente')
-        self.assertTrue(dialog.inputs['CONTRATO CREADO EN JUSTTIME'].isEnabled())
-        self.assertTrue(dialog.inputs['INICIO'].isEnabled())
-        self.assertTrue(dialog.inputs['TERMINO'].isEnabled())
+        # Contrato nuevo: JustTime se completa solo (Pendiente) y los campos quedan bloqueados
+        self.assertTrue(dialog._tipo_va_a_justtime())
+        self.assertTrue(dialog._justtime_automatico())
+        self.assertEqual(dialog.inputs['CONTRATO CREADO EN JUSTTIME'].currentText(), 'Pendiente')
+        self.assertFalse(dialog.inputs['INICIO'].isEnabled())
+        self.assertFalse(dialog.inputs['TERMINO'].isEnabled())
 
     def test_justtime_habilitado_para_interno(self):
         dialog = self._make_dialog()
         dialog.inputs['FORMA DE CONTRATO'].setCurrentText('Provision')  # unico FORMA DE CONTRATO que admite 'Interno'
         self._elegir_tipo_facturacion(dialog, 'Interno')
-        self.assertTrue(dialog.inputs['CONTRATO CREADO EN JUSTTIME'].isEnabled())
+        self.assertTrue(dialog._tipo_va_a_justtime())
+        self.assertEqual(dialog.inputs['CONTRATO CREADO EN JUSTTIME'].currentText(), 'Pendiente')
 
     def test_justtime_deshabilitado_para_provision_mas(self):
         """30-09-2026 (definido con el usuario): Provisión + ya no va a JustTime."""

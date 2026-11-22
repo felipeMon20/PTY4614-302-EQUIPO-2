@@ -1,25 +1,53 @@
 import os
 import json
-import sys
 
+from config.directorio_app import BASE_DIR
 from config.rutas import completar_rutas, resolver_nombre_anterior, CLAVES_OBSOLETAS
-
-if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CONFIG_FILE = os.path.join(BASE_DIR, "app_config.json")
 
-# Muestra herramientas de desarrollo (pestaña Avanzado de Configuración). El
-# programador lo pone en True aquí o define GESTOR_SSCC_PROGRAMADOR=1 en su
-# entorno; el ejecutable que recibe el usuario común lo deja en False.
-MODO_PROGRAMADOR = False or os.environ.get("GESTOR_SSCC_PROGRAMADOR") == "1"
+# Muestra herramientas de desarrollo (pestaña Avanzado de Configuración). Se activa
+# con un archivo vacío llamado .programador junto a la aplicación o con la variable
+# GESTOR_SSCC_PROGRAMADOR=1. El ejecutable que recibe el usuario común no lo tiene.
+MODO_PROGRAMADOR = (os.path.exists(os.path.join(BASE_DIR, ".programador"))
+                    or os.environ.get("GESTOR_SSCC_PROGRAMADOR") == "1")
 
-# Versión de esta compilación; publicar.bat la usa al publicar el zip
-APP_VERSION = "1.0.5"
+# Datos de prueba: carpeta con archivos inventados (mismos nombres que los
+# reales). Solo el modo programador puede activarlos desde Configuración >
+# Avanzado; la elección vive en un archivo aparte, así no se toca
+# app_config.json ni las rutas reales guardadas.
+DIR_DATOS_PRUEBA = os.path.join(BASE_DIR, "datos_prueba")
+ARCHIVO_MODO_DATOS = os.path.join(BASE_DIR, "modo_datos.json")
+# Copia original de datos_prueba: el botón "Restaurar datos de demostración" la vuelve a copiar encima.
+DIR_DATOS_PRUEBA_BASE = os.path.join(BASE_DIR, "datos_prueba_base")
+
+
+def leer_datos_prueba_activo():
+    if os.environ.get("GESTOR_SSCC_SIN_DATOS_PRUEBA") == "1":
+        return False
+    try:
+        with open(ARCHIVO_MODO_DATOS, 'r', encoding='utf-8-sig') as f:
+            return bool(json.load(f).get("DATOS_PRUEBA"))
+    except Exception:
+        return False
+
+
+def guardar_datos_prueba_activo(activo):
+    with open(ARCHIVO_MODO_DATOS, 'w', encoding='utf-8') as f:
+        json.dump({"DATOS_PRUEBA": bool(activo)}, f, indent=4)
+
+
+def hay_datos_prueba():
+    return os.path.exists(os.path.join(DIR_DATOS_PRUEBA, "Registro Maestro.csv"))
+
+
+def hay_base_demo():
+    return os.path.exists(os.path.join(DIR_DATOS_PRUEBA_BASE, "Registro Maestro.csv"))
+
+# Versión de esta compilación; el publicador (src/publicacion) la usa al publicar el zip
+APP_VERSION = "1.3.1"
 # Subcarpeta, hermana de la carpeta de datos, donde se publican Gestor_SSCC.zip y version.json
-CARPETA_ACTUALIZACIONES = "Codigo - APP"
+CARPETA_ACTUALIZACIONES = "Actualizaciones"
 
 # Diccionario maestro de estructura. Será la fuente de verdad si falta el archivo.
 DEFAULT_CONFIG = {
@@ -30,7 +58,6 @@ DEFAULT_CONFIG = {
     "DELETED_LOG_EXCEL_PATH": "",
     "PROVISION_EXCEL_PATH": "",
     "INSTALACIONES_PATH": "",
-    "RM_JAVI_PATH": "",
     "POWERBI_EXCEL_PATH": "",
     "CONTACTOS_EXCEL_PATH": "",
     "CORREOS_EXCEL_PATH": "",
@@ -124,7 +151,6 @@ LOG_CSV_PATH = _current_config.get("LOG_CSV_PATH", "")
 DELETED_LOG_EXCEL_PATH = _current_config.get("DELETED_LOG_EXCEL_PATH", "")
 PROVISION_EXCEL_PATH = _current_config.get("PROVISION_EXCEL_PATH", "")
 INSTALACIONES_PATH = _current_config.get("INSTALACIONES_PATH", "")
-RM_JAVI_PATH = _current_config.get("RM_JAVI_PATH", "")
 POWERBI_EXCEL_PATH = _current_config.get("POWERBI_EXCEL_PATH", "")
 CONTACTOS_EXCEL_PATH = _current_config.get("CONTACTOS_EXCEL_PATH", "")
 CORREOS_EXCEL_PATH = _current_config.get("CORREOS_EXCEL_PATH", "")
@@ -137,5 +163,16 @@ METAS_VC_PATH = _current_config.get("METAS_VC_PATH", "")
 PROVISIONES_SHAREPOINT_URL = _current_config.get("PROVISIONES_SHAREPOINT_URL", "")
 REPORTE_NOTAS_VENTAS_URL = _current_config.get("REPORTE_NOTAS_VENTAS_URL", "")
 POWERBI_EMBED_URL = _current_config.get("POWERBI_EMBED_URL", "")
+
+# Con los datos de prueba activos, todas las rutas apuntan a su carpeta (solo en
+# memoria: lo que Configuración guarda sigue siendo lo de app_config.json). Sin
+# RM de Javiera, para que ninguna sincronización traiga datos reales.
+DATOS_DE_PRUEBA = MODO_PROGRAMADOR and leer_datos_prueba_activo() and hay_datos_prueba()
+if DATOS_DE_PRUEBA:
+    from config.rutas import ARCHIVOS_DE_DATOS
+    for _clave, (_etiqueta, _nombre, _obligatorio) in ARCHIVOS_DE_DATOS.items():
+        globals()[_clave] = os.path.join(DIR_DATOS_PRUEBA, _nombre)
+    DATA_DIR = DIR_DATOS_PRUEBA
+    LOG_EXCEL_PATH = os.path.join(DIR_DATOS_PRUEBA, "LogApp.xlsx")
 
 WATCH_DIR = os.path.dirname(EXCEL_PATH) if EXCEL_PATH and os.path.exists(EXCEL_PATH) else ""

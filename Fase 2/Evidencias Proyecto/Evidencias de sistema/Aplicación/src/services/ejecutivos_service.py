@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 _COLUMNAS = ["id_ejecutivo", "nombre", "correo", "alias", "activo"]
 _NOMBRES_IGNORADOS = {"", "-", "nan", "none", "desconocido", "no aplica"}
+NOMBRE_DESCONOCIDO = "Desconocido"
 
 # Directorio inicial de ejemplo (nombre en el RM, correo, alias). Datos ficticios
 # de esta versión pública; en producción el archivo lo mantiene el negocio.
@@ -226,6 +227,21 @@ def actualizar_ejecutivo(id_ejecutivo, nombre, correo, alias, activo=True):
     directorio.loc[coincide, ['nombre', 'correo', 'alias', 'activo']] = [nombre, correo, alias, "SI" if activo else "NO"]
     try:
         _escribir(get_ejecutivos_csv_path(), directorio.values.tolist())
+    except Exception as e:
+        return False, f"No se pudo guardar el directorio (¿el archivo está abierto?): {e}"
+    return True, ""
+
+
+def eliminar_ejecutivo(id_ejecutivo):
+    """Quita al ejecutivo del directorio. No toca PruebasFM: quien llama debe
+    haber pasado antes sus contratos a otro ejecutivo (o a Desconocido).
+    Devuelve (ok, mensaje)."""
+    directorio = leer_ejecutivos()
+    coincide = directorio['id_ejecutivo'] == id_ejecutivo
+    if not coincide.any():
+        return False, "El ejecutivo ya no existe en el directorio."
+    try:
+        _escribir(get_ejecutivos_csv_path(), directorio[~coincide].values.tolist())
     except Exception as e:
         return False, f"No se pudo guardar el directorio (¿el archivo está abierto?): {e}"
     return True, ""

@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import time
 import shutil
 import logging
 from datetime import datetime
@@ -18,7 +19,6 @@ _CLAVES_ARCHIVOS_MAESTROS = [
     "DELETED_LOG_EXCEL_PATH",
     "PROVISION_EXCEL_PATH",
     "INSTALACIONES_PATH",
-    "RM_JAVI_PATH",
     "POWERBI_EXCEL_PATH",
     "CONTACTOS_EXCEL_PATH",
     "CORREOS_EXCEL_PATH",
@@ -109,6 +109,15 @@ class BackupManager:
         )
         return resultado
 
+    def _limpiar_temporales_huerfanos(self, destino_base):
+        """Un snapshot interrumpido deja su carpeta .tmp_*; la retencion las ignora."""
+        limite = time.time() - 86400
+        for d in os.listdir(destino_base):
+            ruta = os.path.join(destino_base, d)
+            if d.startswith(".tmp_") and os.path.isdir(ruta) and os.path.getmtime(ruta) < limite:
+                shutil.rmtree(ruta, ignore_errors=True)
+                logger.info(f"Snapshot interrumpido eliminado: '{ruta}'.")
+
     def _aplicar_retencion(self, destino_base, maximo):
         if not os.path.exists(destino_base):
             return
@@ -116,6 +125,7 @@ class BackupManager:
             os.path.join(destino_base, d) for d in os.listdir(destino_base)
             if os.path.isdir(os.path.join(destino_base, d)) and not d.startswith(".")
         ]
+        self._limpiar_temporales_huerfanos(destino_base)
         carpetas.sort(key=os.path.getmtime)
         while len(carpetas) > maximo:
             mas_vieja = carpetas.pop(0)
@@ -133,7 +143,7 @@ class BackupManager:
         return self._crear_snapshot(self.manual_dir)
 
     # ------------------------------------------------------------------
-    # Backup automatico semanal: al iniciar, los viernes, maximo 1 por semana
+    # Backup automatico semanal: al iniciar, maximo 1 por semana ISO
     # ------------------------------------------------------------------
     def _semana_actual(self):
         iso = datetime.now().isocalendar()
@@ -160,10 +170,8 @@ class BackupManager:
             logger.warning(f"No se pudo guardar el estado del backup automatico: {e}")
 
     def backup_semanal_pendiente(self):
-        """True si hoy es viernes y todavia no existe un backup automatico
-        exitoso registrado para la semana ISO actual."""
-        if datetime.now().weekday() != 4:  # 0=lunes ... 4=viernes
-            return False
+        """True si todavia no existe un backup automatico exitoso registrado
+        para la semana ISO actual (se hace en la primera apertura de la semana)."""
         estado = self._leer_estado()
         return estado.get("ultima_semana_respaldada") != self._semana_actual()
 

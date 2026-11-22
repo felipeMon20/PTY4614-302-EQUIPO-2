@@ -18,6 +18,11 @@ from datetime import datetime
 # (mas abajo, en el bloque __main__), por eso va al inicio del archivo.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# El interruptor "Usar datos de prueba" del programador redirige todas las
+# rutas a datos_prueba/ y pisaba las del entorno de pruebas: los tests leían
+# y escribían esos datos en vez de los mock. La batería siempre usa los mock.
+os.environ["GESTOR_SSCC_SIN_DATOS_PRUEBA"] = "1"
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from unittest.mock import patch as _patch
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -43,13 +48,19 @@ for _metodo, _valor_por_defecto in [
 ]:
     _patch.object(QMessageBox, _metodo, return_value=_valor_por_defecto).start()
 
+# El aviso de VIN huérfanos de Provisiones queda programado a 800 ms tras
+# guardar y puede dispararse mientras corre otra clase de tests: abría un
+# diálogo real que nadie cierra bajo "offscreen" y la batería se colgaba.
+from PyQt6.QtWidgets import QDialog
+from src.ui.provisiones.dialogos import VinsHuerfanosAlertDialog, VincularComercialDialog
+for _clase_dialogo in (VinsHuerfanosAlertDialog, VincularComercialDialog):
+    _patch.object(_clase_dialogo, 'exec', return_value=QDialog.DialogCode.Rejected).start()
+
 from test_comercial import (
-    TestComercial, TestRMJaviSyncActualizaHistorial, TestRMJaviSyncColumnasAutorizadas, TestComercialTabsEstructura,
+    TestComercial, TestComercialTabsEstructura,
     TestComercialRevisionCM, TestConfirmarBajaCM, TestDialogoAccionCm, TestEnviarCorreoCM,
     TestEnviarCorreoOtrasSubpestanas, TestEditarUnidadComercial, TestAgregarContactoComercial,
     TestConfirmarBajaCmFlujoRealDeGuardado,
-    TestReglaSinContrato, TestReglaTerminatedCm, TestRMJaviSyncNormalizaEstadoComercial,
-    TestReconciliacionEstadoExpiredAlGuardarEnComercial, TestComercialFiltrosHeader,
     TestSaveExcelThreadLogsActualizadosSignal, TestSetLogsDfIntegracionConGeneralModule,
 )
 from test_contratos import (
@@ -287,7 +298,6 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     suite_comercial = unittest.TestLoader().loadTestsFromTestCase(TestComercial)
-    suite_comercial_filtros_header = unittest.TestLoader().loadTestsFromTestCase(TestComercialFiltrosHeader)
     suite_save_excel_thread_logs_signal = unittest.TestLoader().loadTestsFromTestCase(TestSaveExcelThreadLogsActualizadosSignal)
     suite_set_logs_df_integracion_general = unittest.TestLoader().loadTestsFromTestCase(TestSetLogsDfIntegracionConGeneralModule)
     suite_provisiones = unittest.TestLoader().loadTestsFromTestCase(TestProvisiones)
@@ -309,8 +319,6 @@ if __name__ == '__main__':
     suite_restore_backup = unittest.TestLoader().loadTestsFromTestCase(TestRestoreBackupValidation)
     suite_backup_manager_snapshot = unittest.TestLoader().loadTestsFromTestCase(TestBackupManagerSnapshot)
     suite_backup_manager_retencion = unittest.TestLoader().loadTestsFromTestCase(TestBackupManagerRetencionYProgramacion)
-    suite_rm_javi_historial = unittest.TestLoader().loadTestsFromTestCase(TestRMJaviSyncActualizaHistorial)
-    suite_rm_javi_columnas_autorizadas = unittest.TestLoader().loadTestsFromTestCase(TestRMJaviSyncColumnasAutorizadas)
     suite_comercial_tabs = unittest.TestLoader().loadTestsFromTestCase(TestComercialTabsEstructura)
     suite_comercial_revision_cm = unittest.TestLoader().loadTestsFromTestCase(TestComercialRevisionCM)
     suite_confirmar_baja_cm = unittest.TestLoader().loadTestsFromTestCase(TestConfirmarBajaCM)
@@ -320,10 +328,6 @@ if __name__ == '__main__':
     suite_agregar_contacto_comercial = unittest.TestLoader().loadTestsFromTestCase(TestAgregarContactoComercial)
     suite_dialogo_accion_cm = unittest.TestLoader().loadTestsFromTestCase(TestDialogoAccionCm)
     suite_confirmar_baja_cm_flujo_real = unittest.TestLoader().loadTestsFromTestCase(TestConfirmarBajaCmFlujoRealDeGuardado)
-    suite_regla_sin_contrato = unittest.TestLoader().loadTestsFromTestCase(TestReglaSinContrato)
-    suite_regla_terminated_cm = unittest.TestLoader().loadTestsFromTestCase(TestReglaTerminatedCm)
-    suite_reconciliacion_expired_comercial = unittest.TestLoader().loadTestsFromTestCase(TestReconciliacionEstadoExpiredAlGuardarEnComercial)
-    suite_rm_javi_normaliza_estado_comercial = unittest.TestLoader().loadTestsFromTestCase(TestRMJaviSyncNormalizaEstadoComercial)
     suite_contratos_no_limpia_vin_ausente = unittest.TestLoader().loadTestsFromTestCase(TestContratosNoLimpiaAutomaticamenteVinAusente)
     suite_contratos_regla_terminated_cm = unittest.TestLoader().loadTestsFromTestCase(TestContratosReglaTerminatedCm)
     suite_contratos_reconciliacion_expired_guardar = unittest.TestLoader().loadTestsFromTestCase(TestContratosReconciliacionEstadoExpiredAlGuardar)
@@ -495,13 +499,11 @@ if __name__ == '__main__':
     suite_fm_generar_plantilla_base = unittest.TestLoader().loadTestsFromTestCase(TestGenerarPlantillaBase)
 
     bateria_completa = unittest.TestSuite([
-        suite_comercial, suite_comercial_filtros_header, suite_comercial_tabs, suite_comercial_revision_cm, suite_confirmar_baja_cm,
+        suite_comercial, suite_comercial_tabs, suite_comercial_revision_cm, suite_confirmar_baja_cm,
         suite_save_excel_thread_logs_signal, suite_set_logs_df_integracion_general,
         suite_enviar_correo_cm, suite_enviar_correo_otras_subpestanas,
         suite_editar_unidad_comercial, suite_agregar_contacto_comercial,
         suite_dialogo_accion_cm, suite_confirmar_baja_cm_flujo_real,
-        suite_regla_sin_contrato,
-        suite_regla_terminated_cm, suite_reconciliacion_expired_comercial, suite_rm_javi_normaliza_estado_comercial,
         suite_contratos_no_limpia_vin_ausente, suite_contratos_regla_terminated_cm,
         suite_contratos_reconciliacion_expired_guardar, suite_contratos_reconciliacion_expired_importar,
         suite_contratos_edicion_manual_flujo_real, suite_contratos_importacion_masiva_flujo_real,
@@ -526,7 +528,7 @@ if __name__ == '__main__':
         suite_fm_construir_plantilla_base, suite_fm_generar_plantilla_base,
         suite_backups, suite_punto_c, suite_log_deleted, suite_log_deleted_por_modulo, suite_restore_backup,
         suite_backup_manager_snapshot, suite_backup_manager_retencion,
-        suite_rm_javi_historial, suite_rm_javi_columnas_autorizadas, suite_configuracion_historial,
+        suite_configuracion_historial,
         suite_configuracion_casos_baja_cm_path, suite_normalizacion_config,
         suite_clear_logs_bloqueado, suite_papelera_por_modulo, suite_vaciar_papelera_backup,
         suite_vaciar_logs_modificaciones_backup,

@@ -4,6 +4,9 @@ dentro de los hilos para no restarle tiempo a la animación de inicio."""
 from datetime import datetime
 
 from PyQt6.QtCore import QObject, QSettings, QThread, pyqtSignal
+import logging
+
+logger = logging.getLogger(__name__)
 
 CLAVE_VERSION_AVISADA = "actualizacion_version_avisada"
 
@@ -16,7 +19,7 @@ class _HiloChequeo(QThread):
             from src.services import actualizador_service
             self.resultado.emit(actualizador_service.leer_manifiesto())
         except Exception as e:
-            print(f"[ACTUALIZADOR] No se pudo revisar la carpeta de actualizaciones: {e}")
+            logger.warning(f"[ACTUALIZADOR] No se pudo revisar la carpeta de actualizaciones: {e}")
             self.resultado.emit(None)
 
 

@@ -9,8 +9,8 @@ from src.core.data_manager import DataManager
 from src.ui.general import GeneralModule
 from src.ui.comercial import ComercialModule
 from src.ui.contratos import ContratosModule
-from src.ui.historial import HistorialModule
-from src.ui.configuracion import ConfiguracionModule
+from src.ui.administracion.historial import HistorialModule
+from src.ui.marco.configuracion import ConfiguracionModule
 
 
 def _esperar_prep_thread_general(modulo, timeout_ms=20000, interval_ms=20):
@@ -118,55 +118,6 @@ class TestActualizacionDiferidaComercial(unittest.TestCase):
             self.modulo.refresh_if_dirty()
             spy_load.assert_not_called()
 
-    @patch('src.ui.comercial.QMessageBox')
-    def test_07_pending_changes_no_se_pierden_si_usuario_cancela(self, mock_msgbox_cls):
-        self.modulo._data_dirty = True
-        self.modulo.pending_changes = {
-            'YV2TEST0000000001': {'VIN': 'YV2TEST0000000001', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
-        }
-        mock_instance = _configurar_dialogo(mock_msgbox_cls, boton_elegido=2)  # Cancelar
-
-        with patch.object(self.modulo, 'load_data', wraps=self.modulo.load_data) as spy_load:
-            self.modulo.refresh_if_dirty()
-            spy_load.assert_not_called()
-
-        mock_instance.exec.assert_called_once()
-        self.assertEqual(len(self.modulo.pending_changes), 1, "Cancelar no debe descartar los cambios pendientes.")
-        self.assertTrue(self.modulo._data_dirty, "Sigue pendiente de refrescar: el usuario no eligio ninguna accion definitiva.")
-
-    @patch('src.ui.comercial.QMessageBox')
-    def test_08_descartar_y_recargar_limpia_pending_changes_y_dirty(self, mock_msgbox_cls):
-        self.modulo._data_dirty = True
-        self.modulo.pending_changes = {
-            'YV2TEST0000000001': {'VIN': 'YV2TEST0000000001', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
-        }
-        _configurar_dialogo(mock_msgbox_cls, boton_elegido=1)  # Descartar y Recargar
-
-        self.modulo.refresh_if_dirty()
-
-        self.assertEqual(self.modulo.pending_changes, {}, "Descartar y Recargar debe limpiar la mochila de cambios (mismo comportamiento que load_data() siempre tuvo).")
-        self.assertFalse(self.modulo._data_dirty)
-
-    @patch('src.ui.comercial.QMessageBox')
-    def test_09_guardar_mis_cambios_invoca_confirm_save_sin_descartar_nada(self, mock_msgbox_cls):
-        self.modulo._data_dirty = True
-        self.modulo.pending_changes = {
-            'YV2TEST0000000001': {'VIN': 'YV2TEST0000000001', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}
-        }
-        _configurar_dialogo(mock_msgbox_cls, boton_elegido=0)  # Guardar mis cambios
-
-        with patch.object(self.modulo, 'confirm_save') as spy_confirm_save, \
-             patch.object(self.modulo, 'load_data', wraps=self.modulo.load_data) as spy_load:
-            self.modulo.refresh_if_dirty()
-            spy_confirm_save.assert_called_once()
-            spy_load.assert_not_called()
-
-        # confirm_save() (ya probado en test_comercial.py) es quien
-        # eventualmente limpia pending_changes via _on_save_finished tras el
-        # guardado real; aqui solo verificamos que se invoco correctamente y
-        # que nada se descarto en el camino.
-        self.assertEqual(len(self.modulo.pending_changes), 1)
-
     def test_10_skip_self_triggered_reload_tiene_prioridad_sobre_dirty(self):
         """La auditoria exigio explicitamente que _skip_self_triggered_reload
         se siga evaluando ANTES que la logica de visible/dirty (cross-updates
@@ -210,7 +161,7 @@ class TestActualizacionDiferidaOtrosModulos(unittest.TestCase):
         self.assertTrue(modulo._data_dirty)
 
         modulo.pending_changes = {'YV2TEST0000000001': {'cambios': {'ESTADO DEL CM': 'Running'}}}
-        with patch('src.ui.contratos.QMessageBox') as mock_msgbox_cls:
+        with patch('src.ui.contratos.pantalla.QMessageBox') as mock_msgbox_cls:
             _configurar_dialogo(mock_msgbox_cls, boton_elegido=2)  # Cancelar
             modulo.refresh_if_dirty()
         self.assertEqual(len(modulo.pending_changes), 1, "No debe perder cambios pendientes al cancelar.")

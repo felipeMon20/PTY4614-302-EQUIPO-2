@@ -41,13 +41,13 @@ def escribir_config(forzar):
     if os.path.exists(CONFIG) and not forzar:
         print(f"Ya existe {CONFIG}; no se modifica (usa --forzar para sobrescribirla).")
         return
-    config = {
-        "DATA_DIR": DESTINO,
-        "RM_JAVI_PATH": os.path.join(DESTINO, "RM_JAVI_VOLVO CONNECT.xlsx"),
-        "PROVISIONES_SHAREPOINT_URL": "",
-        "REPORTE_NOTAS_VENTAS_URL": "",
-        "POWERBI_EMBED_URL": "",
-    }
+    plantilla = os.path.join(ORIGEN, "app_config_referencia.json")
+    with open(plantilla, encoding="utf-8") as f:
+        config = json.load(f)
+    marcador = "<RUTA_DEL_PROYECTO>\\duoc\\archivos de referencia"
+    for clave, valor in config.items():
+        if isinstance(valor, str) and valor.startswith(marcador):
+            config[clave] = DESTINO + valor[len(marcador):]
     with open(CONFIG, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
     print(f"Configuración escrita en {CONFIG}")

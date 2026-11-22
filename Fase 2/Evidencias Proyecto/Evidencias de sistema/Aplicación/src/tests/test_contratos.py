@@ -166,6 +166,9 @@ class TestContratosReglaTerminatedCm(unittest.TestCase):
         self.modulo = ContratosModule()
         self.modulo.data_manager.df_master = self.df_master.copy()
         self.modulo.load_data()
+        # La pantalla abre filtrada por CM Conectados: estos datos de prueba no traen activación, se pide la lista completa.
+        self.modulo.current_kpi_filter = 'total'
+        self.modulo.filter_table()
 
     def test_running_a_terminated_conserva_datos_del_cm(self):
         self.modulo.on_item_edited(row=0, col_name='ESTADO DEL CM', new_value='Terminated')
@@ -223,6 +226,9 @@ class TestContratosReconciliacionEstadoExpiredAlGuardar(unittest.TestCase):
         self.modulo = ContratosModule()
         self.modulo.data_manager.df_master = self.df_master.copy()
         self.modulo.load_data()
+        # La pantalla abre filtrada por CM Conectados: estos datos de prueba no traen activación, se pide la lista completa.
+        self.modulo.current_kpi_filter = 'total'
+        self.modulo.filter_table()
 
         self._patches = [
             patch('src.ui.contratos.QMessageBox.information'),
@@ -394,6 +400,9 @@ class TestContratosEdicionManualFlujoReal(unittest.TestCase):
         self.modulo = ContratosModule()
         self.modulo.data_manager.df_master = self.df_master_original.copy()
         self.modulo.load_data()
+        # La pantalla abre filtrada por CM Conectados: estos datos de prueba no traen activación, se pide la lista completa.
+        self.modulo.current_kpi_filter = 'total'
+        self.modulo.filter_table()
 
         self.modulo.writer.filepath = self.excel_path
         self.modulo.writer.log_filepath = ""

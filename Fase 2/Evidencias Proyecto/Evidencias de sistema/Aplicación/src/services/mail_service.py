@@ -7,6 +7,7 @@ import os
 
 import pandas as pd
 
+from src.services.mail_templates import construir_cuerpo_facturacion
 from src.services.mail_templates import (
     construir_cuerpo_conoce_volvo_connect,
     construir_cuerpo_reactivacion,
@@ -125,6 +126,50 @@ PLANTILLAS = {
 
 
 IMAGENES_PERSONALIZADO = _imagenes()
+IMAGENES_FACTURACION = _imagenes(_FOTO_HOMBRE_COMPUTADOR)
+
+
+def _tipos_facturacion(tipos):
+    return {"OC" if str(x).strip().upper() == "OC" else "FACTURA" for x in tipos} or {"FACTURA"}
+
+
+def correo_facturacion(tipos, mes, flota):
+    """(asunto, html) del correo de facturación manual de una flota. `tipos`: los TIPO de sus registros
+    (OC o Factura manual); con ambos el correo habla de las dos gestiones."""
+    tipos = _tipos_facturacion(tipos)
+    if tipos == {"OC"}:
+        asunto = f"Solicitud de OC · Servicios Volvo Connect · {mes} · {flota}"
+    elif tipos == {"FACTURA"}:
+        asunto = f"Detalle de servicios Volvo Connect · {mes} · {flota}"
+    else:
+        asunto = f"Servicios Volvo Connect · {mes} · {flota}"
+    return asunto, construir_cuerpo_facturacion(tipos, mes)
+
+
+def tipo_registro_facturacion(tipos):
+    """Tipo con que el correo de facturación queda en el Registro de envíos."""
+    tipos = _tipos_facturacion(tipos)
+    if tipos == {"OC"}:
+        return "FACTURACIÓN OC"
+    return "FACTURACIÓN" if tipos == {"FACTURA"} else "FACTURACIÓN OC Y FACTURA"
+
+
+def correos_de_flota(df_correos, vins):
+    """Correos del administrador de una flota según Correos.csv, de los VIN dados: del más repetido al menos.
+    Una celda puede traer varios separados por ';'."""
+    if df_correos is None or df_correos.empty or 'VIN' not in df_correos.columns or 'CORREO ELECTRÓNICO' not in df_correos.columns:
+        return []
+    vins = {str(v).strip().upper() for v in vins}
+    filas = df_correos[df_correos['VIN'].astype(str).str.strip().str.upper().isin(vins)]
+    cuenta, original = {}, {}
+    for celda in filas['CORREO ELECTRÓNICO'].astype(str):
+        for correo in celda.split(';'):
+            correo = correo.strip()
+            if "@" in correo:
+                clave = correo.lower()
+                cuenta[clave] = cuenta.get(clave, 0) + 1
+                original.setdefault(clave, correo)
+    return [original[c] for c in sorted(cuenta, key=lambda c: (-cuenta[c], c))]
 
 
 def cuerpo_personalizado(asunto, mensaje):

@@ -2,7 +2,7 @@
 import re
 
 COLUMNAS_COINCIDENCIA = ("VIN", "CHASIS", "RUT")
-_PARECE_VIN = re.compile(r'^[a-z0-9]{8,}$')
+_PARECE_VIN = re.compile(r'^(?=.*[a-z])(?=.*\d)[a-z0-9]{8,}$')  # con letras y dígitos, como un VIN real
 
 
 def terminos(texto):
@@ -28,7 +28,8 @@ class IndiceCoincidencias:
         self._df = None
         self._texto = ""
 
-    def contar(self, df, lista):
+    def estados(self, df, lista):
+        """Por cada término (en minúsculas), si aparece en VIN, chasis o RUT."""
         if df is not self._df:
             valores = set()
             for col in COLUMNAS_COINCIDENCIA:
@@ -36,4 +37,7 @@ class IndiceCoincidencias:
                     valores.update(df[col].astype(str).str.lower().unique())
             self._texto = "\n".join(valores)
             self._df = df
-        return sum(1 for t in lista if t in self._texto)
+        return [t in self._texto for t in lista]
+
+    def contar(self, df, lista):
+        return sum(self.estados(df, lista))

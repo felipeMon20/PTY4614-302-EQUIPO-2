@@ -11,21 +11,10 @@ from src.core.constants import (
     VALOR_TIPO_FACT_FACTURACION_MANUAL, COL_FECHA_INICIO_FACT, COL_FECHA_TERMINO_FACT,
     COL_ESTADO_ENTREGA,
 )
+from src.core.registro_app import configurar_logging
 
-# --- NUEVA CONFIGURACIÓN DE LOGS ---
-if not os.path.exists("logs"):
-    os.makedirs("logs")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("logs/sistema.log", encoding='utf-8'), 
-        logging.StreamHandler()                                    
-    ]
-)
+configurar_logging()
 logger = logging.getLogger(__name__)
-# -----------------------------------
 
 def _memoizar_por_valor(func):
     # Evalúa func una vez por valor distinto; la clave incluye el tipo para no mezclar 1, 1.0 y True.
@@ -226,9 +215,9 @@ class DataFrameFormatter:
             'FECHA INICIO CM',
             'FECHA TERMINO CM',
             # Corregido (25-09-2026): esta lista tenía los nombres de RM_JAVI
-            # ANTES del renombrado (RM_JAVI_COLUMN_ALIASES en constants.py),
+            # ANTES del renombrado de la antigua sincronización con el RM,
             # que nunca llegan a existir en el DataFrame que recibe clean()
-            # -- para cuando RMJaviSyncWorker.run() llama a clean(), esas
+            # -- para cuando esa sincronización (eliminada el 27-10-2026) llamaba a clean(), esas
             # columnas ya se renombraron a COL_FECHA_INICIO_FACT/
             # COL_FECHA_TERMINO_FACT ("INICIO"/"TERMINO"). Por eso nunca se
             # formateaban: llegaban tal cual las entrega pandas al leer una
@@ -249,14 +238,23 @@ class DataFrameFormatter:
             # Con duración numérica el resultado solo depende de inicio y
             # meses; el caché por fila también incluye el término y casi no acierta
             sumas = {}
+            fechas = {}
+            desplazamientos = {}
 
             def inicio_mas_meses(inicio, meses):
                 clave = (type(inicio), inicio, meses)
                 if clave not in sumas:
                     try:
-                        inicio_dt = DataFrameFormatter.parsear_fecha_segura(inicio)
-                        sumas[clave] = "" if pd.isna(inicio_dt) else \
-                            (inicio_dt + pd.DateOffset(months=meses)).strftime("%d-%m-%Y")
+                        # Cada fecha de inicio se interpreta una sola vez, sin importar cuántas duraciones tenga
+                        if clave[:2] not in fechas:
+                            fechas[clave[:2]] = DataFrameFormatter.parsear_fecha_segura(inicio)
+                        inicio_dt = fechas[clave[:2]]
+                        if pd.isna(inicio_dt):
+                            sumas[clave] = ""
+                        else:
+                            if meses not in desplazamientos:
+                                desplazamientos[meses] = pd.DateOffset(months=meses)
+                            sumas[clave] = (inicio_dt + desplazamientos[meses]).strftime("%d-%m-%Y")
                     except Exception:
                         sumas[clave] = ""
                 return sumas[clave]

@@ -7,8 +7,8 @@ import pandas as pd
 
 from src.core.data_manager import DataManager
 from src.services.operaciones_services import (
-    filtrar_activaciones, filtrar_sin_flota, filtrar_bajas, armar_export_contactos_ejecutivo,
-    calcular_cambios_marcar_desconectado, calcular_cambios_marcar_conectado,
+    filtrar_activaciones, filtrar_sin_flota, filtrar_no_entregados, filtrar_bajas, armar_export_contactos_ejecutivo,
+    calcular_cambios_marcar_desconectado, calcular_cambios_marcar_conectado, sin_fecha_entrega,
     separar_vins_contrato_abierto, filtrar_cdb_sin_contacto,
 )
 from src.services.comercial_services import (
@@ -36,7 +36,8 @@ class TestFiltrarActivaciones(unittest.TestCase):
     """Regla vigente (rediseño 24-09-2026, alineado con
     ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ -- ver constants.py y el
     docstring de filtrar_activaciones): entran las unidades con ESTADO DE
-    ACTIVACIÓN ACTUAL en Activando, No entregado o Desconectado (agregado
+    ACTIVACIÓN ACTUAL en Activando o Desconectado (No entregado salió el
+    04-11-2026 a su propia pestaña; Desconectado agregado
     24-09-2026, pedido explícito del usuario: antes Vigente+Desconectado y
     Activación Pendiente+Desconectado, con ETAPA GESTIÓN=Operaciones, no
     tenían ninguna cola en Operaciones) Y ETAPA GESTIÓN=Operaciones. La
@@ -54,11 +55,12 @@ class TestFiltrarActivaciones(unittest.TestCase):
         df = pd.DataFrame([_fila(estado_activacion='Sin flota', etapa_gestion='Operaciones')])
         self.assertEqual(len(filtrar_activaciones(df)), 0)
 
-    def test_no_entregado_con_etapa_operaciones_entra(self):
-        # No entregado y Sin flota son estados distintos (09-10-2026): No entregado sigue en Activaciones.
+    def test_no_entregado_ya_no_entra_a_activaciones(self):
+        # Desde el 04-11-2026 No entregado tiene su propia pestaña (filtrar_no_entregados).
         df = pd.DataFrame([_fila(estado_activacion='No entregado', etapa_gestion='Operaciones')])
-        self.assertEqual(len(filtrar_activaciones(df)), 1)
+        self.assertEqual(len(filtrar_activaciones(df)), 0)
         self.assertEqual(len(filtrar_sin_flota(df)), 0)
+        self.assertEqual(len(filtrar_no_entregados(df)), 1)
 
     def test_conectado_no_entra(self):
         df = pd.DataFrame([_fila(estado_activacion='Conectado', etapa_gestion='Operaciones')])
@@ -95,7 +97,8 @@ class TestFiltrarActivaciones(unittest.TestCase):
             _fila(vin='F', estado_comercial='Vencido', estado_activacion='Activando', etapa_gestion='Comercial'),
         ])
         resultado = filtrar_activaciones(df)
-        self.assertEqual(set(resultado['VIN']), {'A', 'C', 'E'})
+        self.assertEqual(set(resultado['VIN']), {'A', 'E'})
+        self.assertEqual(set(filtrar_no_entregados(df)['VIN']), {'C'})
 
 
 class TestFiltrarBajas(unittest.TestCase):
@@ -341,11 +344,149 @@ class TestOperacionesPorContrato(unittest.TestCase):
 
     def test_contactos_cuenta_cada_unidad_una_vez(self):
         df = self._df_dos_contratos()
+        df.loc[df['ID'] == '6', 'ESTADO DE ACTIVACIÓN ACTUAL'] = 'Conectado'
         sin_contactos = pd.DataFrame({'CDB': ['999']})
         completo = filtrar_cdb_sin_contacto(df, sin_contactos)
         actual = filtrar_cdb_sin_contacto(contratos_actuales(df), sin_contactos)
         self.assertEqual(completo.set_index('CDB FLOTA').loc['500', 'UNIDADES'], 2)
         self.assertEqual(actual.set_index('CDB FLOTA').loc['500', 'UNIDADES'], 1)
+
+
+
+class TestFechaEntregaAlConectar(unittest.TestCase):
+    """05-11-2026: al marcar Conectado, la fecha de entrega (ESTADO DE ENTREGA) se guarda
+    solo en las unidades que no la tenían; la que ya existe no se reemplaza."""
+
+    ENTREGA_NUEVA = '05-11-2026'
+
+    @staticmethod
+    def _df(entregas):
+        filas = []
+        for i, entrega in enumerate(entregas, start=1):
+            fila = _fila(estado_comercial='Vigente', estado_activacion='Activando', etapa_gestion='Operaciones', vin=f'V{i}')
+            fila['ID'] = str(i)
+            fila['ESTADO DE ENTREGA'] = entrega
+            filas.append(fila)
+        return pd.DataFrame(filas)
+
+    def test_sin_fecha_entrega_reconoce_vacios(self):
+        for vacio in ('', '-', ' - ', 'nan', 'NaN', 'None', 'NaT', None, float('nan')):
+            self.assertTrue(sin_fecha_entrega({'ESTADO DE ENTREGA': vacio}), repr(vacio))
+        self.assertTrue(sin_fecha_entrega({}))
+        self.assertFalse(sin_fecha_entrega({'ESTADO DE ENTREGA': '08-09-2026'}))
+
+    def test_unidad_sin_fecha_la_recibe(self):
+        cambios = calcular_cambios_marcar_conectado({'ESTADO DE ENTREGA': '-'}, fecha_entrega=self.ENTREGA_NUEVA)
+        self.assertEqual(cambios['ESTADO DE ENTREGA'], self.ENTREGA_NUEVA)
+
+    def test_unidad_con_fecha_no_se_reemplaza(self):
+        cambios = calcular_cambios_marcar_conectado({'ESTADO DE ENTREGA': '08-09-2026'}, fecha_entrega=self.ENTREGA_NUEVA)
+        self.assertNotIn('ESTADO DE ENTREGA', cambios)
+
+    def test_sin_fecha_elegida_no_toca_la_entrega(self):
+        cambios = calcular_cambios_marcar_conectado({'ESTADO DE ENTREGA': '-'})
+        self.assertNotIn('ESTADO DE ENTREGA', cambios)
+
+    def test_varios_contratos_con_y_sin_fecha(self):
+        """Mezcla: solo las que no tenían fecha la reciben; las demás conservan la suya."""
+        entregas = ['01-08-2026', '-', '', '15-09-2026', 'nan']
+        df = self._df(entregas)
+        cambios = {}
+        for _, fila in df.iterrows():
+            f = fila.to_dict()
+            cambios[f['VIN']] = {'VIN': f['VIN'], 'cambios': calcular_cambios_marcar_conectado(f, fecha_entrega=self.ENTREGA_NUEVA)}
+        agregar_id_a_cambios(cambios, df)
+        aplicar_cambios_pendientes(df, cambios)
+        resultado = dict(zip(df['VIN'], df['ESTADO DE ENTREGA']))
+        self.assertEqual(resultado, {'V1': '01-08-2026', 'V2': self.ENTREGA_NUEVA, 'V3': self.ENTREGA_NUEVA,
+                                     'V4': '15-09-2026', 'V5': self.ENTREGA_NUEVA})
+        self.assertTrue(all(df['ESTADO DE ACTIVACIÓN ACTUAL'].str.upper() == 'CONECTADO'))
+
+    def test_todos_con_fecha_ninguno_cambia(self):
+        df = self._df(['01-08-2026', '02-08-2026', '03-08-2026'])
+        cambios = {}
+        for _, fila in df.iterrows():
+            f = fila.to_dict()
+            cambios[f['VIN']] = {'VIN': f['VIN'], 'cambios': calcular_cambios_marcar_conectado(f, fecha_entrega=self.ENTREGA_NUEVA)}
+        agregar_id_a_cambios(cambios, df)
+        aplicar_cambios_pendientes(df, cambios)
+        self.assertEqual(df['ESTADO DE ENTREGA'].tolist(), ['01-08-2026', '02-08-2026', '03-08-2026'])
+
+    def test_todos_sin_fecha_todos_la_reciben(self):
+        df = self._df(['-', '-', ''])
+        cambios = {}
+        for _, fila in df.iterrows():
+            f = fila.to_dict()
+            cambios[f['VIN']] = {'VIN': f['VIN'], 'cambios': calcular_cambios_marcar_conectado(f, fecha_entrega=self.ENTREGA_NUEVA)}
+        agregar_id_a_cambios(cambios, df)
+        aplicar_cambios_pendientes(df, cambios)
+        self.assertEqual(df['ESTADO DE ENTREGA'].tolist(), [self.ENTREGA_NUEVA] * 3)
+
+    def test_la_fecha_de_entrega_no_altera_inicio_ni_termino(self):
+        fila = {**_fila(estado_comercial='Activación Pendiente', estado_activacion='Activando', etapa_gestion='Operaciones'),
+                'ESTADO DE ENTREGA': '-', 'DURACIÓN (MESES)': '12'}
+        cambios = calcular_cambios_marcar_conectado(fila, fecha_inicio='10-11-2026', fecha_entrega='05-11-2026')
+        self.assertEqual(cambios['INICIO CONTRATO'], '10-11-2026')
+        self.assertEqual(cambios['TÉRMINO CONTRATO'], '10-11-2027')
+        self.assertEqual(cambios['ESTADO DE ENTREGA'], '05-11-2026')
+
+
+class TestNoEntregadosSiempreEnOperaciones(unittest.TestCase):
+    """05-11-2026: toda unidad con estado de activación No entregado (salvo contratos en Baja o
+    Baja Solicitada) aparece en Operaciones > No entregados, sin importar el estado comercial, la
+    etapa de gestión ni si su flota está completa; no aparece en Sin Flota ni en Activaciones, y no
+    se ve en las colas de Comercial (Vencidos y Nuevas oportunidades)."""
+
+    @staticmethod
+    def _unidad(vin, estado_comercial, etapa, flota_vc, cdb_flota, termino=None):
+        fila = _fila(estado_comercial=estado_comercial, estado_activacion='No entregado', etapa_gestion=etapa,
+                     termino_contrato=termino, vin=vin, cdb=cdb_flota)
+        fila['FLOTA VC'] = flota_vc
+        return fila
+
+    def test_aparece_en_todas_las_combinaciones(self):
+        casos = []
+        for estado in ('Vigente', 'Activación Pendiente', 'Revisar', 'Vencido'):
+            for etapa in ('Operaciones', 'Comercial', 'Cliente'):
+                for flota_vc, cdb in (('Flota A', '100'), ('', ''), ('Flota A', ''), ('', '100'), ('-', '100')):
+                    casos.append((estado, etapa, flota_vc, cdb))
+        df = pd.DataFrame([self._unidad(f'V{i}', *caso) for i, caso in enumerate(casos)])
+        self.assertEqual(len(filtrar_no_entregados(df)), len(casos))
+        self.assertTrue(filtrar_sin_flota(df).empty, "No entregado no debe caer en Sin Flota por flota incompleta.")
+        self.assertTrue(filtrar_activaciones(df).empty)
+
+    def test_baja_y_baja_solicitada_las_resuelve_comercial(self):
+        df = pd.DataFrame([self._unidad('B1', 'Baja', 'Comercial', 'Flota A', '100'),
+                           self._unidad('B2', 'Baja Solicitada', 'Comercial', 'Flota A', '100'),
+                           self._unidad('N1', 'Vigente', 'Operaciones', 'Flota A', '100')])
+        self.assertEqual(filtrar_no_entregados(df)['VIN'].tolist(), ['N1'])
+
+    def test_sin_columna_de_etapa_igual_aparece(self):
+        df = pd.DataFrame([self._unidad('N1', 'Revisar', 'Comercial', '', '')]).drop(columns=['ETAPA GESTIÓN'])
+        self.assertEqual(filtrar_no_entregados(df)['VIN'].tolist(), ['N1'])
+
+    def test_otras_unidades_con_flota_incompleta_siguen_en_sin_flota(self):
+        otra = _fila(estado_comercial='Vigente', estado_activacion='Conectado', etapa_gestion='Cliente', vin='C1', cdb='100')
+        otra['FLOTA VC'] = ''
+        df = pd.DataFrame([self._unidad('N1', 'Vigente', 'Operaciones', '', '100'), otra])
+        self.assertEqual(filtrar_sin_flota(df)['VIN'].tolist(), ['C1'])
+        self.assertEqual(filtrar_no_entregados(df)['VIN'].tolist(), ['N1'])
+
+    def test_vencido_no_entregado_va_a_operaciones_y_no_a_comercial(self):
+        """Un dato inconsistente (Vencido y No entregado) se ve en Operaciones, no en Comercial > Vencidos."""
+        from src.services.comercial_services import filtrar_vencidos
+        df = pd.DataFrame([self._unidad('V1', 'Vencido', 'Comercial', 'Flota A', '100', termino=_fecha(-10)),
+                           _fila(estado_comercial='Vencido', estado_activacion='Conectado', etapa_gestion='Comercial', vin='V2',
+                                 termino_contrato=_fecha(-10))])
+        self.assertEqual(filtrar_no_entregados(df)['VIN'].tolist(), ['V1'])
+        self.assertEqual(filtrar_vencidos(df)['VIN'].tolist(), ['V2'])
+
+    def test_revisar_no_entregado_no_va_a_nuevas_oportunidades(self):
+        from src.services.comercial_services import filtrar_por_gestionar
+        df = pd.DataFrame([self._unidad('R1', 'Revisar', 'Comercial', 'Flota A', '100'),
+                           _fila(estado_comercial='Revisar', estado_activacion='Activando', etapa_gestion='Comercial', vin='R2')])
+        self.assertEqual(filtrar_no_entregados(df)['VIN'].tolist(), ['R1'])
+        self.assertEqual(filtrar_por_gestionar(df)['VIN'].tolist(), ['R2'])
 
 
 if __name__ == '__main__':

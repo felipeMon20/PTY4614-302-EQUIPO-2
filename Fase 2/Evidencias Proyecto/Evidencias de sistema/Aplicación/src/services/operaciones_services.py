@@ -45,16 +45,43 @@ fecha de termino."""
 import pandas as pd
 from datetime import date
 
-from src.core.constants import (COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_ETAPA_GESTION,
+from src.core.constants import (COL_TIPO_SERVICIO, COL_ESTADO_COMERCIAL, COL_ESTADO_ACTIVACION, COL_ETAPA_GESTION,
                                 COL_CDB_FLOTA, COL_RAZON_SOCIAL, COL_EJECUTIVO, COL_VIN, COL_TIPO_FACTURACION,
                                 COL_FECHA_BAJA, COL_FLOTA_VC, COL_INICIO_CONTRATO, COL_DURACION_MESES, COL_TERMINO_CONTRATO,
-                                ESTADO_ACTIVANDO, ESTADO_NO_ENTREGADO,
+                                COL_ESTADO_ENTREGA, ESTADO_ACTIVANDO, ESTADO_NO_ENTREGADO,
                                 ESTADO_SIN_FLOTA, ESTADO_CONECTADO, ESTADO_DESCONECTADO,
                                 VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA,
                                 VALOR_ESTADO_COMERCIAL_VIGENTE, VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE,
                                 VALOR_ETAPA_GESTION_OPERACIONES)
 from src.core.dataframe_formatter import DataFrameFormatter
 from src.services.comercial_services import clasificar_vigencia_contrato, es_contrato_cerrado
+
+PLANES_BASE = ("Basico", "Medio", "Full")
+
+
+def mascara_sin_plan(df):
+    """Unidades sin tipo de servicio ('-' o vacío): quedan "SIN PLAN" hasta que
+    Operaciones les asigne uno. Por ejemplo, un contrato nuevo creado desde el 3PC."""
+    if df is None or df.empty or COL_TIPO_SERVICIO not in df.columns:
+        return pd.Series(False, index=df.index if df is not None else None)
+    plan = df[COL_TIPO_SERVICIO].fillna("").astype(str).str.strip().str.upper()
+    return plan.isin(["", "-", "NAN", "NONE"])
+
+
+def planes_base():
+    """Planes base del catálogo de tipos de servicio (Basico, Medio y Full primero)."""
+    from src.services import catalogos_service
+    return catalogos_service.planes_base(PLANES_BASE)
+
+
+def armar_plan(base, complementos=()):
+    """Tipo de servicio a partir del plan base y los complementos elegidos (CIV, SZ...),
+    con el formato que ya usa el RM: "Medio + CIV + SZ"."""
+    from src.services import catalogos_service
+    if base not in planes_base():
+        raise ValueError(f"Plan base desconocido: {base!r}")
+    return catalogos_service.armar_tipo_servicio(base, complementos)
+
 
 def filtrar_activaciones(df):
     """Panel Operaciones -> Activaciones. Ver docstring del modulo.
@@ -84,11 +111,27 @@ def filtrar_activaciones(df):
 
     estado_activacion = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
     etapa_gestion = df[COL_ETAPA_GESTION].astype(str).str.strip().str.upper()
-    mask = estado_activacion.isin({ESTADO_ACTIVANDO, ESTADO_NO_ENTREGADO, ESTADO_DESCONECTADO}) & \
+    # Desde el 04-11-2026 No entregado tiene su propia pestaña (filtrar_no_entregados).
+    mask = estado_activacion.isin({ESTADO_ACTIVANDO, ESTADO_DESCONECTADO}) & \
         (etapa_gestion == VALOR_ETAPA_GESTION_OPERACIONES)
-    # Desde el 15-10-2026 la sincronización RM_JAVI convierte No entregado en
-    # Sin flota; aquí se conserva solo para datos anteriores. Una baja con
-    # Activando va a Bajas.
+    # Una baja con Activando va a Bajas.
+    if COL_ESTADO_COMERCIAL in df.columns:
+        estado_com = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
+        mask = mask & ~estado_com.isin({VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA})
+    return df[mask]
+
+
+def filtrar_no_entregados(df):
+    """Panel Operaciones -> No entregados (04-11-2026): unidades con ESTADO DE
+    ACTIVACIÓN ACTUAL = No entregado, sin importar la ETAPA GESTIÓN. Antes iban en Activaciones.
+    Una baja con No entregado la resuelve Comercial, igual que en Activaciones."""
+    if df.empty or COL_ESTADO_ACTIVACION not in df.columns:
+        return df.iloc[0:0]
+
+    estado_activacion = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
+    # 05-11-2026: basta el estado de activación; con estado comercial Revisar o Vencido la matriz da ETAPA
+    # GESTIÓN = Comercial y la unidad no se veía en ninguna pestaña de Operaciones
+    mask = estado_activacion == ESTADO_NO_ENTREGADO
     if COL_ESTADO_COMERCIAL in df.columns:
         estado_com = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
         mask = mask & ~estado_com.isin({VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA})
@@ -112,7 +155,8 @@ def filtrar_sin_flota(df):
     estado_activacion = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
     etapa_gestion = df[COL_ETAPA_GESTION].astype(str).str.strip().str.upper()
     mask = (estado_activacion == ESTADO_SIN_FLOTA) & (etapa_gestion == VALOR_ETAPA_GESTION_OPERACIONES)
-    return df[mask | mascara_flota_incompleta(df)]
+    # Una unidad No entregado se ve en su pestaña, aunque tenga la flota incompleta
+    return df[mask | (mascara_flota_incompleta(df) & (estado_activacion != ESTADO_NO_ENTREGADO))]
 
 
 def mascara_flota_incompleta(df):
@@ -128,16 +172,21 @@ def mascara_flota_incompleta(df):
     return sin_flota_vc ^ sin_cdb_flota
 
 
+# Estados comerciales de la pestaña Conectados (Datos de flota)
+_ESTADOS_COMERCIALES_DATOS_FLOTA = {VALOR_ESTADO_COMERCIAL_VIGENTE.upper(), 'REVISAR', 'VENCIDO'}
+
+
 def filtrar_conectados_vigentes(df):
-    """Panel Operaciones -> Datos de flota: todos los contratos Vigentes cuya
-    unidad está Conectada. Operaciones revisa y corrige FLOTA VC y CDB FLOTA
-    directo en la tabla; los que tienen alguno vacío se obtienen con
-    filtrar_conectados_sin_flota_vc."""
+    """Panel Operaciones -> Datos de flota: todos los contratos Vigentes, en
+    Revisar o Vencidos cuya unidad está Conectada (29-10-2026: son unidades que
+    ya funcionan y su flota igual debe estar completa).
+    Operaciones revisa y corrige FLOTA VC y CDB FLOTA directo en la tabla; los
+    que tienen alguno vacío se obtienen con filtrar_conectados_sin_flota_vc."""
     if df.empty or COL_ESTADO_COMERCIAL not in df.columns or COL_ESTADO_ACTIVACION not in df.columns:
         return df.iloc[0:0]
     estado_comercial = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
     estado_activacion = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
-    return df[(estado_comercial == VALOR_ESTADO_COMERCIAL_VIGENTE.upper()) & (estado_activacion == ESTADO_CONECTADO)]
+    return df[estado_comercial.isin(_ESTADOS_COMERCIALES_DATOS_FLOTA) & (estado_activacion == ESTADO_CONECTADO)]
 
 
 # FLOTA VC que no corresponde a una flota real de Volvo Connect: "NO EXISTE EN VC" (la
@@ -155,7 +204,7 @@ def filtrar_conectados_sin_flota_vc(df):
 
     estado_comercial = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
     estado_activacion = df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
-    mask = (estado_comercial == VALOR_ESTADO_COMERCIAL_VIGENTE.upper()) \
+    mask = estado_comercial.isin(_ESTADOS_COMERCIALES_DATOS_FLOTA) \
         & (estado_activacion == ESTADO_CONECTADO) & mascara_flota_pendiente(df)
     return df[mask]
 
@@ -183,6 +232,22 @@ def mascara_cdb_con_varias_flotas(df):
     distintas = flota[valido].groupby(cdb[valido]).nunique()
     cdb_multiples = set(distintas[distintas > 1].index)
     return cdb.isin(cdb_multiples) & valido
+
+
+def contar_cdb_flota_cruzados(df):
+    """(CDB con varias FLOTA VC, total de CDB, FLOTA VC con varios CDB, total de
+    FLOTA VC) de `df`. Mismo criterio de filas válidas que
+    `mascara_cdb_con_varias_flotas`."""
+    if df.empty or COL_FLOTA_VC not in df.columns or COL_CDB_FLOTA not in df.columns:
+        return 0, 0, 0, 0
+    vacios = {'', 'NAN', 'NONE', '-', 'NAT'}
+    cdb = df[COL_CDB_FLOTA].astype(str).str.strip().str.upper()
+    flota = df[COL_FLOTA_VC].astype(str).str.strip().str.upper()
+    valido = ~cdb.isin(vacios) & ~flota.isin(vacios | FLOTAS_VC_NO_REALES)
+    flotas_por_cdb = flota[valido].groupby(cdb[valido]).nunique()
+    cdb_por_flota = cdb[valido].groupby(flota[valido]).nunique()
+    return (int((flotas_por_cdb > 1).sum()), len(flotas_por_cdb),
+            int((cdb_por_flota > 1).sum()), len(cdb_por_flota))
 
 
 def construir_mapa_flota_por_cdb(df):
@@ -274,7 +339,7 @@ def separar_vins_contrato_abierto(cola, vins):
     return abiertos, cerrados
 
 
-def calcular_cambios_marcar_desconectado(fila):
+def calcular_cambios_marcar_desconectado(fila, fecha_baja=None):
     """Cambios a aplicar cuando Operaciones -> Bajas marca una unidad como
     DESCONECTADO (22-09-2026, cierre del ciclo Comercial -> Operaciones ->
     Comercial para BAJA, ver conversación con el usuario): ESTADO DE
@@ -291,9 +356,10 @@ def calcular_cambios_marcar_desconectado(fila):
     _obtener_vins_baja_seleccionados en operaciones.py.
 
     Nuevo (23-09-2026, confirmado con el usuario):
-    - FECHA DE BAJA se autocompleta siempre con la fecha de hoy (DD-MM-YYYY,
-      mismo formato que valida el resto de la app -- ver docs "Validación de
-      Fechas de Baja"), sin importar el origen de la unidad.
+    - FECHA DE BAJA (DD-MM-YYYY, mismo formato que valida el resto de la
+      app -- ver docs "Validación de Fechas de Baja") es la `fecha_baja` que
+      elige quien confirma (puede ser pasada o futura); sin ella, la fecha de
+      hoy, sin importar el origen de la unidad.
     - Si la unidad llegaba como BAJA SOLICITADA (ciclo de baja anticipada,
       Comercial -> Vigentes -> "Enviar a operaciones"), ESTADO COMERCIAL se
       promueve a BAJA: esta acción es la confirmación real de la baja. Si ya
@@ -314,8 +380,71 @@ def calcular_cambios_marcar_desconectado(fila):
         COL_ESTADO_COMERCIAL: nuevo_estado_comercial,
         COL_ESTADO_ACTIVACION: ESTADO_DESCONECTADO,
         COL_ETAPA_GESTION: nueva_etapa,
-        COL_FECHA_BAJA: date.today().strftime('%d-%m-%Y'),
+        COL_FECHA_BAJA: fecha_baja or date.today().strftime('%d-%m-%Y'),
     }
+
+
+# ---------------------------------------------------------------
+# Operaciones > Bajas > Fechas de baja: corregir FECHA DE BAJA de contratos ya dados de
+# baja (el actual o los de historial), agrupados por flota.
+# ---------------------------------------------------------------
+COLUMNAS_FECHAS_BAJA_FLOTAS = ['FLOTA VC', 'RAZÓN SOCIAL', 'UNIDADES']
+COLUMNAS_FECHAS_BAJA_CONTRATOS = ['ID', 'VIN', 'ESTADO COMERCIAL', 'INICIO CONTRATO', 'TÉRMINO CONTRATO', 'FECHA DE BAJA']
+SIN_FLOTA_BAJAS = "Sin flota"
+_TEXTOS_VACIOS = {'', 'NAN', 'NONE', 'NAT', '-', '<NA>'}
+
+
+def contratos_dados_de_baja(df):
+    """Todos los contratos de `df` (actuales e historial) que están en Baja o Baja
+    Solicitada o tienen una fecha de baja registrada."""
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df.iloc[0:0]
+    mascara = pd.Series(False, index=df.index)
+    if COL_ESTADO_COMERCIAL in df.columns:
+        estado = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
+        mascara |= estado.isin({VALOR_ESTADO_COMERCIAL_BAJA.upper(), VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA.upper()})
+    if COL_FECHA_BAJA in df.columns:
+        mascara |= ~df[COL_FECHA_BAJA].astype(str).str.strip().str.upper().isin(_TEXTOS_VACIOS)
+    return df[mascara]
+
+
+def _flota_de_baja(df):
+    """Nombre de la flota de cada fila; "Sin flota" cuando no tiene una real."""
+    if COL_FLOTA_VC not in df.columns:
+        return pd.Series(SIN_FLOTA_BAJAS, index=df.index)
+    flota = df[COL_FLOTA_VC].astype(str).str.strip()
+    sin = flota.str.upper().isin(_TEXTOS_VACIOS | FLOTAS_VC_NO_REALES)
+    return flota.where(~sin, SIN_FLOTA_BAJAS)
+
+
+def agrupar_bajas_por_flota(df):
+    """Una fila por flota con sus contratos dados de baja: FLOTA VC, RAZÓN SOCIAL (la
+    del cliente, o "N clientes") y UNIDADES (contratos). "Sin flota" va al final."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=COLUMNAS_FECHAS_BAJA_FLOTAS)
+    flota = _flota_de_baja(df)
+    razon = df[COL_RAZON_SOCIAL].astype(str).str.strip() if COL_RAZON_SOCIAL in df.columns else pd.Series('', index=df.index)
+    filas = []
+    for nombre, indices in flota.groupby(flota).groups.items():
+        razones = sorted({r for r in razon.loc[indices] if r.upper() not in _TEXTOS_VACIOS})
+        cliente = razones[0] if len(razones) == 1 else (f"{len(razones)} clientes" if razones else '')
+        filas.append({'FLOTA VC': nombre, 'RAZÓN SOCIAL': cliente, 'UNIDADES': len(indices)})
+    filas.sort(key=lambda f: (f['FLOTA VC'] == SIN_FLOTA_BAJAS, f['FLOTA VC'].upper()))
+    return pd.DataFrame(filas, columns=COLUMNAS_FECHAS_BAJA_FLOTAS)
+
+
+def contratos_de_flota_en_baja(df, flota):
+    """Contratos de `df` cuya flota es `flota` (ver agrupar_bajas_por_flota), por VIN y ID."""
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df.iloc[0:0]
+    contratos = df[_flota_de_baja(df) == flota]
+    orden = [c for c in (COL_VIN, 'ID') if c in contratos.columns]
+    return contratos.sort_values(orden, kind="mergesort") if orden else contratos
+
+
+def calcular_cambios_fecha_baja(fecha_baja):
+    """Único cambio de la corrección: FECHA DE BAJA (DD-MM-YYYY)."""
+    return {COL_FECHA_BAJA: fecha_baja}
 
 
 def es_activacion_pendiente(fila):
@@ -325,11 +454,23 @@ def es_activacion_pendiente(fila):
     return estado in (VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE, 'ACTIVACION PENDIENTE')
 
 
+def sin_fecha_inicio(fila):
+    """True si la unidad no tiene INICIO CONTRATO (vacío o '-')."""
+    texto = str(fila.get(COL_INICIO_CONTRATO, '')).strip().upper()
+    return texto in ('', '-', 'NAN', 'NONE', 'NAT', '<NA>')
+
+
 def duracion_sin_dato(fila):
     """True si DURACIÓN (MESES) está vacía: sin ella no se puede calcular el
     término al fijar el inicio ('-' y MENSUAL sí son un dato)."""
     texto = str(fila.get(COL_DURACION_MESES, '')).strip().upper()
     return texto in ('', 'NAN', 'NONE', 'NAT', '<NA>')
+
+
+def sin_fecha_entrega(fila):
+    """True si la unidad no tiene fecha de entrega (ESTADO DE ENTREGA vacío o '-')."""
+    texto = str(fila.get(COL_ESTADO_ENTREGA, '')).strip().upper()
+    return texto in ('', '-', 'NAN', 'NONE', 'NAT', '<NA>')
 
 
 def calcular_termino_desde_inicio(inicio, duracion):
@@ -345,7 +486,7 @@ def calcular_termino_desde_inicio(inicio, duracion):
     return (inicio_dt + pd.DateOffset(months=meses)).strftime("%d-%m-%Y")
 
 
-def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None, fecha_inicio=None):
+def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None, fecha_inicio=None, fecha_entrega=None):
     """Cambios a aplicar cuando Operaciones (Activaciones o Sin Flota)
     marca una unidad como CONECTADO (24-09-2026, alineado con
     ESTADO_COMERCIAL_ACTIVACION_ETAPA_MATRIZ -- ver riesgo detectado el
@@ -361,9 +502,11 @@ def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None, fecha_inici
     incluyen también en el resultado para guardarse en la misma
     operación.
     `fecha_inicio` (DD-MM-YYYY, 19-10-2026): si la unidad estaba en
-    Activación Pendiente, pasa a ser su INICIO CONTRATO (reemplaza el que
-    tuviera) y el término se recalcula con su duración. Con otro estado
-    comercial no se toca el inicio."""
+    Activación Pendiente y no tenía INICIO CONTRATO, pasa a ser su inicio y
+    el término se recalcula con su duración. Si ya tenía inicio (12-11-2026)
+    se mantiene, igual que con otro estado comercial.
+    `fecha_entrega` (DD-MM-YYYY): solo se guarda si la unidad no tenía una;
+    nunca reemplaza la que vino del reporte de notas de venta."""
     nueva_etapa = DataFrameFormatter.calcular_etapa_gestion_esperada({
         COL_ESTADO_COMERCIAL: 'Vigente',
         COL_ESTADO_ACTIVACION: ESTADO_CONECTADO,
@@ -375,11 +518,13 @@ def calcular_cambios_marcar_conectado(fila, cdb=None, flota_vc=None, fecha_inici
         COL_ESTADO_ACTIVACION: ESTADO_CONECTADO,
         COL_ETAPA_GESTION: nueva_etapa,
     }
-    if fecha_inicio and es_activacion_pendiente(fila):
+    if fecha_inicio and es_activacion_pendiente(fila) and sin_fecha_inicio(fila):
         cambios[COL_INICIO_CONTRATO] = fecha_inicio
         termino = calcular_termino_desde_inicio(fecha_inicio, fila.get(COL_DURACION_MESES, ''))
         if termino:
             cambios[COL_TERMINO_CONTRATO] = termino
+    if fecha_entrega and sin_fecha_entrega(fila):
+        cambios[COL_ESTADO_ENTREGA] = fecha_entrega
     if cdb is not None:
         cambios[COL_CDB_FLOTA] = cdb
     if flota_vc is not None:
@@ -407,6 +552,24 @@ def construir_cambios_propagar_flota(df, flota_por_cdb, excluir_vins=()):
         if clave and clave not in excluidos and cdb in flotas:
             lote[clave] = {'VIN': str(vin).strip(), 'cambios': {COL_FLOTA_VC: flotas[cdb]}}
     return lote
+
+
+def calcular_cambios_deshacer_envio(fila):
+    """Cambios al devolver a Comercial una unidad de Activaciones (enviada desde Provisiones o desde Comercial):
+    vuelve a Nuevas oportunidades (estado Revisar, activación No aplica y la etapa que la matriz da para eso), se
+    limpian el inicio del contrato y el inicio y término de JustTime y OBSERVACIONES queda marcada «Devuelto por
+    Operaciones». La forma de contrato y la facturación quedan como estaban: si venía de Provisiones, allí la
+    unidad vuelve a salir Pendiente."""
+    etapa = DataFrameFormatter.calcular_etapa_gestion_esperada({
+        COL_ESTADO_COMERCIAL: 'Revisar', COL_ESTADO_ACTIVACION: 'No aplica',
+        COL_TIPO_FACTURACION: fila.get(COL_TIPO_FACTURACION, ''), COL_ETAPA_GESTION: fila.get(COL_ETAPA_GESTION, ''),
+    })
+    from src.services.comercial_services import observacion_devuelto
+    return {
+        COL_ESTADO_COMERCIAL: 'Revisar', COL_ESTADO_ACTIVACION: 'No aplica', COL_ETAPA_GESTION: etapa,
+        'INICIO CONTRATO': '-', 'CONTRATO CREADO EN JUSTTIME': '-', 'INICIO': '-', 'TERMINO': '-',
+        'OBSERVACIONES': observacion_devuelto(fila.get('OBSERVACIONES', '')),
+    }
 
 
 def calcular_cambios_marcar_sin_flota(fila, cdb=None, flota_vc=None):
@@ -440,6 +603,30 @@ def calcular_cambios_marcar_sin_flota(fila, cdb=None, flota_vc=None):
     if flota_vc is not None:
         cambios[COL_FLOTA_VC] = flota_vc
     return cambios
+
+
+def calcular_cambios_marcar_no_entregado(fila):
+    """Activaciones -> No entregados (04-11-2026): ESTADO DE ACTIVACIÓN ACTUAL pasa a No entregado, sin
+    tocar ESTADO COMERCIAL ni la flota, y ETAPA GESTIÓN se recalcula con la matriz de negocio."""
+    nueva_etapa = DataFrameFormatter.calcular_etapa_gestion_esperada({
+        COL_ESTADO_COMERCIAL: fila.get(COL_ESTADO_COMERCIAL, ''),
+        COL_ESTADO_ACTIVACION: ESTADO_NO_ENTREGADO,
+        COL_TIPO_FACTURACION: fila.get(COL_TIPO_FACTURACION, ''),
+        COL_ETAPA_GESTION: fila.get(COL_ETAPA_GESTION, ''),
+    })
+    return {COL_ESTADO_ACTIVACION: ESTADO_NO_ENTREGADO, COL_ETAPA_GESTION: nueva_etapa}
+
+
+def calcular_cambios_activacion_pendiente(fila):
+    """Sin Flota o No entregados -> Activaciones: la unidad vuelve a Activando y ETAPA GESTIÓN se
+    recalcula con la matriz de negocio. No toca ESTADO COMERCIAL ni la flota."""
+    nueva_etapa = DataFrameFormatter.calcular_etapa_gestion_esperada({
+        COL_ESTADO_COMERCIAL: fila.get(COL_ESTADO_COMERCIAL, ''),
+        COL_ESTADO_ACTIVACION: ESTADO_ACTIVANDO,
+        COL_TIPO_FACTURACION: fila.get(COL_TIPO_FACTURACION, ''),
+        COL_ETAPA_GESTION: fila.get(COL_ETAPA_GESTION, ''),
+    })
+    return {COL_ESTADO_ACTIVACION: ESTADO_ACTIVANDO, COL_ETAPA_GESTION: nueva_etapa}
 
 
 _COLUMNAS_EXPORT_CONTACTOS = [
@@ -530,6 +717,18 @@ def calcular_kpis_activaciones(df):
     }
 
 
+def calcular_kpis_no_entregados(df):
+    """"No entregados": total y cuántas están en Activación Pendiente o ya Vigentes (con el servicio corriendo)."""
+    if df.empty:
+        return {"total": 0, "activacion_pendiente": 0, "vigentes": 0}
+    estado_com = df.get(COL_ESTADO_COMERCIAL, pd.Series(dtype=str)).astype(str).str.strip().str.upper()
+    return {
+        "total": len(df),
+        "activacion_pendiente": int((estado_com == VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE).sum()),
+        "vigentes": int((estado_com == VALOR_ESTADO_COMERCIAL_VIGENTE).sum()),
+    }
+
+
 def calcular_kpis_sin_flota(df):
     """"Sin Flota": cuántas unidades ya tienen CDB y FLOTA VC completos
     (listas para "Marcar como CONECTADO" de inmediato) vs a cuántas les
@@ -582,8 +781,8 @@ def _dato_o_vacio(serie):
 
 
 def filtrar_cdb_sin_contacto(df, df_contactos):
-    """Una fila por CDB (dato real, no vacío ni '-') que no aparece en la
-    columna CDB de contactos.xlsx: FLOTA VC y RUT más frecuentes del CDB,
+    """Una fila por CDB (dato real, no vacío ni '-') con al menos una unidad
+    conectada que no aparece en la columna CDB de contactos.xlsx: FLOTA VC y RUT más frecuentes del CDB,
     cantidad de UNIDADES y cuántas están VIGENTES (para priorizar). Sin
     contactos cargados devuelve vacío en vez de marcar todos los CDB."""
     vacio = pd.DataFrame(columns=COLUMNAS_CDB_SIN_CONTACTO)
@@ -602,9 +801,13 @@ def filtrar_cdb_sin_contacto(df, df_contactos):
         COL_FLOTA_VC: _dato_o_vacio(df[COL_FLOTA_VC]) if COL_FLOTA_VC in df.columns else '',
         'RUT': _dato_o_vacio(df['RUT']) if 'RUT' in df.columns else '',
         'VIGENTE': vigente,
+        'CONECTADA': (df[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper() == ESTADO_CONECTADO)
+        if COL_ESTADO_ACTIVACION in df.columns else False,
     })
     base = base[(base[COL_CDB_FLOTA] != '') & ~base[COL_CDB_FLOTA].isin(con_contacto)
                 & (base[COL_FLOTA_VC].str.upper() != 'NO EXISTE EN VC')]
+    # Solo importan los CDB con al menos una unidad conectada: sin ella no hay a quién avisar en Volvo Connect
+    base = base[base.groupby(COL_CDB_FLOTA)['CONECTADA'].transform('any')]
     if base.empty:
         return vacio
 
@@ -628,6 +831,31 @@ def filtrar_cdb_sin_contacto(df, df_contactos):
     })
     return resultado.sort_values(
         ['VIGENTES', 'UNIDADES', COL_CDB_FLOTA], ascending=[False, False, True]).reset_index(drop=True)
+
+
+COLUMNAS_EXPORT_CDB_SIN_CONTACTO = [COL_CDB_FLOTA, COL_FLOTA_VC, 'RUT', COL_EJECUTIVO, 'UNIDADES', 'VIGENTES',
+                                    'NOMBRE ADMINISTRADOR', 'CORREO ADMINISTRADOR', 'TELÉFONO ADMINISTRADOR']
+
+
+def armar_export_cdb_sin_contacto(df_cdb, df_master):
+    """Lista de CDB sin administrador de flota con el ejecutivo que los lleva (el más frecuente entre
+    sus unidades) y columnas vacías para que el ejecutivo anote el contacto."""
+    if df_cdb is None or df_cdb.empty:
+        return pd.DataFrame(columns=COLUMNAS_EXPORT_CDB_SIN_CONTACTO)
+    resultado = df_cdb.copy()
+    ejecutivos = pd.Series(dtype=object)
+    if df_master is not None and not df_master.empty and COL_EJECUTIVO in df_master.columns and COL_CDB_FLOTA in df_master.columns:
+        datos = pd.DataFrame({COL_CDB_FLOTA: _dato_o_vacio(df_master[COL_CDB_FLOTA]),
+                              COL_EJECUTIVO: _dato_o_vacio(df_master[COL_EJECUTIVO])})
+        datos = datos[(datos[COL_CDB_FLOTA] != '') & (datos[COL_EJECUTIVO] != '')]
+        if not datos.empty:
+            conteo = datos.groupby([COL_CDB_FLOTA, COL_EJECUTIVO]).size().reset_index(name='n')
+            ganador = conteo.sort_values(['n', COL_EJECUTIVO], ascending=[False, True], kind='stable').drop_duplicates(COL_CDB_FLOTA)
+            ejecutivos = ganador.set_index(COL_CDB_FLOTA)[COL_EJECUTIVO]
+    resultado[COL_EJECUTIVO] = resultado[COL_CDB_FLOTA].astype(str).str.strip().map(ejecutivos).fillna('')
+    for columna in ('NOMBRE ADMINISTRADOR', 'CORREO ADMINISTRADOR', 'TELÉFONO ADMINISTRADOR'):
+        resultado[columna] = ''
+    return resultado.reindex(columns=COLUMNAS_EXPORT_CDB_SIN_CONTACTO).fillna('')
 
 
 def calcular_kpis_cdb_sin_contacto(df):

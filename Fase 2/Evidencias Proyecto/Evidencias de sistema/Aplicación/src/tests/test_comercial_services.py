@@ -347,12 +347,13 @@ class TestFiltrarRenovaciones(unittest.TestCase):
         self.assertEqual(resultado['VIN'].tolist(), ['V1'])
 
     def test_incluye_vigente_y_excluye_revisar_y_el_resto(self):
-        # Desde el 08-10-2026 Revisar va siempre a Nuevas oportunidades (matriz de destino).
+        # Revisar va a Nuevas oportunidades (matriz de destino, 08-10-2026), salvo Revisar + Conectado,
+        # que desde el 22-10-2026 se gestiona en Renovar contratos: aquí Revisar no está conectado.
         df = pd.DataFrame({
             'VIN': ['VIGENTE', 'REVISAR', 'BAJA', 'ACTIVACION_PENDIENTE'],
             'TÉRMINO CONTRATO': [self._fecha(15)] * 4,
             'ESTADO COMERCIAL': ['Vigente', 'Revisar', 'Baja', 'Activación Pendiente'],
-            'ESTADO DE ACTIVACIÓN ACTUAL': ['Conectado'] * 4,
+            'ESTADO DE ACTIVACIÓN ACTUAL': ['Conectado', 'Desconectado', 'Conectado', 'Conectado'],
         })
         resultado = filtrar_renovaciones(df)
         self.assertEqual(sorted(resultado['VIN'].tolist()), ['VIGENTE'])

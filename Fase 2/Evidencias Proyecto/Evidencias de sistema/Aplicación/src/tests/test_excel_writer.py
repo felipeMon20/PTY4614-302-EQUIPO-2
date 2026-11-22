@@ -332,13 +332,13 @@ class TestExcelWriter(unittest.TestCase):
         # El xlsx legado sigue existiendo intacto (la migracion no lo borra)
         self.assertTrue(os.path.exists(legacy_xlsx))
 
-    def test_main_data_loader_lee_todas_las_hojas_de_registro_eliminado(self):
-        """MainDataLoaderThread debe exponer TODAS las hojas de
-        RegistroEliminado.xlsx (una por modulo de origen), no solo la primera
-        (comportamiento por defecto de pd.read_excel sin sheet_name). Antes de
-        esta correccion, las eliminaciones de cualquier modulo que no fuera la
-        primera hoja del archivo quedaban invisibles para la app."""
-        from src.core.data_manager import MainDataLoaderThread
+    def test_lee_todas_las_hojas_de_registro_eliminado(self):
+        """La Papelera debe exponer TODAS las hojas de RegistroEliminado.xlsx
+        (una por modulo de origen), no solo la primera (comportamiento por
+        defecto de pd.read_excel sin sheet_name). Desde el 26-10-2026 la carga
+        principal ya no la lee: se lee con leer_registro_eliminado al abrir
+        Historial › Papelera."""
+        from src.core.data_manager import MainDataLoaderThread, leer_registro_eliminado
 
         main_excel_path = os.path.join(self.temp_dir.name, "PruebasFM_hojas.xlsx")
         df_base = pd.DataFrame({"VIN": ["YV2A"], "CHASIS": ["C1"]})
@@ -366,7 +366,10 @@ class TestExcelWriter(unittest.TestCase):
             thread.data_loaded_signal.connect(capturar)
             thread.run()
 
-        deleted_sheets = resultado['deleted_sheets']
+        self.assertIsNone(resultado['deleted_sheets'], "Fallo: la carga principal ya no debe leer la Papelera.")
+
+        df_deleted, deleted_sheets = leer_registro_eliminado(deleted_path)
+        self.assertEqual(list(df_deleted.columns), ["FECHA Y HORA DE ELIMINACIÓN", "MÓDULO", "VIN", "MODELO"])
         self.assertIn("Comercial", deleted_sheets)
         self.assertIn("Contactos", deleted_sheets)
         self.assertEqual(list(deleted_sheets["Comercial"].columns), ["FECHA Y HORA DE ELIMINACIÓN", "MÓDULO", "VIN", "MODELO"])

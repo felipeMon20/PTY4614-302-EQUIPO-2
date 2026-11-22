@@ -7,6 +7,11 @@ WARNING = "#F59E0B"       # Naranja (Por vencer, Activando)
 DANGER = "#EF4444"        # Rojo (Vencido, Desconectado, Eliminar)
 
 BACKGROUND = "#F8FAFC"    # Gris muy claro (Fondo de la app)
+FONDO_APP = "#D3DBE9"     # Gris azulado detrás de las cajas blancas de Clientes y Flota (28-10-2026)
+BORDE_CAJA = "#BFCADD"    # Borde de esas cajas blancas sobre FONDO_APP
+FILA_ALTERNA_TABLA = "#EDF1F8"  # Filas pares de todas las tablas: un blanco azulado algo más oscuro
+FILA_HOVER_TABLA = "#DCE8FB"    # Fila bajo el mouse: un azul algo más vivo que la fila alterna, para distinguirlas
+FILA_SELECCION_TABLA = "#C3D8F6"  # Fila seleccionada: un paso más fuerte que el hover
 SURFACE = "#FFFFFF"       # Blanco puro (Tarjetas, Tablas)
 BORDER = "#E5E7EB"        # Gris claro (Bordes de tablas y tarjetas)
 
@@ -33,7 +38,7 @@ MODULE_DISPLAY_NAMES = {
     "Configuración": "Configuración",
     "Instalaciones": "Instalaciones",
     "Contactos": "Contactos",
-    "Ejecutivos": "Ejecutivos",
+    "Catálogos": "Catálogos",
     "Clientes": "Clientes",
 }
 
@@ -50,6 +55,6 @@ MODULE_COLORS = {
     "Configuración": "#334155",
     "Instalaciones": "#F97316",
     "Contactos": "#06B6D4",
-    "Ejecutivos": "#6366F1",
+    "Catálogos": "#6366F1",
     "Clientes": "#0EA5E9",
 }

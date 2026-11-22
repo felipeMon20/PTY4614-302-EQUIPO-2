@@ -1,5 +1,5 @@
-"""Metas de unidades vendidas de Volvo Connect y el registro de los meses ya
-cerrados (MetasVC.csv). Una fila por año y mes con la meta del equipo y, para los
+"""Metas de unidades vendidas de Volvo Connect (y, aparte, de unidades con CIV) y el registro de los meses ya
+cerrados (MetasVC.csv). Una fila por año y mes con las metas del equipo y, para los
 meses cerrados, cuántas unidades se vendieron y cuántas estaban conectadas al
 registrarlos. Vive en la carpeta de datos compartida, así que todos los PCs ven
 las mismas metas."""
@@ -16,7 +16,7 @@ from src.services import mail_registro
 
 logger = logging.getLogger(__name__)
 
-_COLUMNAS = ["anio", "mes", "meta_unidades", "vendidas", "conectadas", "registrado"]
+_COLUMNAS = ["anio", "mes", "meta_unidades", "vendidas", "conectadas", "registrado", "meta_civ"]
 
 
 def get_metas_csv_path():
@@ -24,6 +24,16 @@ def get_metas_csv_path():
     if configurada and os.path.isdir(os.path.dirname(configurada)):
         return configurada
     return os.path.join(mail_registro._sharepoint_dir(), 'MetasVC.csv')
+
+
+def firma_archivo():
+    """(fecha de modificación, tamaño) de MetasVC.csv, o None si no existe: sirve para saber si otra persona
+    cambió las metas desde la última lectura."""
+    try:
+        info = os.stat(get_metas_csv_path())
+        return info.st_mtime_ns, info.st_size
+    except OSError:
+        return None
 
 
 def _escribir(path, filas):
@@ -99,6 +109,16 @@ def leer_metas():
     return metas
 
 
+def leer_metas_civ():
+    """{(año, mes): meta de unidades vendidas con CIV} de los meses que tienen esa meta."""
+    metas = {}
+    for clave, datos in _a_dict(_leer()).items():
+        meta = _entero(datos['meta_civ'])
+        if meta is not None:
+            metas[clave] = meta
+    return metas
+
+
 def leer_registro():
     """{(año, mes): (vendidas, conectadas)} de los meses ya registrados."""
     registro = {}
@@ -109,17 +129,21 @@ def leer_registro():
     return registro
 
 
-def guardar_metas(anio, metas_por_mes):
-    """Guarda la meta de cada mes (1-12) del año. Conserva el registro de cierres.
-    Devuelve (ok, mensaje)."""
+def guardar_metas(anio, metas_por_mes, metas_civ_por_mes=None):
+    """Guarda la meta de cada mes (1-12) del año, y la de unidades con CIV si se entrega. Conserva el registro de
+    cierres. Devuelve (ok, mensaje)."""
     hoy = datetime.now()
-    if any((int(anio), int(mes)) < (hoy.year, hoy.month) for mes in metas_por_mes):
+    meses = set(metas_por_mes) | set(metas_civ_por_mes or {})
+    if any((int(anio), int(mes)) < (hoy.year, hoy.month) for mes in meses):
         return False, "Los meses pasados no se pueden modificar."
     try:
         filas = _a_dict(_leer())
         for mes, meta in metas_por_mes.items():
             datos = filas.setdefault((int(anio), int(mes)), {})
             datos['meta_unidades'] = str(int(meta)) if meta else ""
+        for mes, meta in (metas_civ_por_mes or {}).items():
+            datos = filas.setdefault((int(anio), int(mes)), {})
+            datos['meta_civ'] = str(int(meta)) if meta else ""
         _guardar({k: v for k, v in filas.items() if any(str(x).strip() for x in v.values())})
     except Exception as e:
         return False, f"No se pudo guardar las metas (¿el archivo está abierto?): {e}"

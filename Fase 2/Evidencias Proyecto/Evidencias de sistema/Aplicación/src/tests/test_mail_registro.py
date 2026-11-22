@@ -161,7 +161,7 @@ class TestOutlookSenderThreadUsaMailRegistro(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _run_thread_sync(self, registro_mock_return):
-        from src.ui.mail_dialog import OutlookSenderThread
+        from src.ui.compartido.mail_dialog import OutlookSenderThread
 
         destinatarios = [{
             "correo": "test@empresa.cl", "flota": "EMPRESA TEST", "nombre": "Juan Perez",
@@ -180,9 +180,9 @@ class TestOutlookSenderThreadUsaMailRegistro(unittest.TestCase):
         fake_mail = MagicMock()
         fake_outlook.CreateItem.return_value = fake_mail
 
-        with patch('src.ui.mail_dialog.win32com.client.Dispatch', return_value=fake_outlook), \
-             patch('src.ui.mail_dialog.pythoncom.CoInitialize'), \
-             patch('src.ui.mail_dialog.pythoncom.CoUninitialize'), \
+        with patch('src.ui.compartido.mail_dialog.win32com.client.Dispatch', return_value=fake_outlook), \
+             patch('src.ui.compartido.mail_dialog.pythoncom.CoInitialize'), \
+             patch('src.ui.compartido.mail_dialog.pythoncom.CoUninitialize'), \
              patch('src.services.mail_registro.registrar_envios', return_value=registro_mock_return) as mock_registrar:
             thread.run()
 

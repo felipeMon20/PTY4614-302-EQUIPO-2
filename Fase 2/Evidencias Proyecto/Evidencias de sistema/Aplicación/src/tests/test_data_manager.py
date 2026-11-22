@@ -241,7 +241,8 @@ class TestMainDataLoaderThreadLecturaExcelPrincipal(unittest.TestCase):
         self.assertEqual(len(df), 3)
         self.assertEqual(
             list(df.columns),
-            ['VIN', 'CHASIS', 'INICIO', 'TERMINO', 'ESTADO DE ENTREGA', 'PERIODO INTERNO'],
+            ['VIN', 'CHASIS', 'INICIO', 'TERMINO', 'ESTADO DE ENTREGA', 'PERIODO INTERNO',
+             'ULTIMO PAGO CM', 'FECHA ULTIMO PAGO CM'],  # columnas opcionales que agrega el lector
         )
 
     def test_valores_columnas_fecha_legado_tras_pipeline_completo(self):
@@ -255,7 +256,7 @@ class TestMainDataLoaderThreadLecturaExcelPrincipal(unittest.TestCase):
         # el valor correcto (25-09-2026, fix de dataframe_formatter.py --
         # antes 'INICIO'/'TERMINO'/'ESTADO DE ENTREGA' no estaban en la lista
         # date_columns de DataFrameFormatter.clean(), que tenía los nombres
-        # de columna de ANTES del renombrado RM_JAVI_COLUMN_ALIASES y nunca
+        # de columna de ANTES del renombrado de columnas del RM y nunca
         # calzaban). Antes del fix, clean() no tocaba esta columna y el
         # Timestamp crudo llegaba tal cual a formatear_columna_fecha_legado(),
         # que sí re-parsea vía pd.to_datetime(dayfirst=True, format='mixed')

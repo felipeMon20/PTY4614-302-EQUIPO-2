@@ -7,7 +7,7 @@ import traceback
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QPixmap, QIcon, QImage, QPainter
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
-from src.ui.pantalla_inicio import PantallaInicio
+from src.ui.marco.pantalla_inicio import PantallaInicio
 
 INTERVALO_GIL_ARRANQUE = 0.001
 INTERVALO_GIL_NORMAL = 0.005
@@ -141,7 +141,7 @@ class CustomSplashScreen(PantallaInicio):
             # mostrarla, con los hilos de MainWindow ya compitiendo por el GIL:
             # ~90 ms aquí, hasta ~1,5 s allá
             import src.ui.general  # noqa: F401
-            from src.ui.main_window import MainWindow  # noqa: F401
+            from src.ui.marco.main_window import MainWindow  # noqa: F401
             self.set_progreso(0.72)
             QTimer.singleShot(PAUSA_ENTRE_ETAPAS_MS, self._crear_ventana_principal)
         except Exception as e:
@@ -149,7 +149,7 @@ class CustomSplashScreen(PantallaInicio):
 
     def _crear_ventana_principal(self):
         try:
-            from src.ui.main_window import MainWindow
+            from src.ui.marco.main_window import MainWindow
             self.main_window = MainWindow(arranque_oculto=True)
             self.main_window.progreso_arranque.connect(self.set_progreso)
             self.main_window.arranque_listo.connect(self._terminar_arranque)
@@ -231,6 +231,11 @@ def _asegurar_instancia_unica():
 
 
 def main():
+    # data/, logs/ y config/ se resuelven contra la carpeta de trabajo; un acceso
+    # directo con otro "Iniciar en" los crearía en otro lugar
+    from config.directorio_app import BASE_DIR
+    os.chdir(BASE_DIR)
+
     # 1. Le decimos a Windows que ignore el modo oscuro para esta app
     os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
 
@@ -244,6 +249,11 @@ def main():
     if servidor_unico is None:
         return
 
+    from src.core import registro_app
+    registro_app.configurar_logging()
+    registro_app.instalar_manejo_de_errores()
+    _vigia_congelamientos = registro_app.instalar_vigia_de_congelamientos()
+
     # 2. Estilo "Fusion"; la paleta (clara u oscura, la última que usó la
     # persona) la fija GestorTema junto con styles.qss
     app.setStyle("Fusion")
@@ -251,25 +261,27 @@ def main():
     from src.theme.tema import GestorTema
     GestorTema.instancia().inicializar(app)
     # Los QMessageBox de toda la app se muestran como tarjetas modernas
-    from src.ui.mensajes import instalar as instalar_mensajes
+    from src.ui.compartido.mensajes import instalar as instalar_mensajes
     instalar_mensajes()
 
+    # El ícono y la identidad de la aplicación se fijan antes de abrir cualquier ventana
+    app_icon = QIcon(get_resource_path(os.path.join('src', 'assets', 'app_icono.png')))
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
+    try:
+        import ctypes
+        myappid = 'volvo.dashboard.gestion.1'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
+
     # Primer arranque o carpeta movida: ofrece buscar y configurar las rutas solo
-    from src.ui.asistente_rutas import revisar_rutas_al_arrancar
+    from src.ui.marco.asistente_rutas import revisar_rutas_al_arrancar
     if revisar_rutas_al_arrancar():
         return
 
-    logo_path = get_resource_path(os.path.join('src', 'assets', 'splash_logo.png'))
-    app_icon = create_white_background_icon(logo_path)
-    
-    if not app_icon.isNull():
-        app.setWindowIcon(app_icon)
-        try:
-            import ctypes
-            myappid = 'volvo.dashboard.gestion.1'
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        except Exception:
-            pass
+    registro_app.iniciar_sesion()
+    app.aboutToQuit.connect(registro_app.cerrar_sesion)
 
     sys.setswitchinterval(INTERVALO_GIL_ARRANQUE)
     splash = CustomSplashScreen()

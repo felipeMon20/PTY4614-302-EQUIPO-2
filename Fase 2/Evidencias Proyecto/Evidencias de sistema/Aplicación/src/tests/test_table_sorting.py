@@ -8,7 +8,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication, QMenu
 
 import config.settings
-from src.ui.custom_table import VolvoTableWidget, PandasTableModel
+from src.ui.compartido.custom_table import VolvoTableWidget, PandasTableModel
 from src.services import comercial_services
 from src.theme.colors import SUCCESS, DANGER, WARNING, TEXT_MUTED
 
@@ -215,7 +215,7 @@ class TestInstalacionesMenuType(unittest.TestCase):
 
     def test_instalaciones_no_hereda_eliminar_camion(self):
         logger.info("[Test Instalaciones] Verificando que la tabla no herede el menú contextual de Comercial...")
-        from src.ui.instalaciones import InstalacionesModule
+        from src.ui.administracion.instalaciones import InstalacionesModule
         module = InstalacionesModule()
         self.assertNotEqual(
             module.table.menu_type, "comercial",
@@ -385,7 +385,7 @@ class TestSetTableIdDescartaEstadoDesactualizado(unittest.TestCase):
             def remove(self, key):
                 store.pop(key, None)
 
-        with patch('src.ui.custom_table.QSettings', _FakeSettings):
+        with patch('src.ui.compartido.custom_table.QSettings', _FakeSettings):
             tabla_nueva.set_table_id("test_desactualizado")
 
         self.assertEqual(

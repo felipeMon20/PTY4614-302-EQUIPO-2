@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import config.settings
-from src.ui.configuracion import ConfiguracionModule
+from src.ui.marco.configuracion import ConfiguracionModule
 
 
 class TestConfiguracionHistorialCsv(unittest.TestCase):
@@ -35,19 +35,19 @@ class TestConfiguracionHistorialCsv(unittest.TestCase):
         # El cambio del campo de historial no debe tocar ninguno de los
         # demás campos de archivos Excel maestros reales.
         for clave in ['EXCEL_PATH', 'PROVISION_EXCEL_PATH', 'INSTALACIONES_PATH',
-                      'RM_JAVI_PATH', 'CONTACTOS_EXCEL_PATH',
+                      'CONTACTOS_EXCEL_PATH',
                       'CORREOS_EXCEL_PATH', 'POWERBI_EXCEL_PATH', 'DELETED_LOG_EXCEL_PATH']:
             self.assertIn(clave, self.module.path_inputs, f"Fallo: el campo '{clave}' no debería haberse eliminado.")
 
     def test_selector_de_archivos_permite_csv_para_el_historial(self):
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName') as mock_dialog:
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName') as mock_dialog:
             mock_dialog.return_value = ('', '')
             self.module._browse_file('LOG_CSV_PATH', self.module.path_inputs['LOG_CSV_PATH'])
             filtro_usado = mock_dialog.call_args[0][3]
             self.assertIn('*.csv', filtro_usado, "Fallo: el selector para el historial debe permitir *.csv.")
 
     def test_selector_de_otros_campos_sigue_pidiendo_excel(self):
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName') as mock_dialog:
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName') as mock_dialog:
             mock_dialog.return_value = ('', '')
             self.module._browse_file('EXCEL_PATH', self.module.path_inputs['EXCEL_PATH'])
             filtro_usado = mock_dialog.call_args[0][3]
@@ -69,7 +69,7 @@ class TestConfiguracionCasosBajaCmPath(unittest.TestCase):
                        "Fallo: CASOS_BAJA_CM_PATH debe exponerse como campo editable en Configuración.")
 
     def test_selector_de_casos_baja_cm_permite_csv(self):
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName') as mock_dialog:
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName') as mock_dialog:
             mock_dialog.return_value = ('', '')
             self.module._browse_file('CASOS_BAJA_CM_PATH', self.module.path_inputs['CASOS_BAJA_CM_PATH'])
             filtro_usado = mock_dialog.call_args[0][3]

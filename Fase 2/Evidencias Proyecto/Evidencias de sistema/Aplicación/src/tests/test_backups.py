@@ -419,16 +419,16 @@ class TestRestoreBackupValidation(unittest.TestCase):
     a otro archivo (ej. un backup de Contactos o Provisiones)."""
 
     def setUp(self):
-        from src.ui.configuracion import ConfiguracionModule
+        from src.ui.marco.configuracion import ConfiguracionModule
         self.module = ConfiguracionModule()
 
     def test_bloquea_restaurar_backup_de_otro_archivo(self):
         backup_ajeno = os.path.join(os.getcwd(), 'data', 'backups', "contactos_Test_backup_20260101_000000.xlsx")
 
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName', return_value=(backup_ajeno, '')), \
-             patch('src.ui.configuracion.QMessageBox.critical') as mock_critical, \
-             patch('src.ui.configuracion.QMessageBox.question') as mock_question, \
-             patch('src.ui.configuracion.shutil.copy2') as mock_copy:
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName', return_value=(backup_ajeno, '')), \
+             patch('src.ui.marco.configuracion.QMessageBox.critical') as mock_critical, \
+             patch('src.ui.marco.configuracion.QMessageBox.question') as mock_question, \
+             patch('src.ui.marco.configuracion.shutil.copy2') as mock_copy:
             self.module._restore_backup()
 
         mock_critical.assert_called_once()
@@ -440,14 +440,14 @@ class TestRestoreBackupValidation(unittest.TestCase):
         # al momento de cargarse el modulo, asi que el valor vigente en ese
         # modulo (no en config.settings, que puede haberse recargado despues)
         # es el que _restore_backup usa realmente para comparar.
-        from src.ui.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
+        from src.ui.marco.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
         nombre_base = os.path.splitext(os.path.basename(EXCEL_PATH_EN_USO))[0]  # igual que configuracion.py (xlsx o csv)
         backup_correcto = os.path.join(os.getcwd(), 'data', 'backups', f"{nombre_base}_backup_20260101_000000.xlsx")
 
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
-             patch('src.ui.configuracion.QMessageBox.critical') as mock_critical, \
-             patch('src.ui.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.No) as mock_question, \
-             patch('src.ui.configuracion.shutil.copy2') as mock_copy:
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
+             patch('src.ui.marco.configuracion.QMessageBox.critical') as mock_critical, \
+             patch('src.ui.marco.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.No) as mock_question, \
+             patch('src.ui.marco.configuracion.shutil.copy2') as mock_copy:
             self.module._restore_backup()
 
         mock_critical.assert_not_called()
@@ -455,7 +455,7 @@ class TestRestoreBackupValidation(unittest.TestCase):
         mock_copy.assert_not_called()  # el usuario respondio "No" a la confirmacion final
 
     def test_backup_del_estado_actual_falla_cancela_la_restauracion(self):
-        from src.ui.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
+        from src.ui.marco.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
         nombre_base = os.path.splitext(os.path.basename(EXCEL_PATH_EN_USO))[0]  # igual que configuracion.py (xlsx o csv)
         backup_correcto = os.path.join(os.getcwd(), 'data', 'backups', f"{nombre_base}_backup_20260101_000000.xlsx")
 
@@ -463,18 +463,18 @@ class TestRestoreBackupValidation(unittest.TestCase):
             self.last_backup_ok = False
             return False
 
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
-             patch('src.ui.configuracion.QMessageBox.critical') as mock_critical, \
-             patch('src.ui.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes), \
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
+             patch('src.ui.marco.configuracion.QMessageBox.critical') as mock_critical, \
+             patch('src.ui.marco.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes), \
              patch('src.core.excel_writer.ExcelWriter._crear_backup', new=backup_fallido), \
-             patch('src.ui.configuracion.shutil.copy2') as mock_copy:
+             patch('src.ui.marco.configuracion.shutil.copy2') as mock_copy:
             self.module._restore_backup()
 
         mock_critical.assert_called_once()
         mock_copy.assert_not_called()
 
     def test_backup_del_estado_actual_exitoso_permite_restaurar(self):
-        from src.ui.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
+        from src.ui.marco.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
         nombre_base = os.path.splitext(os.path.basename(EXCEL_PATH_EN_USO))[0]  # igual que configuracion.py (xlsx o csv)
         backup_correcto = os.path.join(os.getcwd(), 'data', 'backups', f"{nombre_base}_backup_20260101_000000.xlsx")
 
@@ -482,14 +482,14 @@ class TestRestoreBackupValidation(unittest.TestCase):
             self.last_backup_ok = True
             return True
 
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
-             patch('src.ui.configuracion.QMessageBox.critical') as mock_critical, \
-             patch('src.ui.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.configuracion.QMessageBox.information') as mock_info, \
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
+             patch('src.ui.marco.configuracion.QMessageBox.critical') as mock_critical, \
+             patch('src.ui.marco.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes), \
+             patch('src.ui.marco.configuracion.QMessageBox.information') as mock_info, \
              patch('src.core.excel_writer.ExcelWriter._crear_backup', new=backup_exitoso), \
-             patch('src.ui.configuracion.shutil.copy2') as mock_copy, \
-             patch('src.ui.configuracion.QProcess') as mock_proceso, \
-             patch('src.ui.configuracion.QApplication.quit') as mock_quit:
+             patch('src.ui.marco.configuracion.shutil.copy2') as mock_copy, \
+             patch('src.ui.marco.configuracion.QProcess') as mock_proceso, \
+             patch('src.ui.marco.configuracion.QApplication.quit') as mock_quit:
             self.module._restore_backup()
 
         mock_critical.assert_not_called()
@@ -500,7 +500,7 @@ class TestRestoreBackupValidation(unittest.TestCase):
         mock_quit.assert_called_once()
 
     def test_backup_del_estado_actual_ocurre_antes_de_restaurar(self):
-        from src.ui.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
+        from src.ui.marco.configuracion import EXCEL_PATH as EXCEL_PATH_EN_USO
         nombre_base = os.path.splitext(os.path.basename(EXCEL_PATH_EN_USO))[0]  # igual que configuracion.py (xlsx o csv)
         backup_correcto = os.path.join(os.getcwd(), 'data', 'backups', f"{nombre_base}_backup_20260101_000000.xlsx")
 
@@ -514,14 +514,14 @@ class TestRestoreBackupValidation(unittest.TestCase):
         def copy2_fake(origen, destino):
             llamadas.append('restaurar_backup_elegido')
 
-        with patch('src.ui.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
-             patch('src.ui.configuracion.QMessageBox.critical'), \
-             patch('src.ui.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes), \
-             patch('src.ui.configuracion.QMessageBox.information'), \
+        with patch('src.ui.marco.configuracion.QFileDialog.getOpenFileName', return_value=(backup_correcto, '')), \
+             patch('src.ui.marco.configuracion.QMessageBox.critical'), \
+             patch('src.ui.marco.configuracion.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes), \
+             patch('src.ui.marco.configuracion.QMessageBox.information'), \
              patch('src.core.excel_writer.ExcelWriter._crear_backup', new=backup_exitoso), \
-             patch('src.ui.configuracion.shutil.copy2', side_effect=copy2_fake), \
-             patch('src.ui.configuracion.QProcess'), \
-             patch('src.ui.configuracion.QApplication.quit'):
+             patch('src.ui.marco.configuracion.shutil.copy2', side_effect=copy2_fake), \
+             patch('src.ui.marco.configuracion.QProcess'), \
+             patch('src.ui.marco.configuracion.QApplication.quit'):
             self.module._restore_backup()
 
         self.assertEqual(llamadas, ['crear_backup_estado_actual', 'restaurar_backup_elegido'],

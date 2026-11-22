@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QMe
 from PyQt6.QtCore import QEventLoop, QTimer, Qt, QEvent
 from PyQt6.QtGui import QKeyEvent, QKeySequence
 
-from src.ui.main_window import MainWindow, MultiSearchLineEdit, MAX_TERMINOS_BUSQUEDA_GLOBAL, DEBOUNCE_BUSQUEDA_GLOBAL_MS
-from src.ui.sidebar_estilo import ANCHO_EXPANDIDO, ANCHO_COLAPSADO
+from src.ui.marco.main_window import MainWindow, MultiSearchLineEdit, MAX_TERMINOS_BUSQUEDA_GLOBAL, DEBOUNCE_BUSQUEDA_GLOBAL_MS
+from src.ui.marco.sidebar_estilo import ANCHO_EXPANDIDO, ANCHO_COLAPSADO
 
 logger = logging.getLogger("TestRunner")
 
@@ -50,7 +50,7 @@ class TestMainWindowSincronizacion(unittest.TestCase):
         mock_instance.clickedButton.return_value = btn_cancelar
         return mock_instance
 
-    @patch('src.ui.main_window.QMessageBox')
+    @patch('src.ui.marco.main_window.QMessageBox')
     def test_01_cambios_pendientes_en_modulo_no_visible_no_se_pierden(self, mock_msgbox_cls):
         logger.info("[MainWindow 01] Verificando que cambios pendientes en un modulo en segundo plano bloqueen la recarga silenciosa...")
 
@@ -71,7 +71,7 @@ class TestMainWindowSincronizacion(unittest.TestCase):
         self.assertEqual(modulo_comercial.pending_changes, {'YV2X': {'VIN': 'YV2X', 'cambios': {'ESTADO COMERCIAL': 'Vigente'}}})
         logger.info(" -> Exito: la recarga automatica no se disparo en silencio; se respeto la mochila de Comercial.")
 
-    @patch('src.ui.main_window.QMessageBox')
+    @patch('src.ui.marco.main_window.QMessageBox')
     def test_02_cambios_pendientes_en_mas_de_un_modulo_en_segundo_plano(self, mock_msgbox_cls):
         logger.info("[MainWindow 02] Verificando deteccion cuando VARIOS modulos en segundo plano tienen cambios...")
 
@@ -95,7 +95,7 @@ class TestMainWindowSincronizacion(unittest.TestCase):
         win.data_manager.load_data_async.assert_not_called()
         logger.info(" -> Exito: se detectaron cambios pendientes aunque no estuvieran en el primer modulo cargado.")
 
-    @patch('src.ui.main_window.QMessageBox')
+    @patch('src.ui.marco.main_window.QMessageBox')
     def test_03_sin_cambios_pendientes_mantiene_recarga_automatica(self, mock_msgbox_cls):
         logger.info("[MainWindow 03] Verificando que sin cambios pendientes se mantiene la recarga automatica (comportamiento original)...")
 
@@ -133,6 +133,8 @@ class TestDataLoadedTriggersRevisionCmReconciliation(unittest.TestCase):
         QMainWindow.__init__(win)
         win.menu_buttons = {"Vista General": MagicMock()}
         win.config_btn = MagicMock()
+        win.search_bar = MagicMock()
+        win._actualizar_contador_busqueda = MagicMock()
         fake_widget = MagicMock()
         win.workspace = MagicMock()
         win.workspace.currentWidget.return_value = fake_widget
@@ -147,8 +149,8 @@ class TestDataLoadedTriggersRevisionCmReconciliation(unittest.TestCase):
         if hilo is not None:
             self.assertTrue(hilo.wait(5000), "La reconciliación en segundo plano no terminó")
 
-    @patch('src.ui.main_window.config.settings')
-    @patch('src.ui.main_window.cm_bajas_service.procesar_reconciliacion_estado_expired')
+    @patch('src.ui.marco.main_window.config.settings')
+    @patch('src.ui.marco.main_window.cm_bajas_service.procesar_reconciliacion_estado_expired')
     def test_reconcilia_al_cargar_datos_con_df_master_no_vacio(self, mock_reconciliar, mock_settings):
         mock_settings.CASOS_BAJA_CM_PATH = 'C:/fake/CasosBajaCM.csv'
         df = pd.DataFrame({'VIN': ['V1'], 'ESTADO DEL CM': ['Expired']})
@@ -162,7 +164,7 @@ class TestDataLoadedTriggersRevisionCmReconciliation(unittest.TestCase):
         self.assertTrue(kwargs['df_pruebas_actual'].equals(df))
         self.assertEqual(kwargs['casos_path'], 'C:/fake/CasosBajaCM.csv')
 
-    @patch('src.ui.main_window.cm_bajas_service.procesar_reconciliacion_estado_expired')
+    @patch('src.ui.marco.main_window.cm_bajas_service.procesar_reconciliacion_estado_expired')
     def test_no_reconcilia_si_df_master_vacio(self, mock_reconciliar):
         win = self._make_fake_window(pd.DataFrame())
 
@@ -171,7 +173,7 @@ class TestDataLoadedTriggersRevisionCmReconciliation(unittest.TestCase):
 
         mock_reconciliar.assert_not_called()
 
-    @patch('src.ui.main_window.cm_bajas_service.procesar_reconciliacion_estado_expired', side_effect=Exception("boom"))
+    @patch('src.ui.marco.main_window.cm_bajas_service.procesar_reconciliacion_estado_expired', side_effect=Exception("boom"))
     def test_error_en_reconciliacion_no_rompe_la_carga(self, mock_reconciliar):
         df = pd.DataFrame({'VIN': ['V1'], 'ESTADO DEL CM': ['Expired']})
         win = self._make_fake_window(df)
@@ -391,6 +393,7 @@ class TestGlobalSearchDebounce(unittest.TestCase):
         win._global_search_timer.timeout.connect(lambda: MainWindow._ejecutar_busqueda_global_pendiente(win))
         win._pending_search_text = ""
         win._on_global_search = MagicMock()
+        win._actualizar_contador_busqueda = MagicMock()
         return win
 
     def _esperar(self, ms):

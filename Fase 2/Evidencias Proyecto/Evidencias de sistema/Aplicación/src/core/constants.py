@@ -2,7 +2,6 @@
 Archivo de Constantes Globales.
 Centraliza los nombres de las columnas del Excel y otros textos críticos.
 """
-import re
 from src.theme.colors import MODULE_COLORS
 
 # ==========================================
@@ -163,6 +162,7 @@ ESTADO_DEL_CM_MAP = {
     'RUNNING': 'Running',
     'EXPIRED': 'Expired',
     'TERMINATED': 'Terminated',
+    'PENDIENTE': 'Pendiente',
     # Dato real detectado en PruebasFM (12 filas, 11-09-2026): alguien
     # escribio "Expirado" directamente en Excel, fuera del desplegable de
     # la app (que nunca ofrecio ese valor). Sin este alias, esas filas
@@ -198,26 +198,6 @@ CONTRATO_JUSTTIME_MAP = {
     'REVISAR EL PAGO PROVISION Y LUEGO SACARLA DE JUSTTIME PARA COBRAR A CM': JUSTTIME_ESTADO_REVISAR_PAGO,
 }
 
-# Correccion de un error de digitacion confirmado (no un valor de catalogo
-# valido): "ACTIVO" no es un ESTADO COMERCIAL reconocido, el dato correcto es
-# "VIGENTE". Se aplica ANTES de escribir a PruebasFM durante la sincronizacion
-# RM_JAVI (ver RMJaviSyncWorker), en el mismo formato (mayusculas) en que el
-# RM entrega el resto de los valores de esta columna -- no usa el Title Case
-# de ESTADO_COMERCIAL_MAP (ese mapa normaliza capitalizacion en memoria al
-# cargar via DataFrameFormatter.clean(), un paso distinto y posterior).
-ESTADO_COMERCIAL_CORRECCIONES_RM = {
-    'ACTIVO': 'VIGENTE',
-    '-': 'SIN SERVICIO',
-}
-
-# ESTADO DE ACTIVACIÓN ACTUAL: "No entregado" se trata como "Sin flota" (15-10-2026,
-# decisión del usuario). Ambos tienen el mismo destino en la matriz y la misma tarea
-# en Operaciones (completar Flota VC y CDB flota). Se aplica en la sincronización
-# RM_JAVI, en mayúsculas como entrega el RM.
-ESTADO_ACTIVACION_CORRECCIONES_RM = {
-    'NO ENTREGADO': 'SIN FLOTA',
-}
-
 # ==========================================
 # TIPO DE FACTURACION: presentación en ComboBox del nuevo formulario
 # (ComercialAgregarDialog, pestaña "JustTime & CM") vs. valor real que se
@@ -247,7 +227,7 @@ DROPDOWN_OPTIONS_UNIDAD = {
     'TIPO DE SERVICIO': ["-", "Basico", "Full", "Full + CIV", "Medio", "Medio + CIV"],
     'ESTADO DE ACTIVACIÓN ACTUAL': ["Activando", "Conectado", "Desconectado", "No aplica", "No entregado", "Sin flota"],
     'ESTADO COMERCIAL': ["Vigente", "Vencido", "Baja", "Baja Solicitada", "Revisar", "Activación Pendiente"],
-    'ESTADO DEL CM': ["Running", "Expired", "Terminated", "-"],
+    'ESTADO DEL CM': ["Running", "Expired", "Pendiente", "Terminated", "-"],
 }
 
 # Valores de TIPO DE FACTURACION que van a JustTime: habilitan el bloque
@@ -268,7 +248,11 @@ TIPO_FACTURACION_HABILITA_CM = {VALOR_TIPO_FACT_CM}
 # -- centralizados aqui para no duplicar el catalogo en dos pantallas.
 # ==========================================
 TIPO_CM_OPCIONES = ["Gold", "Blue", "Silver", "Current Contract Type", "-"]
-ESTADO_CM_OPCIONES = ["Running", "Expired", "Terminated", "-"]
+ESTADO_CM_OPCIONES = ["Running", "Expired", "Pendiente", "Terminated", "-"]
+# Estado interno (no viene del 3PC): el cliente no pagó y se espera la respuesta de quien administra el CM
+ESTADO_CM_PENDIENTE = "Pendiente"
+# Estados que mantienen abierto el caso de Oportunidades CM (ver cm_bajas_service)
+ESTADOS_CM_SIN_PAGO = ("EXPIRED", "PENDIENTE")
 
 # Relacion FORMA DE CONTRATO -> TIPO DE CM (nueva regla de negocio,
 # 16-09-2026, definida con Javiera para ComercialAgregarDialog): cuando
@@ -396,84 +380,9 @@ ETAPA_GESTION_COLORES = {
     'OPERACIONES': MODULE_COLORS['Operaciones'],
 }
 
-# ==========================================
-# SINCRONIZACIÓN RM_JAVI -> PRUEBASFM
-# (NOMBRES DE COLUMNA, no de valores: no mezclar con los *_MAP de arriba)
-# ==========================================
-
-# Alias de nombre de columna: "como puede venir del RM" -> "nombre oficial en PruebasFM".
-# Reemplaza al dict `renames` que antes vivía hardcodeado en comercial.py.
-RM_JAVI_COLUMN_ALIASES = {
-    'FECHA INICIO FACTURACIÓN': COL_FECHA_INICIO_FACT,   # -> "INICIO"
-    'FECHA TÉRMINO FACTURACIÓN': COL_FECHA_TERMINO_FACT, # -> "TERMINO"
-    'OPERACION': COL_INDUSTRIA,
-    'CDB Flota': COL_CDB_FLOTA,
-    'CDB COMERCIAL': COL_CDB,
-}
-
-# "PAGO CM" cambia de nombre cada mes en el RM (ej. "PAGO CM 08/2026", "PAGO CM 09/2026").
-# Este patrón reconoce SOLO esa variante mensual oficial (mes/año al final) y la mapea a
-# "PAGO CM". Nombres que no calcen con el patrón (ej. "PAGO CM PRUEBA", "PAGO CM TEST")
-# no se consideran una variante válida y no se renombran.
-RM_JAVI_PAGO_CM_PATTERN = re.compile(r'^PAGO CM\s+\d{1,2}/\d{4}$', re.IGNORECASE)
-
-# Columnas del RM autorizadas explícitamente a pasar a PruebasFM. Una columna del RM que
-# no esté en esta lista se descarta, aunque su nombre coincida con una columna que ya
-# exista en PruebasFM.xlsx.
-RM_JAVI_COLUMNAS_AUTORIZADAS = [
-    COL_ID,
-    COL_EJECUTIVO,
-    COL_PERIODO_INTERNO,
-    COL_RAZON_SOCIAL,
-    COL_VIN,
-    COL_CHASIS,
-    COL_MODELO,
-    COL_FLOTA_VC,
-    COL_RUT,
-    COL_CDB,
-    COL_CDB_FLOTA,
-    COL_FLOTA_VC_2,
-    COL_FORMA_CONTRATO,
-    COL_TIPO_SERVICIO,
-    COL_INICIO_CONTRATO,
-    COL_DURACION_MESES,
-    COL_TERMINO_CONTRATO,
-    COL_ESTADO_COMERCIAL,
-    COL_FECHA_BAJA,
-    COL_TIPO_FACTURACION,
-    COL_CONTRATO_JUSTTIME,
-    COL_FECHA_INICIO_FACT,
-    COL_FECHA_TERMINO_FACT,
-    COL_ESTADO_ACTIVACION,
-    COL_ESTADO_ENTREGA,
-    "OBSERVACIONES",
-    "N CONTRATO 3PC",
-    "FECHA INICIO CM",
-    "FECHA TERMINO CM",
-    "TIPO DE CM",
-    COL_ESTADO_CM,
-    "PAGO CM",
-    COL_INDUSTRIA,
-]
-
-# Columnas que son exclusivamente locales de PruebasFM (no vienen del RM) y deben
-# preservarse tal cual estén en el Excel local durante la sincronización.
-# ETAPA GESTIÓN (25-09-2026, a pedido explícito, corrigiendo un bug real de
-# datos): estaba en RM_JAVI_COLUMNAS_AUTORIZADAS, así que cada sincronización
-# traía el valor de esa columna DESDE RM_JAVI.xlsx (archivo externo mantenido
-# por Javiera), pisando el cálculo local de
-# DataFrameFormatter.calcular_etapa_gestion_esperada -- la propia "única
-# fuente de verdad" que ese método dice ser. Confirmado contra datos reales:
-# el RM_JAVI tenía 427 filas con el número de CHASIS pegado por error en esa
-# columna y ~3.058 filas con el valor legado 'CLIENTE' (retirado del catálogo
-# el 21-09-2026) -- ambos se reintroducían en PruebasFM en cada sync sin que
-# nadie los hubiera vuelto a escribir a mano. Ahora se preserva el valor
-# LOCAL (el que ya calculó esta misma app) durante el merge, y
-# RMJaviSyncWorker.run() recalcula igual con la matriz de negocio antes de
-# escribir a disco (ver el orden de clean() en ese método) -- la columna del
-# RM_JAVI para este campo queda ignorada.
-PRUEBAS_FM_COLUMNAS_LOCALES = [COL_ETAPA_GESTION]
-
-# Columnas técnicas usadas solo en memoria durante la sincronización (matching por VIN).
-# Nunca deben terminar en PruebasFM.xlsx.
-COLUMNAS_TECNICAS_SYNC = ["VIN_CLEAN"]
+# Último pago positivo del 3PC y su fecha. PAGO CM queda en 0 cuando la unidad no pagó
+# en el mes del archivo; estas dos conservan el pago anterior como histórico. La
+# columna se crea sola al guardar (ver core/columnas_opcionales.py).
+COL_ULTIMO_PAGO_CM = "ULTIMO PAGO CM"
+COL_FECHA_ULTIMO_PAGO_CM = "FECHA ULTIMO PAGO CM"
+COLUMNAS_OPCIONALES_RM = [COL_ULTIMO_PAGO_CM, COL_FECHA_ULTIMO_PAGO_CM]

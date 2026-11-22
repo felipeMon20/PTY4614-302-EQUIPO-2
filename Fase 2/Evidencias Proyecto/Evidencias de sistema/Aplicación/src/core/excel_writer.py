@@ -153,11 +153,11 @@ class ExcelWriter:
             if len(archivos) > 10:
                 for f in archivos[:-10]:
                     try: os.remove(f)
-                    except: pass
+                    except Exception: pass
             self.last_backup_ok = True
             return True
         except Exception as e:
-            print(f"Aviso: No se pudo crear el backup automático: {e}")
+            logger.warning(f"Aviso: No se pudo crear el backup automático: {e}")
             logger.warning(f"No se pudo crear el backup automático de '{os.path.basename(ruta_base)}': {e}")
             self.last_backup_ok = False
             return False
@@ -173,7 +173,7 @@ class ExcelWriter:
         (SaveExcelThread, etc.) lean el CSV ya actualizado en su propio hilo
         de fondo justo despues de escribir, y devuelvan el resultado a
         DataManager.set_logs_df() en el hilo principal -- mismo patron que
-        ya usa RMJaviSyncWorker/SyncRMJaviDialog.handle_success. Devuelve
+        usaba la sincronización RM_JAVI (eliminada el 27-10-2026). Devuelve
         DataFrame vacio si el archivo todavia no existe, o None si la
         lectura falla (para que el llamador no pise datos buenos con un
         error)."""
@@ -212,7 +212,7 @@ class ExcelWriter:
                 for entry in log_entries:
                     writer_csv.writerow(entry)
         except Exception as e:
-            print(f"Error escribiendo en logs: {e}")
+            logger.error(f"Error escribiendo en logs: {e}", exc_info=True)
 
     def _get_active_sheet(self, wb):
         if 'BBDD (2)' in wb.sheetnames:
@@ -256,10 +256,10 @@ class ExcelWriter:
             return True
             
         except PermissionError:
-            print(f"El Excel {os.path.basename(target_file)} está bloqueado.")
+            logger.warning(f"El Excel {os.path.basename(target_file)} está bloqueado.")
             return False
         except Exception as e:
-            print(f"Fallo inesperado al sobrescribir DataFrame: {e}")
+            logger.error(f"Fallo inesperado al sobrescribir DataFrame: {e}", exc_info=True)
             return False
         finally:
             dm.is_app_saving = False
@@ -330,7 +330,7 @@ class ExcelWriter:
                 if sheet_name in wb.sheetnames:
                     sheet = wb[sheet_name]
                 else:
-                    print(f"Error: La hoja '{sheet_name}' no existe en el archivo {os.path.basename(target_file)}.")
+                    logger.error(f"Error: La hoja '{sheet_name}' no existe en el archivo {os.path.basename(target_file)}.")
                     # No se muto nada todavia en este intento, pero se
                     # descarta igual: mas simple y seguro que distinguir
                     # caso por caso (prioridad: integridad > rendimiento).
@@ -402,7 +402,7 @@ class ExcelWriter:
                     identificador_log = target_vin
 
                 if not excel_row:
-                    print(f"No se encontró la fila objetivo para guardar: {identificador_log}")
+                    logger.warning(f"No se encontró la fila objetivo para guardar: {identificador_log}")
                     # Iteraciones anteriores de este mismo changes_dict
                     # pueden haber mutado ya celdas del Workbook cacheado sin
                     # llegar a wb.save(). Descartar es obligatorio aqui: de
@@ -448,11 +448,11 @@ class ExcelWriter:
             return True
 
         except PermissionError:
-            print(f"El Excel {os.path.basename(target_file)} está bloqueado.")
+            logger.warning(f"El Excel {os.path.basename(target_file)} está bloqueado.")
             cache.descartar(target_file)
             return False
         except Exception as e:
-            print(f"Fallo inesperado al guardar Excel: {e}")
+            logger.error(f"Fallo inesperado al guardar Excel: {e}", exc_info=True)
             cache.descartar(target_file)
             return False
         finally:
@@ -557,11 +557,11 @@ class ExcelWriter:
             return False
 
         except PermissionError:
-            print(f"El Excel {os.path.basename(target_file)} está bloqueado.")
+            logger.warning(f"El Excel {os.path.basename(target_file)} está bloqueado.")
             cache.descartar(target_file)
             return False
         except Exception as e:
-            print(f"Fallo inesperado al eliminar fila en Excel: {e}")
+            logger.error(f"Fallo inesperado al eliminar fila en Excel: {e}", exc_info=True)
             cache.descartar(target_file)
             return False
         finally:
@@ -672,7 +672,7 @@ class ExcelWriter:
             workbook.save(self.deleted_filepath)
             workbook.close()
         except Exception as e:
-            print(f"Error escribiendo log de eliminados: {e}")
+            logger.error(f"Error escribiendo log de eliminados: {e}", exc_info=True)
             pass
             
     def add_new_row(self, new_data_dict, module_name="Sistema", custom_filepath=None):
@@ -738,11 +738,11 @@ class ExcelWriter:
             return True
 
         except PermissionError:
-            print(f"El Excel {os.path.basename(target_file)} está bloqueado.")
+            logger.warning(f"El Excel {os.path.basename(target_file)} está bloqueado.")
             cache.descartar(target_file)
             return False
         except Exception as e:
-            print(f"Fallo inesperado al añadir fila en Excel: {e}")
+            logger.error(f"Fallo inesperado al añadir fila en Excel: {e}", exc_info=True)
             cache.descartar(target_file)
             return False
         finally:
@@ -819,10 +819,10 @@ class ExcelWriter:
             return True
 
         except PermissionError:
-            print(f"El Excel {os.path.basename(target_file)} está bloqueado.")
+            logger.warning(f"El Excel {os.path.basename(target_file)} está bloqueado.")
             return False
         except Exception as e:
-            print(f"Fallo inesperado al añadir el lote de filas en Excel: {e}")
+            logger.error(f"Fallo inesperado al añadir el lote de filas en Excel: {e}", exc_info=True)
             return False
         finally:
             dm.is_app_saving = False

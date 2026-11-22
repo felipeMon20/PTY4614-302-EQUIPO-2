@@ -2,7 +2,9 @@
 auditoria previa). Python/pandas puro: no depende de PyQt6, QThread,
 QWidget, QMessageBox ni ningun widget."""
 
+import functools
 import re
+from contextlib import contextmanager
 from datetime import datetime
 
 import numpy as np
@@ -17,9 +19,10 @@ from src.core.constants import (COL_ETAPA_GESTION, COL_ESTADO_ACTIVACION, ESTADO
                                 VALOR_ESTADO_COMERCIAL_VENCIDO, VALOR_ESTADO_COMERCIAL_ACTIVACION_PENDIENTE,
                                 VALOR_ESTADO_COMERCIAL_REVISAR, VALOR_ESTADO_COMERCIAL_VIGENTE,
                                 COL_RUT, COL_CDB, COL_RAZON_SOCIAL, COL_PERIODO_INTERNO,
-                                FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ)
+                                FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ, ESTADO_CM_PENDIENTE)
 from src.core.dataframe_formatter import DataFrameFormatter
-from src.services.cm_bajas_service import ORIGEN_CASO_AUSENCIA_3PC, ORIGEN_CASO_ESTADO_EXPIRED
+from src.services.cm_bajas_service import (ORIGEN_CASO_AUSENCIA_3PC, ORIGEN_CASO_ESTADO_EXPIRED,
+                                           ORIGEN_CASO_DATOS_3PC_VACIOS, ORIGEN_CASO_RUNNING_VENCIDO)
 
 # Caché de DataFrameFormatter.parsear_fecha_segura por valor (depende solo
 # del valor): clasificar_vigencia_contrato se llama varias veces por
@@ -42,6 +45,45 @@ def _parsear_fecha_cacheada(valor):
         _CACHE_FECHAS_PARSEADAS.clear()
     _CACHE_FECHAS_PARSEADAS[clave] = resultado
     return resultado
+
+
+# Memo de un refresco de la bandeja: refrescar Comercial pide los mismos filtros (renovaciones, vencidos, vigentes...)
+# varias veces sobre el mismo df_base; dentro de `memo_de_refresco()` cada uno se calcula una sola vez por DataFrame.
+# Fuera de ese bloque las funciones se comportan exactamente igual que siempre.
+_MEMO_REFRESCO = None
+
+
+@contextmanager
+def memo_de_refresco():
+    global _MEMO_REFRESCO
+    if _MEMO_REFRESCO is not None:   # ya hay uno abierto (refresco dentro de otro)
+        yield
+        return
+    _MEMO_REFRESCO = {}
+    try:
+        yield
+    finally:
+        _MEMO_REFRESCO = None
+
+
+def _memo_del_refresco(funcion):
+    """Memoriza `funcion(df, ...)` por DataFrame mientras dura un refresco. Devuelve copias superficiales (con
+    Copy-on-Write de pandas 3 nadie puede alterar el resultado guardado)."""
+    @functools.wraps(funcion)
+    def envoltura(df, *args, **kwargs):
+        memo = _MEMO_REFRESCO
+        if memo is None:
+            return funcion(df, *args, **kwargs)
+        try:
+            clave = (funcion.__name__, id(df), len(df), args, tuple(sorted(kwargs.items())))
+            hash(clave)
+        except TypeError:
+            return funcion(df, *args, **kwargs)
+        if clave not in memo:
+            memo[clave] = (df, funcion(df, *args, **kwargs))   # se guarda df: su id no se reutiliza mientras viva el memo
+        resultado = memo[clave][1]
+        return resultado.copy(deep=False) if isinstance(resultado, (pd.DataFrame, pd.Series)) else resultado
+    return envoltura
 
 
 def aplicar_por_valor_unico(serie, funcion):
@@ -296,6 +338,57 @@ def armar_renovaciones_multiples(data, datos_por_vin, prototipo, id_inicial):
     return resultado
 
 
+_CAMPOS_PROPIOS_NUEVO_CONTRATO = tuple(
+    c for c in _CAMPOS_PROPIOS_RENOVACION if c not in ('ESTADO DE ACTIVACIÓN ACTUAL', 'PERIODO INTERNO'))
+
+
+def armar_contratos_nuevos_multiples(data, datos_por_vin, prototipo, id_inicial):
+    """Contratos nuevos para varias unidades con el contrato actual cerrado (reactivación): cada uno toma de
+    su unidad lo propio (cliente, VIN, flota, entrega) y del formulario todo lo demás, incluido el estado de
+    activación y el periodo, para que entren a Activación de Operaciones. El ejecutivo es el de cada unidad
+    salvo que se haya cambiado en el formulario. Los contratos anteriores no se tocan. Devuelve una lista
+    de {'vin', 'id_anterior', 'cambios_anterior', 'nuevo'} con IDs consecutivos."""
+    resultado = []
+    siguiente = int(id_inicial) if str(id_inicial).strip().isdigit() else None
+    for vin, datos in datos_por_vin.items():
+        nuevo = dict(data)
+        for campo in _CAMPOS_PROPIOS_NUEVO_CONTRATO:
+            if campo == 'EJECUTIVO' and str(data.get(campo, '')).strip() != str(prototipo.get(campo, '')).strip():
+                continue
+            valor = datos.get(campo)
+            if valor is not None and str(valor).strip() not in ('', 'nan', 'NaN', 'None'):
+                nuevo[campo] = str(valor).strip()
+        nuevo[COL_ETAPA_GESTION] = DataFrameFormatter.calcular_etapa_gestion_esperada(pd.Series(nuevo))
+        if siguiente is not None:
+            nuevo['ID'] = str(siguiente)
+            siguiente += 1
+        resultado.append({'vin': vin, 'id_anterior': '', 'cambios_anterior': {}, 'nuevo': nuevo})
+    return resultado
+
+
+_CAMPOS_EDICION_MULTIPLE = (
+    'FORMA DE CONTRATO', 'TIPO DE SERVICIO', 'ESTADO COMERCIAL', 'INICIO CONTRATO', 'DURACIÓN (MESES)', 'TÉRMINO CONTRATO',
+    'ESTADO DE ACTIVACIÓN ACTUAL', 'TIPO DE FACTURACION', 'CONTRATO CREADO EN JUSTTIME', 'INICIO', 'TERMINO',
+    'N CONTRATO 3PC', 'TIPO DE CM', 'ESTADO DEL CM', 'FECHA INICIO CM', 'FECHA TERMINO CM', 'PAGO CM', 'ETAPA GESTIÓN')
+
+
+def calcular_cambios_edicion_multiple(data, datos_por_vin, prototipo):
+    """Cambios por unidad al editar varias a la vez: los campos de Comercial y JustTime & CM toman el valor del
+    formulario en todas; el ejecutivo solo si se cambió respecto de la primera unidad. Devuelve {vin: cambios}
+    solo con las unidades que realmente cambian."""
+    resultado = {}
+    ejecutivo_cambiado = (
+        'EJECUTIVO' in data and str(data['EJECUTIVO']).strip() != str(prototipo.get('EJECUTIVO', '')).strip())
+    for vin, datos in datos_por_vin.items():
+        cambios = {campo: str(data[campo]).strip() for campo in _CAMPOS_EDICION_MULTIPLE
+                   if campo in data and str(datos.get(campo, '')).strip() != str(data[campo]).strip()}
+        if ejecutivo_cambiado and str(datos.get('EJECUTIVO', '')).strip() != str(data['EJECUTIVO']).strip():
+            cambios['EJECUTIVO'] = str(data['EJECUTIVO']).strip()
+        if cambios:
+            resultado[vin] = cambios
+    return resultado
+
+
 def calcular_renovacion(fila, meses_extra, nuevo_inicio=None):
     """Cambios de una renovación: suma `meses_extra` a DURACIÓN (MESES) y
     recalcula TÉRMINO CONTRATO desde el inicio; el contrato conserva su ID. Con
@@ -330,6 +423,7 @@ def preparar_df_base_comercial(df):
     return contratos_actuales(procesar_df_comercial(df))
 
 
+@_memo_del_refresco
 def clasificar_vigencia_contrato(df, dias_alerta=30, hoy=None):
     """Clasifica cada fila de `df` según TÉRMINO CONTRATO. Fuente centralizada
     de vigencia: reemplaza los calculos duplicados que antes vivian por
@@ -515,8 +609,17 @@ def obtener_masks_kpi_por_gestionar(df, razones_contactadas=None):
     return {
         "revisar": estado == 'REVISAR',
         "sin_contrato": forma == 'SIN CONTRATO',
+        "volvo_connect": _mask_trae_volvo_connect(df),
         **_masks_contacto(df, razones_contactadas),
     }
+
+
+def _mask_trae_volvo_connect(df):
+    """Unidades con Conectividad = SI en el reporte Notas de Venta (marca en OBSERVACIONES)."""
+    from src.services.powerbi_import_service import trae_volvo_connect
+    if 'OBSERVACIONES' not in df.columns:
+        return pd.Series(False, index=df.index)
+    return df['OBSERVACIONES'].map(trae_volvo_connect).astype(bool)
 
 
 def calcular_kpis_por_gestionar(df, razones_contactadas=None):
@@ -525,13 +628,14 @@ def calcular_kpis_por_gestionar(df, razones_contactadas=None):
     define por TÉRMINO CONTRATO)."""
     if df.empty:
         return {"clientes": 0, "revisar": 0, "sin_contrato": 0, "total": 0, "clientes_totales": 0,
-                "contactados": 0, "sin_gestionar": 0, "_bases": {}}
+                "contactados": 0, "sin_gestionar": 0, "volvo_connect": 0, "_bases": {}}
     masks = obtener_masks_kpi_por_gestionar(df, razones_contactadas)
     kpis = _kpis_contacto(df, razones_contactadas)
     kpis.update({
         "clientes": kpis["clientes_totales"],
         "revisar": int(masks["revisar"].sum()),
         "sin_contrato": int(masks["sin_contrato"].sum()),
+        "volvo_connect": int(masks["volvo_connect"].sum()),
     })
     return kpis
 
@@ -644,6 +748,12 @@ def calcular_kpis_gestionar_bajas(df, razones_contactadas=None):
     return kpis
 
 
+def _es_cm_pendiente(df_casos):
+    """Casos cuya unidad está en ESTADO DEL CM = Pendiente (a la espera de respuesta del cliente)."""
+    estado = df_casos.get('ESTADO DEL CM', pd.Series("", index=df_casos.index)).astype(str).str.strip().str.upper()
+    return estado == ESTADO_CM_PENDIENTE.upper()
+
+
 def obtener_masks_kpi_gestionar_cm(df_casos, razones_contactadas=None):
     """Máscaras por fila detrás de las tarjetas clicables de "Oportunidades CM"
     (ver _NEW_UI_KPI_MASK_FUNCS en comercial.py)."""
@@ -654,6 +764,9 @@ def obtener_masks_kpi_gestionar_cm(df_casos, razones_contactadas=None):
     return {
         "ausencia_3pc": origen == ORIGEN_CASO_AUSENCIA_3PC,
         "expired": origen == ORIGEN_CASO_ESTADO_EXPIRED,
+        "datos_vacios": origen == ORIGEN_CASO_DATOS_3PC_VACIOS,
+        "sin_pago": origen == ORIGEN_CASO_RUNNING_VENCIDO,
+        "pendientes": _es_cm_pendiente(df_casos),
         "monto_riesgo": monto > 0,
         **_masks_contacto(df_casos, razones_contactadas),
     }
@@ -667,7 +780,7 @@ def calcular_kpis_gestionar_cm(df_casos, razones_contactadas=None):
     CONTRATO). Desglosa por ORIGEN_CASO (ver cm_bajas_service) y suma
     PAGO CM en riesgo."""
     if df_casos.empty:
-        return {"total": 0, "ausencia_3pc": 0, "expired": 0, "monto_riesgo": "$-",
+        return {"total": 0, "ausencia_3pc": 0, "expired": 0, "datos_vacios": 0, "sin_pago": 0, "pendientes": 0, "monto_riesgo": "$-",
                 "clientes_afectados": 0, "contactados": 0, "sin_gestionar": 0, "_bases": {}}
     origen = df_casos.get('ORIGEN_CASO', pd.Series(dtype=str)).astype(str).str.strip().str.upper()
     monto = pd.to_numeric(df_casos.get('PAGO CM', pd.Series(dtype=str)), errors='coerce').fillna(0)
@@ -678,6 +791,9 @@ def calcular_kpis_gestionar_cm(df_casos, razones_contactadas=None):
         "clientes_afectados": clientes,
         "ausencia_3pc": int((origen == ORIGEN_CASO_AUSENCIA_3PC).sum()),
         "expired": int((origen == ORIGEN_CASO_ESTADO_EXPIRED).sum()),
+        "datos_vacios": int((origen == ORIGEN_CASO_DATOS_3PC_VACIOS).sum()),
+        "sin_pago": int((origen == ORIGEN_CASO_RUNNING_VENCIDO).sum()),
+        "pendientes": int(_es_cm_pendiente(df_casos).sum()),
         "monto_riesgo": formatear_pago_cm(monto.sum()),
     })
     return kpis
@@ -739,6 +855,7 @@ def calcular_kpis_vencidos(df):
     }
 
 
+@_memo_del_refresco
 def filtrar_renovaciones(df):
     """Panel Comercial -> Renovaciones (regla actualizada 28-09-2026, a
     pedido explicito): solo unidades con TÉRMINO CONTRATO por vencer dentro
@@ -781,6 +898,7 @@ def filtrar_vencimientos(df):
     return filtrar_renovaciones(df)
 
 
+@_memo_del_refresco
 def _mask_revisar_hacia_comercial(df):
     """Unidades con ESTADO COMERCIAL = 'Revisar' cuya combinación con ESTADO
     DE ACTIVACIÓN ACTUAL da ETAPA GESTIÓN = 'COMERCIAL' en
@@ -809,6 +927,7 @@ def _mask_revisar_hacia_comercial(df):
     return es_revisar & (etapa == 'COMERCIAL') & (estado_act_norm != ESTADO_CONECTADO)
 
 
+@_memo_del_refresco
 def mascara_revisar_conectado(df):
     """Unidades con ESTADO COMERCIAL = Revisar que ya están Conectadas: se gestionan
     en Renovar contratos, donde se les crea el contrato."""
@@ -819,10 +938,12 @@ def mascara_revisar_conectado(df):
     return (estado_com == VALOR_ESTADO_COMERCIAL_REVISAR) & (estado_act == ESTADO_CONECTADO)
 
 
+@_memo_del_refresco
 def filtrar_revisar_conectados(df):
     return df[mascara_revisar_conectado(df)]
 
 
+@_memo_del_refresco
 def filtrar_vencidos(df):
     """Panel Comercial -> Vencidos (pedido explícito del usuario, 23-09-2026):
     unión de dos condiciones, no la misma regla que Renovaciones/
@@ -870,6 +991,8 @@ def filtrar_vencidos(df):
         estado_res = estado_norm.loc[resultado.index]
         activ_res = resultado[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper()
         resultado = resultado[(estado_res + "||" + activ_res).map(ESTADO_COMERCIAL_ACTIVACION_ETAPA_FLAT) != 'OPERACIONES']
+        # 05-11-2026: No entregado lo gestiona Operaciones (pestaña No entregados)
+        resultado = resultado[resultado[COL_ESTADO_ACTIVACION].astype(str).str.strip().str.upper() != 'NO ENTREGADO']
         # Vigente / Activación pendiente + No aplica es de Nuevas oportunidades aunque la fecha haya pasado.
         no_aplica_ajeno = (activ_res.loc[resultado.index] == 'NO APLICA') & \
             (estado_norm.loc[resultado.index] != VALOR_ESTADO_COMERCIAL_VENCIDO)
@@ -947,6 +1070,7 @@ def cdb_discrepante(cdb, razon_social, referencia):
     return bool(esperado) and normalizar_cdb(cdb) != esperado
 
 
+@_memo_del_refresco
 def filtrar_por_gestionar(df):
     """Panel Comercial -> Por gestionar (regla confirmada con Javiera):
     ESTADO DE ACTIVACIÓN ACTUAL == 'NO APLICA', igualdad EXACTA (no
@@ -966,12 +1090,109 @@ def filtrar_por_gestionar(df):
         estado_com = df[COL_ESTADO_COMERCIAL].astype(str).str.strip().str.upper()
         no_aplica = no_aplica & ~estado_com.isin({VALOR_ESTADO_COMERCIAL_BAJA, VALOR_ESTADO_COMERCIAL_BAJA_SOLICITADA,
                                                   VALOR_ESTADO_COMERCIAL_VENCIDO})
-    return df[no_aplica | _mask_revisar_hacia_comercial(df)]
+    revisar = _mask_revisar_hacia_comercial(df)
+    # 05-11-2026: No entregado lo gestiona Operaciones (pestaña No entregados), aunque la matriz dé Comercial
+    revisar = revisar & (df['ESTADO DE ACTIVACIÓN ACTUAL'].astype(str).str.strip().str.upper() != 'NO ENTREGADO')
+    return df[no_aplica | revisar]
 
 
 OBSERVACION_VIENE_DE_PROVISIONES = 'Viene de Provisiones'
+MARCA_DEVUELTO_OPERACIONES = 'Devuelto por Operaciones'
 
 
+def fue_devuelto(observaciones):
+    """True si OBSERVACIONES lleva la marca que deja Operaciones al devolver una unidad a Comercial."""
+    return MARCA_DEVUELTO_OPERACIONES.lower() in str(observaciones or '').lower()
+
+
+def observacion_devuelto(observaciones_previas, hoy=None):
+    """OBSERVACIONES de una unidad devuelta: la marca con la fecha al comienzo y, después, lo que ya decía
+    (sin repetir la marca si la unidad ya había sido devuelta)."""
+    from datetime import date
+    fecha = (hoy or date.today()).strftime('%d-%m-%Y')
+    previo = str(observaciones_previas or '').strip()
+    if previo.lower() in ('', '-', 'nan', 'none', 'nat'):
+        previo = ''
+    if fue_devuelto(previo):
+        return previo
+    marca = f"{MARCA_DEVUELTO_OPERACIONES} el {fecha}"
+    return f"{marca} · {previo}" if previo else marca
+
+
+GESTION_CM_NEGOCIACION = "Negociación"
+GESTION_CM_ESPERA = "Espera"
+GESTION_CM_SIN = "Sin gestión"
+GESTIONES_CM = (GESTION_CM_SIN, GESTION_CM_NEGOCIACION, GESTION_CM_ESPERA)
+# Texto que se guarda en OBSERVACIONES para cada estado de gestión de Oportunidades CM
+TEXTOS_GESTION_CM = {
+    GESTION_CM_NEGOCIACION: "Negociación con los de contrato de mantenimiento",
+    GESTION_CM_ESPERA: "Espera de la respuesta del cliente",
+}
+
+
+def _clave_gestion(texto):
+    import unicodedata
+    plano = unicodedata.normalize('NFKD', str(texto or '')).encode('ascii', 'ignore').decode()
+    return " ".join(plano.lower().replace('.', ' ').split())
+
+
+_GESTION_POR_CLAVE = {_clave_gestion(t): e for e, t in TEXTOS_GESTION_CM.items()}
+_GESTION_POR_CLAVE.update({_clave_gestion(e): e for e in TEXTOS_GESTION_CM})
+
+
+def estado_gestion_cm(observacion):
+    """Estado de gestión de Oportunidades CM leído de OBSERVACIONES: cualquier texto que no sea uno de los
+    estados (o vacío) cuenta como Sin gestión."""
+    return _GESTION_POR_CLAVE.get(_clave_gestion(observacion), GESTION_CM_SIN)
+
+
+def cambios_gestion_cm(filas, estado):
+    """({VIN: cambios}, notas reemplazadas) para dejar `filas` (contratos actuales) en `estado`. Sin gestión
+    solo borra las observaciones que eran un estado: no toca notas de otros temas."""
+    cambios, reemplazadas = {}, 0
+    if filas is None or filas.empty or 'VIN' not in filas.columns:
+        return cambios, reemplazadas
+    observaciones = filas['OBSERVACIONES'] if 'OBSERVACIONES' in filas.columns else pd.Series('', index=filas.index)
+    for vin, obs in zip(filas['VIN'], observaciones):
+        vin = str(vin).strip().upper()
+        actual = str(obs if obs is not None and not pd.isna(obs) else '').strip()
+        es_estado = _clave_gestion(actual) in _GESTION_POR_CLAVE
+        if estado == GESTION_CM_SIN:
+            if not es_estado:
+                continue
+            nuevo = '-'
+        else:
+            nuevo = TEXTOS_GESTION_CM[estado]
+            if actual == nuevo:
+                continue
+            if not es_estado and actual.lower() not in ('', '-', 'nan', 'none'):
+                reemplazadas += 1
+        cambios[vin] = {'VIN': vin, 'cambios': {'OBSERVACIONES': nuevo}}
+    return cambios, reemplazadas
+
+
+TIPO_AVISO_GESTION_CM = "Gestión CM"
+
+
+def avisos_gestion_cm(cambios, flotas_por_vin=None):
+    """Cambios detectados en el Registro Maestro con los de OBSERVACIONES que cambian el estado de gestión de
+    Oportunidades CM convertidos en un aviso propio: «Negociación → Espera», con la flota de la unidad."""
+    flotas_por_vin = flotas_por_vin or {}
+    salida = []
+    for c in cambios or []:
+        if c.get('tipo') == 'Modificación' and c.get('campo') == 'OBSERVACIONES':
+            antes = estado_gestion_cm('' if c.get('viejo') == 'Vacío' else c.get('viejo'))
+            ahora = estado_gestion_cm('' if c.get('nuevo') == 'Vacío' else c.get('nuevo'))
+            if antes != ahora:
+                vin = str(c.get('VIN', '')).strip()
+                salida.append(dict(c, tipo=TIPO_AVISO_GESTION_CM, viejo=antes, nuevo=ahora,
+                                   campo=flotas_por_vin.get(vin.upper()) or "Gestión"))
+                continue
+        salida.append(c)
+    return salida
+
+
+@_memo_del_refresco
 def filtrar_vigentes(df):
     """Panel Comercial -> Vigentes (21-09-2026, cierre del flujo Comercial ->
     Operaciones -> Comercial para unidades nuevas): ESTADO COMERCIAL en
@@ -1057,6 +1278,7 @@ def cambios_provision_a_conversion(filas, df_base, hoy=None):
     return agregar_id_a_cambios(cambios, df_base)
 
 
+@_memo_del_refresco
 def filtrar_renovar_clientes(df):
     """Panel Comercial -> Renovar clientes: unión de las antiguas
     sub-pestañas Renovaciones, Gestionar Bajas (vencidos) y Vigentes, más las
@@ -1092,6 +1314,29 @@ def calcular_kpis_renovar_clientes(df, masks=None):
         "por_vencer": int(masks["por_vencer"].sum()),
         "vigentes": int(masks["vigentes"].sum()),
     }
+
+
+def patron_de_terminos(terminos):
+    """Regex que calza cualquiera de los términos, armada como árbol de prefijos: con cientos de VIN que
+    comparten el inicio (9BVXG, 93KXG...) es unas 8 veces más rápida que 'a|b|c' y calza exactamente lo mismo."""
+    terminos = list(terminos)
+    if any(len(t) > 300 for t in terminos):   # el árbol se arma con recursión: un texto enorme usa la forma simple
+        return '|'.join(re.escape(t) for t in terminos)
+    raiz = {}
+    for termino in terminos:
+        nodo = raiz
+        for letra in termino:
+            nodo = nodo.setdefault(letra, {})
+        nodo[''] = True
+
+    def armar(nodo):
+        ramas = [re.escape(letra) + armar(hijo) for letra, hijo in sorted(nodo.items()) if letra != '']
+        if not ramas:
+            return ''
+        cuerpo = ramas[0] if len(ramas) == 1 else '(?:' + '|'.join(ramas) + ')'
+        return '(?:' + cuerpo + ')?' if '' in nodo else cuerpo
+
+    return armar(raiz)
 
 
 def construir_mascara_busqueda(df, search_text, columnas, columnas_exactas=()):
@@ -1140,7 +1385,7 @@ def construir_mascara_busqueda(df, search_text, columnas, columnas_exactas=()):
     final_mask = pd.Series(False, index=df.index)
 
     if terminos_simples and columnas_presentes:
-        patron = '|'.join(re.escape(t.lower()) for t in terminos_simples)
+        patron = patron_de_terminos({t.lower() for t in terminos_simples})
         for col in columnas_presentes:
             final_mask |= df[col].astype(str).str.lower().str.contains(patron, na=False, regex=True)
     if terminos_simples:
@@ -1373,7 +1618,7 @@ def contar_forma_contrato_sin_tipo_facturacion_asignado(df):
     detectar_inconsistencias_forma_contrato_tipo_facturacion, que por eso
     mismo NO las cuenta como inconsistencia). Puramente informativo: se usa
     junto al conteo de inconsistencias reales para diferenciar ambos casos
-    en el mensaje de sincronización (RMJaviSyncWorker, comercial.py), sin
+    en el mensaje de la antigua sincronización RM_JAVI (eliminada el 27-10-2026), sin
     reimplementar la consulta a la matriz -- solo referencia el mismo dict."""
     cols_necesarias = {'FORMA DE CONTRATO', COL_TIPO_FACTURACION}
     if df.empty or not cols_necesarias.issubset(df.columns):
@@ -1484,7 +1729,7 @@ def normalizar_tipo_facturacion_por_forma_contrato(df):
     FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ tiene EXACTAMENTE una opción
     válida para el FORMA DE CONTRATO de esa fila -- es el único caso sin
     ambigüedad de negocio real (no existe otra opción posible entre la cual
-    "adivinar"). Usada por RMJaviSyncWorker (comercial.py), 24-09-2026, a
+    "adivinar"). La usaba la antigua sincronización RM_JAVI (eliminada el 27-10-2026), 24-09-2026, a
     pedido explícito, justo después de _normalizar_vacios_a_guion (donde
     "sin asignar" ya suele ser '' o '-'). Trata NaN igual que vacío/'-' de
     forma robusta por cuenta propia (con pd.isna(), sin reimplementar
@@ -1552,6 +1797,25 @@ def construir_correcciones_tipo_facturacion(df):
         if vin and vin != 'NAN' and validos is not None and len(validos) == 1:
             correcciones[vin] = next(iter(validos))
     return correcciones
+
+
+def construir_asignacion_tipo_facturacion(df, tipo):
+    """{VIN: tipo} para las filas cuya FORMA DE CONTRATO admite más de una
+    opción en la matriz (Venta, Conversión) y que aún no tienen `tipo`. Es
+    la decisión manual que `construir_correcciones_tipo_facturacion` deja
+    fuera. `tipo` debe ser una de las opciones válidas de la forma."""
+    if df.empty or 'VIN' not in df.columns or 'FORMA DE CONTRATO' not in df.columns \
+            or COL_TIPO_FACTURACION not in df.columns:
+        return {}
+    formas = df['FORMA DE CONTRATO'].astype(str).str.strip().str.upper()
+    actuales = df[COL_TIPO_FACTURACION].astype(str).str.strip().str.upper()
+    vins = df['VIN'].astype(str).str.strip().str.upper()
+    asignacion = {}
+    for vin, forma, actual in zip(vins, formas, actuales):
+        validos = FORMA_CONTRATO_TIPO_FACTURACION_MATRIZ.get(forma)
+        if vin and vin != 'NAN' and validos is not None and len(validos) > 1 and tipo in validos and actual != tipo:
+            asignacion[vin] = tipo
+    return asignacion
 
 
 def _calcular_etapa_gestion_esperada_vectorizado(df):
@@ -1653,21 +1917,34 @@ def aplicar_cambios_pendientes(df, pending_changes):
     `ID` (y `df` tiene esa columna) se aplica solo a ese contrato, aunque el
     VIN esté repetido. Si un vin_key ya no existe en `df`, se ignora
     silenciosamente, igual que las tres implementaciones originales. Muta
-    `df` in-place (mismo comportamiento previo) y lo retorna."""
-    ids_df = None
+    `df` in-place (mismo comportamiento previo) y lo retorna.
+
+    Los contratos se ubican con un índice armado una sola vez y cada columna se
+    reescribe una vez (con cientos de cambios, comparar y copiar la columna entera
+    por cada contrato tardaba segundos)."""
+    posiciones_id = posiciones_vin = None
+    columnas = {}
     for vin_key, data in pending_changes.items():
         id_contrato = _normalizar_id_contrato(data.get('ID'))
         if id_contrato and 'ID' in df.columns:
-            if ids_df is None:
+            if posiciones_id is None:
                 ids_df = _ids_normalizados(df)
-            mask = ids_df == id_contrato
+                posiciones_id = ids_df.groupby(ids_df.to_numpy()).indices
+            posiciones = posiciones_id.get(id_contrato)
         else:
-            mask = df['VIN'].astype(str).str.strip().str.upper() == vin_key
-        if mask.any():
-            for col, val in data['cambios'].items():
-                if col in df.columns:
-                    df[col] = df[col].astype(object)
-                    df.loc[mask, col] = val
+            if posiciones_vin is None:
+                vins_df = df['VIN'].astype(str).str.strip().str.upper()
+                posiciones_vin = vins_df.groupby(vins_df.to_numpy()).indices
+            posiciones = posiciones_vin.get(vin_key)
+        if posiciones is None or len(posiciones) == 0:
+            continue
+        for col, val in data['cambios'].items():
+            if col in df.columns:
+                if col not in columnas:
+                    columnas[col] = df[col].to_numpy(dtype=object, copy=True)
+                columnas[col][posiciones] = val
+    for col, valores in columnas.items():
+        df[col] = pd.Series(valores, index=df.index, dtype=object)   # object, como dejaba la versión anterior
     return df
 
 
@@ -1742,7 +2019,7 @@ def detectar_grupos_razon_social_duplicada(df):
     _elegir_razon_social_ganadora para el criterio de desempate cuando hay
     empate en unidades. No modifica `df`. Usado tanto por el botón manual
     "Unificar Razón Social" (Vista General -> pestaña Duplicados) como por
-    RMJaviSyncWorker (aplicado automáticamente en cada sincronización,
+    la antigua sincronización RM_JAVI (aplicado automáticamente en cada sincronización,
     23-09-2026, a pedido explícito) -- misma detección que
     GeneralModule._calcular_claves_duplicadas_rut_cdb, pero a nivel de fila
     (VIN) en vez de a nivel de cliente ya agrupado."""
@@ -1909,22 +2186,41 @@ def cambios_rut_razon_cliente(df, clave, razon, nuevo_rut, nueva_razon=None):
     return lote
 
 
-def _cdb_serie(df):
+def _cdb_serie(df, columna='CDB'):
     """CDB como texto; '-' donde falta (vacío, nan o none)."""
-    texto = df['CDB'].fillna('').astype(str).str.strip()
+    texto = df[columna].fillna('').astype(str).str.strip()
     return texto.where(~texto.str.lower().isin(['', 'nan', 'none']), '-')
 
 
-def cdbs_por_cliente(df):
+def cambios_cdb_razon_cliente(df, clave, razon, nuevo_cdb):
+    """Lote {VIN: {'VIN', 'cambios'}} que deja `nuevo_cdb` (1 a 10 dígitos) en las unidades de la
+    razón social `razon` del cliente `clave` que tengan otro CDB."""
+    if df is None or df.empty or not all(c in df.columns for c in ('RUT', 'RAZÓN SOCIAL', 'CDB', 'VIN')):
+        return {}
+    nuevo = str(nuevo_cdb).strip()
+    if not re.fullmatch(r'\d{1,10}', nuevo):
+        return {}
+    razon_serie = df['RAZÓN SOCIAL'].astype(str).str.strip()
+    mascara = ((clave_cliente_serie(df['RUT'], razon_serie) == clave) & (razon_serie == str(razon).strip())
+               & (_cdb_serie(df) != nuevo))
+    lote = {}
+    for vin in df.loc[mascara, 'VIN'].astype(str):
+        vin_limpio = vin.strip().upper()
+        lote[vin_limpio] = {'VIN': vin_limpio, 'cambios': {'CDB': nuevo}}
+    return lote
+
+
+def cdbs_por_cliente(df, columna='CDB'):
     """{clave de cliente: [(CDB, unidades)]}, de mayor a menor y con '-' (unidades
-    sin CDB) al final. Pensado para recibir los contratos actuales."""
-    if df is None or df.empty or not all(c in df.columns for c in ('RUT', 'RAZÓN SOCIAL', 'CDB')):
+    sin CDB) al final. Pensado para recibir los contratos actuales. `columna`
+    elige el CDB comercial ('CDB') o el de flota ('CDB FLOTA')."""
+    if df is None or df.empty or not all(c in df.columns for c in ('RUT', 'RAZÓN SOCIAL', columna)):
         return {}
     razon = df['RAZÓN SOCIAL'].astype(str).str.strip()
     claves = clave_cliente_serie(df['RUT'], razon)
     con_nombre = ~razon.str.lower().isin(['', 'nan', 'none', '-'])
     conteos = {}
-    for clave, cdb in zip(claves[con_nombre].tolist(), _cdb_serie(df)[con_nombre].tolist()):
+    for clave, cdb in zip(claves[con_nombre].tolist(), _cdb_serie(df, columna)[con_nombre].tolist()):
         conteo = conteos.setdefault(clave, {})
         conteo[cdb] = conteo.get(cdb, 0) + 1
     return {clave: sorted(conteo.items(), key=lambda kv: (kv[0] == '-', -kv[1])) for clave, conteo in conteos.items()}
@@ -1949,6 +2245,32 @@ def cambios_cdb_cliente(df, clave, cdb_origen, nuevo_cdb):
         vin_limpio = vin.strip().upper()
         lote[vin_limpio] = {'VIN': vin_limpio, 'cambios': {'CDB': nuevo}}
     return lote
+
+
+def combinar_lotes(*lotes):
+    """Une lotes {VIN: {'VIN', 'cambios'}} en uno solo; si un VIN está en varios, suma sus cambios."""
+    resultado = {}
+    for lote in lotes:
+        for vin, datos in lote.items():
+            resultado.setdefault(vin, {'VIN': vin, 'cambios': {}})['cambios'].update(datos['cambios'])
+    return resultado
+
+
+def cambios_grupo_clientes(df, df_actuales, claves, nueva_razon=None, nuevo_rut=None, nuevo_cdb=None):
+    """Lote único {VIN: {'VIN', 'cambios'}} que aplica a varios clientes a la vez la
+    razón social, el RUT y/o el CDB comercial nuevos (los que vengan con valor). El RUT
+    se asigna a todas las razones de cada cliente, salvo a las del cliente que ya lo tiene."""
+    lotes = []
+    llave_nueva = rut_llave(nuevo_rut) if nuevo_rut else None
+    for clave in claves:
+        if nueva_razon:
+            lotes.append(cambios_razon_social_cliente(df, clave, nueva_razon))
+        if llave_nueva and clave != f"RUT:{llave_nueva}":
+            for razon, _n in razones_de_cliente(df, clave):
+                lotes.append(cambios_rut_razon_cliente(df, clave, razon, nuevo_rut))
+        if nuevo_cdb:
+            lotes.append(cambios_cdb_cliente(df_actuales, clave, None, nuevo_cdb))
+    return combinar_lotes(*lotes)
 
 
 def unificar_razon_social_duplicada(df):

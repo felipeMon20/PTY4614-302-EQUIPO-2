@@ -88,9 +88,41 @@ def _pasos(items):
                     </td></tr>"""
 
 
+# Planes y complementos sin descripción salen en rojo hasta que alguien escriba el texto real:
+# agregarlo en PLANES_CONFIG (planes) o en _DESCRIPCION_COMPLEMENTO (complementos).
+_TEXTO_RELLENAR = "texto para rellenar"
+_DESCRIPCION_COMPLEMENTO = {"CIV": "CIV"}
+
+
+def _html_rellenar():
+    return f'<span style="color:#C62828; font-weight:bold;">{_TEXTO_RELLENAR}</span>'
+
+
+def _info_plan(plan):
+    """(nombre, 'incluye' en HTML) de un plan. Los de PLANES_CONFIG salen tal cual; 'Medio + SZ' se arma con
+    lo del plan base más una línea por complemento."""
+    texto = str(plan).strip()
+    conocido = PLANES_CONFIG.get(texto.upper())
+    if conocido:
+        return conocido["nombre"], html.escape(" · ".join(conocido["incluye"]))
+    try:
+        from src.services import catalogos_service
+        base, complementos = catalogos_service.partir_tipo_servicio(texto)
+    except Exception:
+        base, complementos = texto, []
+    if not base or base == "-":
+        return texto, ""
+    info_base = PLANES_CONFIG.get(base.upper())
+    nombre = (info_base["nombre"] if info_base else base) + "".join(f" + {c}" for c in complementos)
+    partes = [html.escape(t) for t in info_base["incluye"]] if info_base else [_html_rellenar()]
+    for codigo in complementos:
+        descripcion = _DESCRIPCION_COMPLEMENTO.get(codigo)
+        partes.append(html.escape(descripcion) if descripcion else _html_rellenar())
+    return nombre, " · ".join(partes)
+
+
 def _etiqueta_plan(plan):
-    key = str(plan).strip().upper()
-    return PLANES_CONFIG.get(key, {"nombre": str(plan).strip()})["nombre"]
+    return _info_plan(plan)[0]
 
 
 def _tabla_unidades(unidades, columnas):
@@ -248,12 +280,12 @@ def _tabla_niveles(grupos_plan: dict[str, list[str]]) -> str:
     en vez de repetir el detalle del plan por cada grupo de unidades."""
     filas = []
     for i, plan in enumerate(grupos_plan):
-        info = PLANES_CONFIG.get(str(plan).strip().upper(), {"nombre": str(plan).strip(), "incluye": []})
+        nombre, incluye = _info_plan(plan)
         fondo = "#ffffff" if i % 2 == 0 else "#f8fafc"
         filas.append(
             f'<tr style="background-color:{fondo};">'
-            f'<td valign="top" style="padding:10px 14px; {_FUENTE} font-weight:bold; color:#222222; border-top:1px solid #e5e9f0;">{html.escape(info["nombre"])}</td>'
-            f'<td style="padding:10px 14px; {_FUENTE} color:#222222; border-top:1px solid #e5e9f0;">{html.escape(" · ".join(info["incluye"]))}</td></tr>')
+            f'<td valign="top" style="padding:10px 14px; {_FUENTE} font-weight:bold; color:#222222; border-top:1px solid #e5e9f0;">{html.escape(nombre)}</td>'
+            f'<td style="padding:10px 14px; {_FUENTE} color:#222222; border-top:1px solid #e5e9f0;">{incluye}</td></tr>')
     return f"""
                     <tr><td style="padding:0 32px 18px 32px;">
                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate; border:1px solid #d7dde5; border-radius:8px; overflow:hidden;">
@@ -430,3 +462,39 @@ def construir_cuerpo_revision_periodica(razon_social: str) -> str:
         ),
         _caja(_TEXTO_RESPUESTA_AYUDA),
     ], hero="foto_hombre_computador")
+
+
+def construir_cuerpo_facturacion(tipos, mes):
+    """Correo de facturación manual a la flota: `tipos` trae "OC", "FACTURA" o ambos. Con los dos, un solo
+    correo que habla de ambas gestiones."""
+    oc, factura = "OC" in tipos, "FACTURA" in tipos
+    if oc and not factura:
+        titulo = "Orden de compra de servicios Volvo Connect"
+        parrafos = [
+            f"Junto con saludar, adjunto el archivo con el detalle de los servicios Volvo Connect correspondientes al mes de {mes}, "
+            "para gestionar la emisión de la respectiva orden de compra (OC).",
+            "Agradeceré tu apoyo con el envío de la OC para avanzar con el proceso de facturación.",
+            "Quedo atenta a cualquier consulta.",
+        ]
+    elif factura and not oc:
+        titulo = "Detalle de servicios Volvo Connect"
+        parrafos = [
+            f"Junto con saludar, adjunto el detalle de los servicios Volvo Connect que se encuentran activos durante el mes de {mes}, "
+            "los cuales serán considerados en el proceso de facturación correspondiente a dicho período.",
+            "Agradeceré que puedas revisar la información y, en caso de tener alguna consulta u observación, nos lo indiques.",
+            "Quedo atenta a tus comentarios.",
+        ]
+    else:
+        titulo = "Detalle de servicios Volvo Connect"
+        parrafos = [
+            f"Junto con saludar, adjunto el detalle de los servicios Volvo Connect correspondientes al mes de {mes}.",
+            "Para los servicios que se gestionan con orden de compra, agradeceré tu apoyo con el envío de la OC para avanzar "
+            "con el proceso de facturación.",
+            "Los demás servicios se encuentran activos durante el mes y serán considerados en el proceso de facturación "
+            "correspondiente a dicho período; agradeceré que revises la información y, en caso de tener alguna consulta u "
+            "observación, nos lo indiques.",
+            "Quedo atenta a cualquier consulta.",
+        ]
+    texto = _p("Estimado/a cliente:") + "".join(_p(html.escape(p)) for p in parrafos)
+    return _pagina(titulo, [_fila_texto(texto)], hero="foto_hombre_computador")
+

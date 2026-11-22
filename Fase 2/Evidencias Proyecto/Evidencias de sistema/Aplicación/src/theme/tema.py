@@ -8,12 +8,14 @@ la propiedad _PROP_ORIGINAL. Los widgets dibujados a mano (paintEvent) leen
 sus colores con color() y escuchan GestorTema.tema_cambiado.
 """
 import colorsys
+import ctypes
 import re
+import sys
 
 from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSettings, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QAbstractScrollArea, QApplication, QToolTip, QWidget
+from PyQt6.QtWidgets import QAbstractScrollArea, QApplication, QStackedWidget, QTabWidget, QToolTip, QWidget
 
 CLARO = "claro"
 OSCURO = "oscuro"
@@ -45,6 +47,8 @@ _MAPA_TEXTO = {
     '002240': '9CC2FF', '1C6BBA': '6EA0FF', '2563EB': '6EA0FF', '1E40AF': '93C5FD', '991B1B': 'FCA5A5',
     'B91C1C': 'FCA5A5', '92400E': 'FCD34D', '065F46': '6EE7B7', '166534': '86EFAC', '5B21B6': 'C4B5FD',
     '0F766E': '5EEAD4', '115E59': '5EEAD4', '9D174D': 'F9A8D4', 'C2410C': 'FDBA74',
+    # Gris de las tarjetas de Contratos (GRIS_TARJETA en general.py): blanco en oscuro
+    '667489': 'F1F5FB',
 }
 
 _PROPIEDADES_TEXTO = ('color', 'selection-color')
@@ -185,6 +189,11 @@ def texto(valor):
 # Envoltura de QWidget.setStyleSheet
 # ----------------------------------------------------------------------
 _PROP_ORIGINAL = "_qss_tema_claro"
+_PROP_PORTADOR = "_tema_portador"
+_PROP_PREFIJO = "_tema_prefijo"
+_PROP_TRANSP = "_tema_transparente"
+# Widgets que sin ser planos no necesitan la hoja global (pintan su propio fondo y no tienen hoja): se saltan
+PROP_TRANSPARENTE_FORZADO = "_tema_transp_forzado"
 _set_style_sheet_original = QWidget.setStyleSheet
 _estado = {'oscuro': False, 'hubo_oscuro': False}
 
@@ -214,6 +223,26 @@ def _set_style_sheet_tematizado(widget, qss):
     if not _estado['hubo_oscuro']:
         _set_style_sheet_original(widget, qss)
         return
+    if qss and widget.property(_PROP_TRANSP):
+        # Un contenedor transparente recibió una hoja propia: pasa a ser portador
+        widget.setProperty(_PROP_TRANSP, None)
+        widget.setProperty(_PROP_PORTADOR, True)
+        widget.setProperty(_PROP_PREFIJO, GestorTema.instancia()._hoja_global() or None)
+    if widget.property(_PROP_PORTADOR):
+        # Portador de la hoja global: su hoja es prefijo global + hoja propia
+        prefijo = widget.property(_PROP_PREFIJO) or ""
+        qss = qss or ""
+        if prefijo and widget.property(_PROP_ORIGINAL) is None and qss.startswith(prefijo):
+            qss = qss[len(prefijo):]
+        propio = _original_de(widget, qss)
+        if _estado['oscuro'] and propio:
+            widget.setProperty(_PROP_ORIGINAL, propio)
+            _set_style_sheet_original(widget, prefijo + convertir_qss(propio))
+        else:
+            if widget.property(_PROP_ORIGINAL) is not None:
+                widget.setProperty(_PROP_ORIGINAL, None)
+            _set_style_sheet_original(widget, prefijo + propio)
+        return
     qss = _original_de(widget, qss or "")
     if _estado['oscuro'] and qss:
         widget.setProperty(_PROP_ORIGINAL, qss)
@@ -227,6 +256,30 @@ def _set_style_sheet_tematizado(widget, qss):
 def _instalar_envoltura():
     if QWidget.setStyleSheet is not _set_style_sheet_tematizado:
         QWidget.setStyleSheet = _set_style_sheet_tematizado
+    from src.theme import globo
+    globo.instalar()
+
+
+def aplicar_barra_titulo(ventana, oscuro):
+    """Barra de título de Windows (minimizar, maximizar, cerrar) negra en modo oscuro y la del sistema en claro.
+    Sin efecto en otros sistemas o en versiones de Windows que no la admiten."""
+    if sys.platform != "win32":
+        return
+    try:
+        dwm = ctypes.windll.dwmapi
+        hwnd = int(ventana.winId())
+
+        def poner(atributo, valor):
+            dato = ctypes.c_int(valor)
+            return dwm.DwmSetWindowAttribute(ctypes.c_void_p(hwnd), atributo, ctypes.byref(dato), ctypes.sizeof(dato))
+
+        # 20: modo oscuro de la barra (19 en las primeras versiones de Windows 10); 35 y 36: color y texto de la barra (Windows 11)
+        if poner(20, 1 if oscuro else 0) != 0:
+            poner(19, 1 if oscuro else 0)
+        poner(35, 0x00000000 if oscuro else 0xFFFFFFFF)
+        poner(36, 0x00FFFFFF if oscuro else 0xFFFFFFFF)
+    except Exception:
+        pass
 
 
 def _paleta(oscuro):
@@ -260,17 +313,59 @@ def _paleta(oscuro):
     return p
 
 
+_EVENTOS_OCULTAR_GLOBO = (QEvent.Type.MouseButtonPress, QEvent.Type.Wheel, QEvent.Type.KeyPress, QEvent.Type.Leave,
+                         QEvent.Type.WindowDeactivate)
+
+
+def _texto_globo(obj, event):
+    """Texto de ayuda para el evento: el del widget o, en pestañas, encabezados y tablas, el de la pestaña, sección o celda
+    bajo el mouse (esos widgets guardan sus globos por elemento y Qt los dibujaba con el diseño antiguo)."""
+    texto = obj.toolTip()
+    if texto:
+        return texto
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QAbstractItemView, QHeaderView, QTabBar
+    pos = event.pos()
+    try:
+        if isinstance(obj, QTabBar):
+            indice = obj.tabAt(pos)
+            return obj.tabToolTip(indice) if indice >= 0 else ""
+        if isinstance(obj, QHeaderView):
+            modelo = obj.model()
+            seccion = obj.logicalIndexAt(pos)
+            if modelo is None or seccion < 0:
+                return ""
+            return str(modelo.headerData(seccion, obj.orientation(), Qt.ItemDataRole.ToolTipRole) or "")
+        vista = obj.parent()
+        if isinstance(vista, QAbstractItemView) and vista.viewport() is obj:
+            indice = vista.indexAt(pos)
+            if indice.isValid():
+                return str(indice.data(Qt.ItemDataRole.ToolTipRole) or "")
+    except (RuntimeError, TypeError):
+        return ""
+    return ""
+
+
 class _FiltroGlobos(QObject):
     """Muestra los tooltips sin colgarlos del widget: si el widget tiene una
     hoja con reglas de QLabel/transparencia, el globo la heredaba y salía
     como un cuadro negro."""
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.ToolTip and isinstance(obj, QWidget):
-            texto = obj.toolTip()
+        tipo = event.type()
+        if tipo == QEvent.Type.Polish:
+            GestorTema.instancia().al_pulir(obj)
+            return False
+        if tipo == QEvent.Type.ToolTip and isinstance(obj, QWidget):
+            texto = _texto_globo(obj, event)
             if texto:
-                QToolTip.showText(event.globalPos(), texto, None)
+                from src.theme import globo
+                globo.mostrar_texto(event.globalPos(), texto, por_distancia=True)
                 return True
+        elif tipo in _EVENTOS_OCULTAR_GLOBO:
+            from src.theme import globo
+            if globo.visible():
+                globo.ocultar_texto()
         return False
 
 
@@ -300,6 +395,12 @@ class GestorTema(QObject):
         self._colas = {}
         self._esqueletos = {}
         self._areas_por_viewport = {}
+        # Ventanas que declaran contenedores_tema(): la hoja global no va en la
+        # ventana (repolariza todo su árbol, ocultas incluidas) sino en sus
+        # hijos directos y en las páginas de la pila; las ocultas la reciben al
+        # mostrarse.
+        self._contenedores = []
+        self._pilas = []
 
     @property
     def modo(self):
@@ -323,7 +424,11 @@ class GestorTema(QObject):
         if ventana not in self._ventanas:
             self._ventanas.append(ventana)
             ventana.destroyed.connect(lambda *_: self._ventanas.remove(ventana) if ventana in self._ventanas else None)
+            if hasattr(ventana, 'contenedores_tema'):
+                self._contenedores = list(ventana.contenedores_tema())
+                self._pilas = [ventana.pila_tema()]
             self._aplicar_hoja_global(ventana)
+            aplicar_barra_titulo(ventana, es_oscuro())
 
     def alternar(self):
         self.aplicar(CLARO if es_oscuro() else OSCURO)
@@ -344,17 +449,132 @@ class GestorTema(QObject):
             self._reaplicar_hojas_de_widgets(oscuro)
         for ventana in list(self._ventanas):
             self._aplicar_hoja_global(ventana)
+            aplicar_barra_titulo(ventana, oscuro)
         if guardar:
             QSettings("VolvoApp", "Dashboard").setValue(CLAVE_AJUSTE, oscuro)
         self.tema_cambiado.emit(self.modo)
 
-    def _aplicar_hoja_global(self, ventana):
+    def _hoja_global(self):
         if es_oscuro() == self._oscuro_en_app:
-            hoja = ""
-        else:
-            hoja = convertir_qss(self._qss_app_claro) if es_oscuro() else (self._qss_app_claro or "")
+            return ""
+        return convertir_qss(self._qss_app_claro) if es_oscuro() else (self._qss_app_claro or "")
+
+    def _aplicar_hoja_global(self, ventana):
+        if self._contenedores and ventana is self._contenedores[0]:
+            if ventana.styleSheet():
+                _set_style_sheet_original(ventana, "")
+            self._aplicar_a_portadores()
+            return
+        hoja = self._hoja_global()
         if ventana.styleSheet() != hoja:
             _set_style_sheet_original(ventana, hoja)
+
+    # ------------------------------------------------------------------
+    # Portadores: reciben la hoja global en lugar de la ventana
+    # ------------------------------------------------------------------
+    def _aplicar_a_portadores(self):
+        """Hijos directos de los contenedores y páginas de la pila: los visibles
+        se estilizan ahora; los ocultos al mostrarse (ver eventFilter)."""
+        contenedores = set(self._contenedores)
+        pilas = set(self._pilas)
+        for cont in self._contenedores:
+            if sip.isdeleted(cont):
+                continue
+            for hijo in cont.children():
+                if isinstance(hijo, QWidget) and hijo not in contenedores and hijo not in pilas:
+                    self._visitar(hijo)
+        for pila in self._pilas:
+            if sip.isdeleted(pila):
+                continue
+            for pagina in pila.children():
+                if isinstance(pagina, QWidget):
+                    self._visitar(pagina)
+
+    @staticmethod
+    def _es_transparente(widget):
+        """Contenedor puramente estructural (QWidget, QStackedWidget o QTabWidget
+        planos, sin hoja propia o con una que no lleva colores): no necesita la
+        hoja global, así que se baja a sus hijos y no se repolariza lo oculto."""
+        if widget.isWindow() or widget.property(_PROP_PORTADOR):
+            return False
+        if type(widget) not in (QWidget, QStackedWidget, QTabWidget) and not widget.property(PROP_TRANSPARENTE_FORZADO):
+            return False
+        propio = widget.property(_PROP_ORIGINAL) or widget.styleSheet()
+        return not propio or convertir_qss(propio) == propio
+
+    def _visitar(self, widget):
+        if self._es_transparente(widget):
+            widget.setProperty(_PROP_TRANSP, True)
+            for hijo in widget.children():
+                if isinstance(hijo, QWidget):
+                    self._visitar(hijo)
+        else:
+            if widget.property(_PROP_TRANSP):
+                widget.setProperty(_PROP_TRANSP, None)
+            self._estilizar_portador(widget)
+
+    def _estilizar_portador(self, widget):
+        widget.setProperty(_PROP_PORTADOR, True)
+        if widget.isVisible():
+            self._sincronizar_portador(widget)
+        else:
+            widget.installEventFilter(self)
+
+    def _sincronizar_portador(self, widget):
+        if sip.isdeleted(widget):
+            return
+        oscuro = es_oscuro()
+        actual = widget.styleSheet()
+        previo = widget.property(_PROP_ORIGINAL)
+        viejo = widget.property(_PROP_PREFIJO) or ""
+        if previo is not None:
+            propio = previo
+        elif viejo and actual.startswith(viejo):
+            propio = actual[len(viejo):]
+        else:
+            propio = actual
+        prefijo = self._hoja_global()
+        if oscuro and propio:
+            nuevo = prefijo + convertir_qss(propio)
+            if previo != propio:
+                widget.setProperty(_PROP_ORIGINAL, propio)
+        else:
+            nuevo = prefijo + propio
+            if previo is not None:
+                widget.setProperty(_PROP_ORIGINAL, None)
+        if viejo != prefijo:
+            widget.setProperty(_PROP_PREFIJO, prefijo or None)
+        if nuevo != actual:
+            _set_style_sheet_original(widget, nuevo)
+
+    def al_pulir(self, widget):
+        """Widget nuevo bajo un contenedor, página nueva o diálogo hijo de la
+        ventana: se convierte en portador antes de mostrarse."""
+        if not self._contenedores or not isinstance(widget, QWidget) \
+                or widget.property(_PROP_PORTADOR) or widget.property(_PROP_TRANSP):
+            return
+        padre = widget.parentWidget()
+        if padre is None or widget in self._pilas:
+            return
+        if widget.isWindow():
+            actual = padre
+            while actual is not None:
+                if actual.property(_PROP_PORTADOR):
+                    return
+                if actual in self._contenedores or actual.property(_PROP_TRANSP):
+                    break
+                actual = actual.parentWidget()
+            else:
+                return
+        elif padre in self._pilas or padre.property(_PROP_TRANSP):
+            pass
+        elif padre not in self._contenedores or widget in self._contenedores:
+            return
+        if self._es_transparente(widget):
+            widget.setProperty(_PROP_TRANSP, True)
+            return
+        widget.setProperty(_PROP_PORTADOR, True)
+        self._sincronizar_portador(widget)
 
     def _reaplicar_hojas_de_widgets(self, oscuro):
         """Los widgets que se ven en pantalla se reestilizan al instante; los
@@ -441,7 +661,7 @@ class GestorTema(QObject):
         self._colas[area] = cerca
         esqueleto = self._esqueletos.get(area)
         if esqueleto is None or sip.isdeleted(esqueleto):
-            from src.ui.esqueleto_carga import EsqueletoCarga
+            from src.ui.compartido.esqueleto_carga import EsqueletoCarga
             esqueleto = self._esqueletos[area] = EsqueletoCarga(area.viewport(), 'tarjetas')
         esqueleto.iniciar_ya()
         QTimer.singleShot(0, lambda: self._procesar_tanda(area))
@@ -470,6 +690,9 @@ class GestorTema(QObject):
 
     @staticmethod
     def _sincronizar_widget(widget, oscuro):
+        if widget.property(_PROP_PORTADOR):
+            GestorTema.instancia()._sincronizar_portador(widget)
+            return
         original = widget.property(_PROP_ORIGINAL)
         if oscuro:
             if original is not None:

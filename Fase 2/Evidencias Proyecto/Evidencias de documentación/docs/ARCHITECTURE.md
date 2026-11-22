@@ -40,7 +40,7 @@ La gestión de variables de entorno, rutas de archivos y enlaces externos se man
 Este archivo opera como la capa de persistencia dinámica para las rutas de los repositorios de datos y enlaces externos.
 *   **Almacenamiento Estructural:** Guarda las rutas absolutas hacia los archivos maestros, además de las direcciones web utilizadas por los procesos de sincronización y visualización.
 *   **Portabilidad:** La externalización de estas rutas previene que queden codificadas rígidamente (*hardcoded*) en la lógica de negocio, facilitando la adaptación de la herramienta a la estructura de directorios particular de cada máquina o perfil de usuario.
-*   **Configuración actual:** Entre las claves utilizadas por la aplicación se encuentran `EXCEL_PATH`, `LOG_EXCEL_PATH`, `DELETED_LOG_EXCEL_PATH`, `PROVISION_EXCEL_PATH`, `INSTALACIONES_PATH`, `RM_JAVI_PATH`, `POWERBI_EXCEL_PATH`, `CONTACTOS_EXCEL_PATH`, `CORREOS_EXCEL_PATH`, `PROVISIONES_SHAREPOINT_URL`, `REPORTE_NOTAS_VENTAS_URL` y `POWERBI_EMBED_URL`. (`CUSTOMER_EXCEL_PATH` fue eliminada el 02-09-2026 junto con `direcciones.xlsx`.)
+*   **Configuración actual:** Entre las claves utilizadas por la aplicación se encuentran `EXCEL_PATH`, `LOG_EXCEL_PATH`, `DELETED_LOG_EXCEL_PATH`, `PROVISION_EXCEL_PATH`, `INSTALACIONES_PATH`, `POWERBI_EXCEL_PATH`, `CONTACTOS_EXCEL_PATH`, `CORREOS_EXCEL_PATH`, `PROVISIONES_SHAREPOINT_URL`, `REPORTE_NOTAS_VENTAS_URL` y `POWERBI_EMBED_URL`. (`CUSTOMER_EXCEL_PATH` fue eliminada el 02-09-2026 junto con `direcciones.xlsx`.)
 
 ### `config/settings.py`
 Es el módulo central encargado de actuar como puente entre la persistencia (`app_config.json`) y el resto del software.
@@ -102,10 +102,7 @@ El sistema emplea un patrón de diseño desacoplado para la Interfaz de Usuario 
 La capa de presentación visual está estructurada mediante widgets modulares de PyQt6, desacoplando las distintas líneas de negocio de la aplicación en pantallas independientes e interconectadas.
 
 ### 6.1. Módulo Directivo (`dashboard.py`)
-Diseñado para presentar el dashboard corporativo externo.
-*   **Visualización Integrada de Power BI:** Utiliza `QWebEngineView` para cargar la URL de inserción (`POWERBI_EMBED_URL`) configurada en `settings.py`.
-*   **Recarga del Reporte:** Incluye un botón que vuelve a cargar la URL del reporte cuando el usuario requiere actualizar la vista.
-*   **Manejo de Configuración Ausente:** Si no existe una URL válida, muestra una pantalla informativa solicitando configurar el enlace desde el módulo de Configuración.
+Tablero propio de Volvo Connect (tarjetas y gráficos dentro de la aplicación). Ya no incrusta Power BI; el detalle está en `docs/16. Guía del Dashboard.md`.
 
 ### 6.2. Diálogo de Ingreso de Registros (`add_record_dialog.py`)
 Componente modal transaccional (`QDialog`) para altas de nuevos vehículos.
@@ -213,7 +210,7 @@ Dado que las políticas de infraestructura restringen el uso de servidores SQL, 
 *   `Instalaciones.xlsx` — Reportes consolidados de instalaciones.
 *   `contactos.xlsx` — Directorio de contactos.
 *   `BBDD CLIENTES CM.xlsx` — Fuente externa (Power BI) leída en vivo para el directorio de empresas y direcciones. (`direcciones.xlsx` fue eliminado el 02-09-2026 por ser un archivo local legado y redundante frente a esta fuente.)
-*   `RM_JAVI_VOLVO CONNECT.xlsx` — Archivo maestro utilizado por la sincronización comercial.
+*   `RM_JAVI_VOLVO CONNECT.xlsx` — Ya no se ocupa en la app (30-10-2026); lo reemplazó `Registro Maestro.csv`.
 *   `Correos.xlsx` — Repositorio utilizado por las funciones de correo.
 *   `LogApp.xlsx` — Libro de auditoría de modificaciones.
 *   `RegistroEliminado.xlsx` — Libro de registros eliminados.

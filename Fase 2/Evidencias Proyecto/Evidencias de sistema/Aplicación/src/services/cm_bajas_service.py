@@ -9,9 +9,9 @@ Un caso de Revision CM puede originarse por dos motivos independientes
     baja. Se cierra (REAPARECIDO) cuando el VIN vuelve a aparecer en el
     3PC (ver actualizar_casos_baja_cm).
   - ESTADO_EXPIRED: el contrato CM de un VIN queda en ESTADO DEL CM =
-    'Expired' (deteccion en tiempo real vs. el estado de PruebasFM, no una
-    ausencia). Se cierra (REAPARECIDO) cuando ESTADO DEL CM deja de ser
-    'Expired' -- pasa a Running o a Terminated (ver
+    'Expired' o 'Pendiente' (deteccion en tiempo real vs. el estado de
+    PruebasFM, no una ausencia). Se cierra (REAPARECIDO) cuando ESTADO DEL CM
+    deja de ser Expired o Pendiente -- pasa a Running o a Terminated (ver
     reconciliar_casos_estado_expired).
 
 Ambos carriles son independientes entre si aunque compartan VIN: un caso
@@ -30,6 +30,8 @@ import time
 from datetime import datetime
 
 import pandas as pd
+
+from src.core.constants import ESTADO_CM_PENDIENTE, ESTADOS_CM_SIN_PAGO,FORMA_CONTRATO_TIPO_CM_MAP, TIPO_FACTURACION_HABILITA_CM
 
 # Serializa los ciclos leer -> modificar -> escribir de CasosBajaCM.csv: la
 # reconciliación por data_ready corre en un hilo de fondo (MainWindow) y
@@ -64,13 +66,22 @@ ESTADO_CASO_CONTRATO_CERRADO = 'CONTRATO_CERRADO'
 # con ESTADO_CASO (estado del caso de revision).
 ORIGEN_CASO_AUSENCIA_3PC = 'AUSENCIA_3PC'
 ORIGEN_CASO_ESTADO_EXPIRED = 'ESTADO_EXPIRED'
+# Contrato vencido de forma o facturación CM que no trae ningún dato del 3PC (29-10-2026)
+ORIGEN_CASO_DATOS_3PC_VACIOS = 'DATOS_3PC_VACIOS'
+# CM en Running con el término ya vencido y sin pago este mes, que el 3PC todavía no cierra (30-10-2026)
+ORIGEN_CASO_RUNNING_VENCIDO = 'RUNNING_VENCIDO'
 
 # Texto amigable de ORIGEN_CASO para la UI (Revision CM). El valor tecnico
 # nunca se muestra directamente al usuario.
 ORIGEN_CASO_MOTIVO_MAP = {
     ORIGEN_CASO_AUSENCIA_3PC: 'Ausente de 3PC',
     ORIGEN_CASO_ESTADO_EXPIRED: 'Contrato expirado',
+    ORIGEN_CASO_DATOS_3PC_VACIOS: 'Datos vacíos en 3PC',
+    ORIGEN_CASO_RUNNING_VENCIDO: 'Término vencido sin pago',
 }
+# Caso Expired de una unidad que hoy tiene otra forma de contrato y facturación (no CM): sus datos CM son
+# antiguos y se resuelven con "Pasar a CM" o "Limpiar datos CM" (28-10-2026)
+MOTIVO_DATOS_CM_ANTIGUOS = 'Datos CM antiguos'
 
 # Columnas de datos CM que definen si una fila de PruebasFM "tiene CM
 # asociado". No alcanza con mirar solo ESTADO DEL CM: un registro legado
@@ -108,6 +119,20 @@ def _contrato_finalizado_inactivo(row):
     return estado in ('BAJA', 'BAJA SOLICITADA') and activacion not in ('CONECTADO', 'ACTIVANDO')
 
 
+def _texto_columna(df, columna):
+    """Columna como texto en mayúsculas y sin espacios; '' si la columna no existe."""
+    if columna not in df.columns:
+        return pd.Series('', index=df.index)
+    return df[columna].astype(str).str.strip().str.upper()
+
+
+def _mascara_finalizado_inactivo(df):
+    """Versión por columnas de `_contrato_finalizado_inactivo` para todo el DataFrame."""
+    estado = _texto_columna(df, 'ESTADO COMERCIAL')
+    activacion = _texto_columna(df, 'ESTADO DE ACTIVACIÓN ACTUAL')
+    return estado.isin(('BAJA', 'BAJA SOLICITADA')) & ~activacion.isin(('CONECTADO', 'ACTIVANDO'))
+
+
 def _solo_contratos_actuales(df_pruebas):
     from src.services.comercial_services import contratos_actuales
     return contratos_actuales(df_pruebas)
@@ -123,16 +148,12 @@ def cerrar_casos_de_contratos_terminados(df_casos, df_pruebas_actual):
             or 'VIN' not in df_pruebas_actual.columns or 'ID' not in df_pruebas_actual.columns:
         return df_casos[CASOS_BAJA_CM_COLUMNS]
 
-    id_por_vin = {}
-    activos = set()
-    for _, fila in df_pruebas_actual.iterrows():
-        id_fila = str(fila.get('ID', '')).strip()
-        id_fila = id_fila[:-2] if id_fila.endswith('.0') else id_fila
-        if not id_fila or id_fila.lower() == 'nan':
-            continue
-        id_por_vin[str(fila.get('VIN', '')).strip().upper()] = id_fila
-        if not _contrato_finalizado_inactivo(fila):
-            activos.add(id_fila)
+    ids = df_pruebas_actual['ID'].astype(str).str.strip()
+    ids = ids.where(~ids.str.endswith('.0'), ids.str[:-2])
+    con_id = (ids != '') & (ids.str.lower() != 'nan')
+    vins = df_pruebas_actual['VIN'].astype(str).str.strip().str.upper()
+    id_por_vin = dict(zip(vins[con_id], ids[con_id]))
+    activos = set(ids[con_id & ~_mascara_finalizado_inactivo(df_pruebas_actual)])
 
     df_casos['ID CONTRATO'] = df_casos['ID CONTRATO'].astype(object)
     vin_norm = df_casos['VIN'].astype(str).str.strip().str.upper()
@@ -306,7 +327,7 @@ def actualizar_casos_baja_cm(df_casos, detecciones, vins_en_nuevo_listado, hoy=N
 
 def detectar_casos_expired_actuales(df_pruebas_actual, periodo_deteccion, hoy=None):
     """Devuelve un candidato a caso (dict) por cada VIN cuyo ESTADO DEL CM
-    actual en `df_pruebas_actual` es 'Expired'. A diferencia de
+    actual en `df_pruebas_actual` es 'Expired' o 'Pendiente'. A diferencia de
     detectar_posibles_bajas_cm, no compara contra una version anterior: el
     evento aqui es el estado ACTUAL del contrato (Running/Expired/
     Terminated), no una desaparicion del 3PC. No modifica
@@ -318,7 +339,7 @@ def detectar_casos_expired_actuales(df_pruebas_actual, periodo_deteccion, hoy=No
         return []
 
     fecha_deteccion = hoy.strftime('%Y-%m-%d %H:%M:%S')
-    mask_expired = df_pruebas_actual['ESTADO DEL CM'].astype(str).str.strip().str.upper() == 'EXPIRED'
+    mask_expired = df_pruebas_actual['ESTADO DEL CM'].astype(str).str.strip().str.upper().isin(ESTADOS_CM_SIN_PAGO)
 
     detecciones = []
     for _, row in df_pruebas_actual[mask_expired].iterrows():
@@ -335,7 +356,116 @@ def detectar_casos_expired_actuales(df_pruebas_actual, periodo_deteccion, hoy=No
     return detecciones
 
 
+def _es_unidad_cm(row):
+    forma = str(row.get('FORMA DE CONTRATO', '')).strip().upper()
+    tipo = str(row.get('TIPO DE FACTURACION', row.get('TIPO DE FACTURACIÓN', ''))).strip().upper()
+    return forma in FORMA_CONTRATO_TIPO_CM_MAP or tipo in TIPO_FACTURACION_HABILITA_CM
+
+
+def mascara_datos_3pc_vacios(df):
+    """Filas Vigentes o Vencidas de forma o facturación CM sin N° de contrato 3PC y sin ESTADO DEL CM; una
+    marcada Pendiente sigue contando para que el caso no se cierre al marcarla."""
+    columnas = {'ESTADO COMERCIAL', 'ESTADO DEL CM', 'N CONTRATO 3PC'}
+    if df is None or df.empty or not columnas <= set(df.columns):
+        return pd.Series(False, index=df.index if df is not None else None)
+    estado = df['ESTADO COMERCIAL'].astype(str).str.strip().str.upper().isin(('VIGENTE', 'VENCIDO'))
+    estado_cm = df['ESTADO DEL CM'].astype(str).str.strip().str.upper()
+    sin_estado = _vacio_columna(df['ESTADO DEL CM']) | (estado_cm == ESTADO_CM_PENDIENTE.upper())
+    sin_3pc = sin_estado & _vacio_columna(df['N CONTRATO 3PC'])
+    return estado & sin_3pc & _mascara_unidad_cm(df)
+
+
+def _vacio_columna(serie):
+    """Versión por columnas de `_valor_vacio`."""
+    return serie.isna() | serie.astype(str).str.strip().str.upper().isin(('', '-', 'NAN', 'NONE', 'NAT', '<NA>'))
+
+
+def _mascara_unidad_cm(df):
+    """Versión por columnas de `_es_unidad_cm`."""
+    forma = _texto_columna(df, 'FORMA DE CONTRATO')
+    tipo = _texto_columna(df, 'TIPO DE FACTURACION' if 'TIPO DE FACTURACION' in df.columns else 'TIPO DE FACTURACIÓN')
+    return forma.isin(tuple(FORMA_CONTRATO_TIPO_CM_MAP)) | tipo.isin(tuple(TIPO_FACTURACION_HABILITA_CM))
+
+
+def detectar_casos_datos_3pc_vacios(df_pruebas_actual, periodo_deteccion, hoy=None):
+    """Un candidato a caso por cada contrato actual Vencido de forma o facturación CM que no trae ni N° de
+    contrato 3PC ni ESTADO DEL CM: debería estar en el 3PC y no llegó nada. Mismo formato que
+    detectar_casos_expired_actuales."""
+    if hoy is None:
+        hoy = datetime.now()
+    columnas = {'VIN', 'ESTADO COMERCIAL', 'ESTADO DEL CM', 'N CONTRATO 3PC'}
+    if df_pruebas_actual is None or df_pruebas_actual.empty or not columnas <= set(df_pruebas_actual.columns):
+        return []
+    fecha_deteccion = hoy.strftime('%Y-%m-%d %H:%M:%S')
+    detecciones = []
+    for _, row in df_pruebas_actual[mascara_datos_3pc_vacios(df_pruebas_actual)].iterrows():
+        vin_norm = str(row.get('VIN', '')).strip().upper()
+        if not vin_norm or vin_norm == 'NAN':
+            continue
+        deteccion = {'VIN': vin_norm, 'ID CONTRATO': str(row.get('ID', '')).strip()}
+        for col in COLUMNAS_INFO_UNIDAD + COLUMNAS_DATOS_CM:
+            deteccion[col] = row.get(col, '')
+        deteccion['PERIODO_DETECCION'] = periodo_deteccion
+        deteccion['FECHA_DETECCION'] = fecha_deteccion
+        detecciones.append(deteccion)
+    return detecciones
+
+
+DIAS_AVISO_TERMINO_SIN_PAGO = 7
+
+
+def pago_cubre_mes_actual(fecha, pago, hoy=None):
+    """Serie booleana: el pago CM cubre el mes de hoy. Un pago dura el mes siguiente al
+    que se hizo (como una suscripción), así que sirve el del mes anterior o el de este mes."""
+    hoy = pd.Timestamp(hoy) if hoy is not None else pd.Timestamp.now()
+    fecha = pd.to_datetime(fecha, errors='coerce', format='%d-%m-%Y')
+    pago = pd.to_numeric(pago, errors='coerce').fillna(0)
+    return (fecha.dt.to_period('M') >= hoy.to_period('M') - 1) & (pago > 0)
+
+
+def mascara_running_vencido_sin_pago(df, hoy=None):
+    """CM en Running sin pago este mes cuyo término ya venció o vence en los próximos
+    DIAS_AVISO_TERMINO_SIN_PAGO días: el 3PC todavía no lo cierra."""
+    columnas = {'ESTADO DEL CM', 'FECHA TERMINO CM', 'FECHA ULTIMO PAGO CM'}
+    if df is None or df.empty or not columnas <= set(df.columns):
+        return pd.Series(False, index=df.index if df is not None else None)
+    hoy = pd.Timestamp(hoy) if hoy is not None else pd.Timestamp.now()
+    running = df['ESTADO DEL CM'].astype(str).str.strip().str.upper() == 'RUNNING'
+    termino = pd.to_datetime(df['FECHA TERMINO CM'], errors='coerce', format='%d-%m-%Y')
+    vencido = termino.dt.normalize() <= hoy.normalize() + pd.Timedelta(days=DIAS_AVISO_TERMINO_SIN_PAGO)
+    columna_pago = 'PAGO CM_NUM' if 'PAGO CM_NUM' in df.columns else 'PAGO CM'
+    pago = df[columna_pago] if columna_pago in df.columns else pd.Series(0, index=df.index)
+    return running & vencido & ~pago_cubre_mes_actual(df['FECHA ULTIMO PAGO CM'], pago, hoy)
+
+
+def detectar_casos_running_vencido(df_pruebas_actual, periodo_deteccion, hoy=None):
+    """Un candidato a caso por cada contrato actual en Running con el término vencido y sin pago este mes.
+    Mismo formato que detectar_casos_expired_actuales."""
+    if hoy is None:
+        hoy = datetime.now()
+    if df_pruebas_actual is None or df_pruebas_actual.empty or 'VIN' not in df_pruebas_actual.columns:
+        return []
+    fecha_deteccion = hoy.strftime('%Y-%m-%d %H:%M:%S')
+    detecciones = []
+    for _, row in df_pruebas_actual[mascara_running_vencido_sin_pago(df_pruebas_actual, hoy)].iterrows():
+        vin_norm = str(row.get('VIN', '')).strip().upper()
+        if not vin_norm or vin_norm == 'NAN' or _contrato_finalizado_inactivo(row):
+            continue
+        deteccion = {'VIN': vin_norm, 'ID CONTRATO': str(row.get('ID', '')).strip()}
+        for col in COLUMNAS_INFO_UNIDAD + COLUMNAS_DATOS_CM:
+            deteccion[col] = row.get(col, '')
+        deteccion['PERIODO_DETECCION'] = periodo_deteccion
+        deteccion['FECHA_DETECCION'] = fecha_deteccion
+        detecciones.append(deteccion)
+    return detecciones
+
+
 def reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual, hoy=None):
+    """Carril ESTADO_EXPIRED de `reconciliar_casos_por_origen`."""
+    return reconciliar_casos_por_origen(df_casos, ORIGEN_CASO_ESTADO_EXPIRED, detecciones, vins_expired_actual, hoy)
+
+
+def reconciliar_casos_por_origen(df_casos, origen, detecciones, vins_actuales, hoy=None):
     """Aplica sobre `df_casos` las detecciones de ESTADO DEL CM = 'Expired'
     actuales, en un carril propio (ORIGEN_CASO=ESTADO_EXPIRED) que nunca
     toca ni es tocado por los casos ORIGEN_CASO=AUSENCIA_3PC, aun si
@@ -356,13 +486,13 @@ def reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual,
         hoy = datetime.now()
 
     df_casos = _asegurar_columnas_y_backfill_origen(df_casos.copy())
-    vins_expired_norm = {str(v).strip().upper() for v in vins_expired_actual}
+    vins_expired_norm = {str(v).strip().upper() for v in vins_actuales}
 
-    # 1) Cierre de casos Expired que ya no lo estan (solo carril ESTADO_EXPIRED).
+    # 1) Cierre de casos que ya no cumplen la condicion (solo el carril `origen`).
     if not df_casos.empty:
         mask_cierre = (
             (df_casos['ESTADO_CASO'] == ESTADO_CASO_PENDIENTE) &
-            (df_casos['ORIGEN_CASO'] == ORIGEN_CASO_ESTADO_EXPIRED) &
+            (df_casos['ORIGEN_CASO'] == origen) &
             (~df_casos['VIN'].astype(str).str.strip().str.upper().isin(vins_expired_norm))
         )
         df_casos.loc[mask_cierre, 'ESTADO_CASO'] = ESTADO_CASO_REAPARECIDO
@@ -375,14 +505,14 @@ def reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual,
         vin_norm = deteccion['VIN']
         mask_abierto = (
             (df_casos['ESTADO_CASO'] == ESTADO_CASO_PENDIENTE) &
-            (df_casos['ORIGEN_CASO'] == ORIGEN_CASO_ESTADO_EXPIRED) &
+            (df_casos['ORIGEN_CASO'] == origen) &
             (df_casos['VIN'].astype(str).str.strip().str.upper() == vin_norm)
         )
         if not mask_abierto.any():
             nueva_fila = {col: deteccion.get(col, '') for col in CASOS_BAJA_CM_COLUMNS}
             nueva_fila['CASO_ID'] = str(siguiente_id)
             nueva_fila['ESTADO_CASO'] = ESTADO_CASO_PENDIENTE
-            nueva_fila['ORIGEN_CASO'] = ORIGEN_CASO_ESTADO_EXPIRED
+            nueva_fila['ORIGEN_CASO'] = origen
             nueva_fila['MESES_CONSECUTIVOS_AUSENTE'] = ''
             siguiente_id += 1
             filas_nuevas.append(nueva_fila)
@@ -407,6 +537,15 @@ def leer_casos_baja_cm(path):
     return _asegurar_columnas_y_backfill_origen(df)[CASOS_BAJA_CM_COLUMNS]
 
 
+# Momento del último guardado de CasosBajaCM.csv hecho por esta app: el aviso de cambios lo ignora
+_ULTIMA_ESCRITURA_PROPIA = [0.0]
+VENTANA_ESCRITURA_PROPIA_S = 30
+
+
+def escritura_propia_reciente():
+    return time.time() - _ULTIMA_ESCRITURA_PROPIA[0] < VENTANA_ESCRITURA_PROPIA_S
+
+
 def guardar_casos_baja_cm(df_casos, path):
     """Persiste `df_casos` en `path` (CSV, mismo formato simple que
     LogApp.csv). No hace nada si `path` no esta configurado."""
@@ -422,6 +561,7 @@ def guardar_casos_baja_cm(df_casos, path):
         with os.fdopen(fd, 'w', encoding='utf-8', newline='') as archivo:
             df_casos.to_csv(archivo, index=False)
         os.replace(temporal, path)
+        _ULTIMA_ESCRITURA_PROPIA[0] = time.time()
     except Exception:
         if os.path.exists(temporal):
             os.remove(temporal)
@@ -533,14 +673,24 @@ def procesar_reconciliacion_estado_expired(df_pruebas_actual, periodo_deteccion,
     _esperar_si_archivo_ausente(casos_path)
     df_leido = leer_casos_baja_cm(casos_path)
     df_casos = cerrar_casos_de_contratos_terminados(df_leido, df_pruebas_actual)
-    detecciones = detectar_casos_expired_actuales(df_pruebas_actual, periodo_deteccion, hoy=hoy)
+    detecciones_vacios = detectar_casos_datos_3pc_vacios(df_pruebas_actual, periodo_deteccion, hoy=hoy)
+    vins_vacios = {d['VIN'] for d in detecciones_vacios}
+    # Una unidad sin datos del 3PC marcada Pendiente sigue en su caso, no pasa al carril Expired
+    detecciones = [d for d in detectar_casos_expired_actuales(df_pruebas_actual, periodo_deteccion, hoy=hoy)
+                   if d['VIN'] not in vins_vacios]
 
     vins_expired_actual = []
     if not df_pruebas_actual.empty and 'VIN' in df_pruebas_actual.columns and 'ESTADO DEL CM' in df_pruebas_actual.columns:
-        mask = df_pruebas_actual['ESTADO DEL CM'].astype(str).str.strip().str.upper() == 'EXPIRED'
-        vins_expired_actual = df_pruebas_actual.loc[mask, 'VIN'].astype(str).str.strip().str.upper().tolist()
+        mask = df_pruebas_actual['ESTADO DEL CM'].astype(str).str.strip().str.upper().isin(ESTADOS_CM_SIN_PAGO)
+        vins_expired_actual = [v for v in df_pruebas_actual.loc[mask, 'VIN'].astype(str).str.strip().str.upper()
+                               if v not in vins_vacios]
 
     df_casos_actualizado = reconciliar_casos_estado_expired(df_casos, detecciones, vins_expired_actual, hoy=hoy)
+    df_casos_actualizado = reconciliar_casos_por_origen(
+        df_casos_actualizado, ORIGEN_CASO_DATOS_3PC_VACIOS, detecciones_vacios, list(vins_vacios), hoy=hoy)
+    detecciones_rv = detectar_casos_running_vencido(df_pruebas_actual, periodo_deteccion, hoy=hoy)
+    df_casos_actualizado = reconciliar_casos_por_origen(
+        df_casos_actualizado, ORIGEN_CASO_RUNNING_VENCIDO, detecciones_rv, [d['VIN'] for d in detecciones_rv], hoy=hoy)
     existe = bool(casos_path) and os.path.exists(casos_path)
     sin_cambios = existe and df_casos_actualizado.reset_index(drop=True).astype(str).equals(
         df_leido.reset_index(drop=True).astype(str))

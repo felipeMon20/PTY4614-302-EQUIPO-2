@@ -7,9 +7,7 @@ from src.services.mail_service import (
     obtener_configuracion_plantilla,
     validar_destinatarios,
 )
-from src.ui import mail_dialog
-
-
+from src.ui.compartido import mail_dialog as mail_dialog
 NOMBRES_PLANTILLAS = [
     "Conoce Volvo Connect", "Reactivación", "Continuidad post CM", "Bienvenida",
     "Activación", "Capacitación", "Seguimiento de Uso", "Revisión Periódica",

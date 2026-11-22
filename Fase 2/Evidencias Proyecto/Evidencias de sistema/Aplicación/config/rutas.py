@@ -19,18 +19,13 @@ ARCHIVOS_DE_DATOS = {
     "FACTURACION_MANUAL_PATH": ("Facturación manual", "facturacionManual.xlsx", False),
     "EJECUTIVOS_PATH": ("Directorio de ejecutivos", "Ejecutivos_VC.csv", False),
     "METAS_VC_PATH": ("Metas de Volvo Connect", "MetasVC.csv", False),
-    # Suele vivir en otra carpeta del equipo: se busca, pero no se deriva a ciegas
-    "RM_JAVI_PATH": ("RM Javiera", "RM_JAVI_VOLVO CONNECT.xlsx", False),
 }
 
 # Claves que se derivan de la carpeta de datos cuando están vacías
-# Se elige a mano en Configuración > Avanzado (modo programador), no se lista en Archivos
-CLAVES_SOLO_PROGRAMADOR = ("RM_JAVI_PATH",)
-
-CLAVES_DERIVABLES =tuple(k for k in ARCHIVOS_DE_DATOS if k != "RM_JAVI_PATH")
+CLAVES_DERIVABLES = tuple(ARCHIVOS_DE_DATOS)
 
 # Claves de versiones anteriores que nada lee y se eliminan al guardar
-CLAVES_OBSOLETAS = ("CUSTOMER_EXCEL_PATH", "POWERBI_URL")
+CLAVES_OBSOLETAS = ("CUSTOMER_EXCEL_PATH", "POWERBI_URL", "RM_JAVI_PATH")
 
 # Nombres anteriores de un archivo (20-10-2026: RM_JAVI.csv pasó a llamarse
 # Registro Maestro.csv). Se aceptan ambos mientras convivan en las carpetas.

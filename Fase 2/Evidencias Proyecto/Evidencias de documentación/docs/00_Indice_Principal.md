@@ -1,3 +1,5 @@
+> Desarrollado por Felipe Monsalve Umanzor.
+
 ### 1. Resumen del arranque actual
 
 **Actualizado 01-10-2026:** se fija el entorno gráfico (sin el modo oscuro de Windows) y se levanta una pantalla de inicio animada que no depende del tema de la app. Mientras se anima, un hilo de fondo (`PrecargaDatosThread`) lee el archivo principal. `MainWindow` se construye recién cuando la animación terminó y los datos están leídos, y reutiliza esa lectura. Detalle completo en [[01_Arranque_y_Configuracion]] §3.6-3.8.
@@ -14,7 +16,7 @@ Este archivo es el punto de entrada directo y realiza las siguientes acciones:
     
 - **Carga la hoja de estilos:** Llama a `load_stylesheet`, la cual lee e inyecta el archivo local `src/assets/styles.qss`.
     
-- **Genera el ícono de la app:** Utiliza `create_white_background_icon` para procesar el logo (`src/assets/splash_logo.png`), dándole fondo blanco, y lo asigna a la ventana.
+- **Fija el ícono de la app (29-10-2026):** carga `src/assets/app_icono.png` y lo asigna a la aplicación, junto con la identidad de Windows (`SetCurrentProcessExplicitAppUserModelID`), antes de abrir cualquier ventana.
     
 - **Agrupa el proceso en Windows:** Utiliza `ctypes` para asignar un identificador (`volvo.dashboard.gestion.1`) al proceso, lo que afecta cómo se agrupa en la barra de tareas.
     

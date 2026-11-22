@@ -7,9 +7,9 @@ import pandas as pd
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
-from src.ui import comercial_estilo as estilo_com
-from src.ui.mail_dialog import MailDialog
-from src.ui.contactos_agregar import ContactosAddDialog
+from src.ui.compartido import comercial_estilo as estilo_com
+from src.ui.compartido.mail_dialog import MailDialog
+from src.ui.administracion.contactos_agregar import ContactosAddDialog
 
 
 def _ensure_app():
@@ -57,8 +57,8 @@ class TestMailDialogCeldaCorreoFaltante(unittest.TestCase):
         mock_dm_instance = MagicMock()
         mock_dm_instance.get_comercial_df.return_value = df_comercial
 
-        with patch('src.ui.mail_dialog.CORREOS_EXCEL_PATH', correos_path), \
-             patch('src.ui.mail_dialog.DataManager', return_value=mock_dm_instance):
+        with patch('src.ui.compartido.mail_dialog.CORREOS_EXCEL_PATH', correos_path), \
+             patch('src.ui.compartido.mail_dialog.DataManager', return_value=mock_dm_instance):
             dialog = MailDialog(**mail_dialog_kwargs)
         return dialog
 
@@ -127,8 +127,8 @@ class TestMailDialogPreseleccionDesdeGestionarCM(unittest.TestCase):
         mock_dm_instance = MagicMock()
         mock_dm_instance.get_comercial_df.return_value = df_comercial
 
-        with patch('src.ui.mail_dialog.CORREOS_EXCEL_PATH', correos_path), \
-             patch('src.ui.mail_dialog.DataManager', return_value=mock_dm_instance):
+        with patch('src.ui.compartido.mail_dialog.CORREOS_EXCEL_PATH', correos_path), \
+             patch('src.ui.compartido.mail_dialog.DataManager', return_value=mock_dm_instance):
             dialog = MailDialog(**mail_dialog_kwargs)
         return dialog
 
@@ -180,7 +180,7 @@ class TestContactosAddDialogPrefillBloqueado(unittest.TestCase):
     def setUpClass(cls):
         _ensure_app()
 
-    @patch('src.ui.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
+    @patch('src.ui.administracion.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
     def test_cdb_y_flota_quedan_precargados_y_bloqueados(self):
         dialog = ContactosAddDialog(cdb_prefill="50002", flota_prefill="EMPRESA SIN CORREO")
 
@@ -190,7 +190,7 @@ class TestContactosAddDialogPrefillBloqueado(unittest.TestCase):
         self.assertEqual(dialog.inputs['Flota'].text(), "EMPRESA SIN CORREO")
         self.assertTrue(dialog.inputs['Flota'].isReadOnly())
 
-    @patch('src.ui.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
+    @patch('src.ui.administracion.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
     def test_sin_prefill_el_formulario_se_comporta_como_siempre(self):
         dialog = ContactosAddDialog()
 
@@ -198,7 +198,7 @@ class TestContactosAddDialogPrefillBloqueado(unittest.TestCase):
         self.assertFalse(dialog.inputs['CDB'].isReadOnly())
         self.assertFalse(dialog.inputs['Flota'].isReadOnly())
 
-    @patch('src.ui.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
+    @patch('src.ui.administracion.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
     def test_flota_prefill_prevalece_sobre_autocompletado_powerbi(self):
         dialog = ContactosAddDialog(cdb_prefill="10001", flota_prefill="RAZÓN SOCIAL DE CORREOS")
         dialog.dict_flotas = {'10001': 'NOMBRE DISTINTO EN POWER BI'}

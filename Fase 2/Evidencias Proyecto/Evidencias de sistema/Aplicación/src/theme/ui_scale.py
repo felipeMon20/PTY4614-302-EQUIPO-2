@@ -2,14 +2,14 @@ import os
 
 from PyQt6.QtCore import QSettings
 
-# Mediano (1.0) es el tamaño con el que se diseñó la interfaz.
+# Mediano (0.85) es el tamaño por defecto: con 1.0 la caja izquierda de General no alcanzaba para sus controles.
 NIVELES_ESCALA = {
-    "pequeno": ("Pequeño", 0.85),
-    "mediano": ("Mediano", 1.0),
-    "grande": ("Grande", 1.25),
+    "pequeno": ("Pequeño", 0.75),
+    "mediano": ("Mediano", 0.85),
 }
 NIVEL_POR_DEFECTO = "mediano"
-_CLAVE = "ui_scale"
+# Clave nueva: lo guardado con la escala anterior (Pequeño 0.85 / Mediano 1.0) vuelve al Mediano de hoy
+_CLAVE = "ui_scale_v2"
 
 
 def _settings():

@@ -179,11 +179,11 @@ def filtrar(df_base, filtro):
 
 def buscar(df, texto):
     """Mismo criterio que Contratos: cada término busca en VIN, CHASIS,
-    RAZÓN SOCIAL y RUT."""
+    RAZÓN SOCIAL, RUT y FLOTA VC."""
     texto = (texto or "").strip().lower()
     if not texto or df.empty:
         return df
-    cols = [c for c in (COL_VIN, COL_CHASIS, COL_RAZON_SOCIAL, COL_RUT) if c in df.columns]
+    cols = [c for c in (COL_VIN, COL_CHASIS, COL_RAZON_SOCIAL, COL_RUT, 'FLOTA VC') if c in df.columns]
     from src.services import comercial_services
     mask = comercial_services.construir_mascara_busqueda(df, texto, cols, (COL_ID,))
     return df[mask]

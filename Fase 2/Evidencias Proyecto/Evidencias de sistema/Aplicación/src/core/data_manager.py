@@ -1,10 +1,11 @@
 import hashlib
+import logging
 import os
 import pickle
+import re
 import threading
 import time
 import uuid
-import urllib3
 import psutil
 import warnings
 import shutil
@@ -12,11 +13,17 @@ import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, QTimer
 import config.settings
 from src.core.cdb_columnas import cdb_a_memoria, asegurar_cdb_flota
+from src.core.columnas_opcionales import asegurar_columnas_opcionales
 from src.core.dataframe_formatter import DataFrameFormatter, aplicar_por_fila_memoizado
 from src.core.constants import *
 from src.core.hilos import iniciar_hilo_retenido
+from src.core.registro_app import RUTA_LOG
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+logger = logging.getLogger(__name__)
+
+# Línea de sistema.log con nivel de alerta (formato de registro_app.configurar_logging)
+_LINEA_ALERTA_LOG = re.compile(r'^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)[,.]\d+ - (WARNING|ERROR|CRITICAL) - (.*)$')
+
 warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
 # El filtro anterior no atrapa este warning: pandas lo emite con stacklevel apuntando
 # al código llamante (este módulo), no a "pandas", así que hay que filtrarlo por mensaje.
@@ -181,7 +188,7 @@ def leer_datos_principales(filepath):
             try: os.remove(temp_main_path)
             except Exception: pass
 
-    df = asegurar_cdb_flota(cdb_a_memoria(df))
+    df = asegurar_columnas_opcionales(asegurar_cdb_flota(cdb_a_memoria(df)))
     # clean() recalcula TÉRMINO CONTRATO: las diferencias con INICIO + DURACIÓN
     # se detectan antes y viajan en df.attrs para el botón de Comercial.
     from src.services.comercial_services import detectar_termino_distinto_de_duracion
@@ -202,39 +209,32 @@ def leer_datos_principales(filepath):
         if config.settings.LOG_CSV_PATH and os.path.exists(config.settings.LOG_CSV_PATH):
             df_logs = pd.read_csv(config.settings.LOG_CSV_PATH, dtype=str, keep_default_na=False)
     except Exception as e:
-        pass
+        logger.warning(f"No se pudo leer el historial (LogApp.csv): {e}")
 
-    # df_deleted (legado, se conserva tal cual para no romper nada que
-    # ya dependa de el): solo la PRIMERA hoja de RegistroEliminado.xlsx,
-    # que es el comportamiento historico de pd.read_excel sin sheet_name.
-    df_deleted = pd.DataFrame()
-    # deleted_sheets (nuevo): TODAS las hojas de RegistroEliminado.xlsx,
-    # una por modulo de origen (Comercial, Contactos, etc.), cada una
-    # con su propio esquema de columnas intacto. RegistroEliminado.xlsx
-    # ya guarda una hoja por module_name (ver ExcelWriter._log_deleted);
-    # antes esta lectura solo tomaba la primera hoja del archivo
-    # (comportamiento por defecto de pd.read_excel sin sheet_name),
-    # dejando invisibles en la app las eliminaciones de cualquier otro
-    # modulo. deleted_sheets es la fuente que usa HistorialModule.
+    # RegistroEliminado.xlsx (Papelera) ya no se lee aquí (26-10-2026): con
+    # openpyxl tomaba 1-7 s del arranque y solo lo usa Historial › Papelera.
+    # Se lee al abrir esa pestaña (DataManager.get_deleted_logs_sheets).
+    load_time = round(time.time() - start_time, 2)
+    df.attrs['termino_distinto_de_duracion'] = termino_distinto
+    return (df, df_logs, pd.DataFrame(), load_time, None)
+
+
+def leer_registro_eliminado(ruta):
+    """(df_deleted, deleted_sheets) de RegistroEliminado.xlsx: todas sus hojas,
+    una por módulo de origen con su propio esquema; df_deleted es la primera."""
     deleted_sheets = {}
-    if os.path.exists(config.settings.DELETED_LOG_EXCEL_PATH):
-        # Una sola lectura del libro (antes se abría dos veces): la
-        # primera hoja es df_deleted, con el mismo procesamiento.
+    if ruta and os.path.exists(ruta):
         try:
-            hojas = pd.read_excel(config.settings.DELETED_LOG_EXCEL_PATH, sheet_name=None)
+            hojas = pd.read_excel(ruta, sheet_name=None)
             for nombre_hoja, df_hoja in hojas.items():
                 df_hoja = df_hoja.fillna("")
                 for col in df_hoja.select_dtypes(include=['datetime64']).columns:
                     df_hoja[col] = df_hoja[col].dt.strftime('%m/%d/%Y')
                 deleted_sheets[nombre_hoja] = df_hoja
-            if deleted_sheets:
-                df_deleted = next(iter(deleted_sheets.values())).copy()
-        except Exception as e:
+        except Exception:
             pass
-
-    load_time = round(time.time() - start_time, 2)
-    df.attrs['termino_distinto_de_duracion'] = termino_distinto
-    return (df, df_logs, df_deleted, load_time, deleted_sheets)
+    df_deleted = next(iter(deleted_sheets.values())).copy() if deleted_sheets else pd.DataFrame()
+    return df_deleted, deleted_sheets
 
 # =========================================================
 # MOTOR 2: DEDICADO SOLO A PROVISIONES
@@ -244,7 +244,7 @@ def leer_datos_principales(filepath):
 # interfaz. Solo se usa si el Excel tiene la misma fecha de modificación y
 # tamaño que cuando se guardó la copia; cualquier escritura la invalida.
 _DIR_CACHE = os.path.join(os.getcwd(), 'data', 'cache')
-_VERSION_CACHE_PROVISIONES = 1
+_VERSION_CACHE_PROVISIONES = 2
 
 
 def _ruta_cache_provisiones(ruta):
@@ -330,13 +330,24 @@ class ProvisionesLoaderThread(QThread):
                     df_planes = xls.parse("Planes")
                     df_prov_raw = xls.parse("Prov")
 
+                # Complementos del plan (CIV, SZ...): cada uno es una fila de Variables, en UF; sin fila valen 0.
+                from src.services import catalogos_service
+                codigos_complemento = {c for c, _n in catalogos_service.complementos(solo_activos=False)}
+                valores_complemento = {}
                 for _, row in df_vars.iterrows():
                     var_name = str(row.iloc[0]).strip().upper()
                     if var_name == "UF": valor_uf = row.iloc[1] if pd.notna(row.iloc[1]) else 0
                     elif var_name == "CIV": valor_civ = row.iloc[1] if pd.notna(row.iloc[1]) else 0
+                    elif var_name in codigos_complemento:
+                        try: valores_complemento[var_name] = float(row.iloc[1])
+                        except Exception: valores_complemento[var_name] = 0.0
+                valores_complemento["CIV"] = float(valor_civ)
+                for codigo in codigos_complemento:
+                    valores_complemento.setdefault(codigo, 0.0)
+                    if pd.isna(valores_complemento[codigo]): valores_complemento[codigo] = 0.0
 
                 dict_mult = {}
-                
+
                 for idx, row in df_planes.iterrows():
                     p_nombre = str(row.iloc[0]).strip()
                     if p_nombre and p_nombre.lower() not in ["nan", ""]:
@@ -345,13 +356,25 @@ class ProvisionesLoaderThread(QThread):
                         if pd.isna(mult): mult = 0.0
                         dict_mult[p_nombre] = mult
 
-                for p_nombre in dict_mult.keys():
-                    if "+ CIV" in p_nombre.upper() and dict_mult[p_nombre] == 0.0:
-                        base_name = p_nombre.upper().replace("+ CIV", "").strip()
-                        base_val = next((v for k, v in dict_mult.items() if k.upper() == base_name), 0.0)
-                        dict_mult[p_nombre] = base_val + valor_civ
-                
-                dict_exact_clp = {} 
+                def mult_por_nombre(nombre, base_mult):
+                    """Plan base + complementos del nombre ('Medio + CIV + SZ'); None si el nombre no es de esa forma."""
+                    partes = [p.strip() for p in str(nombre).upper().split("+")]
+                    extras = partes[1:]
+                    if not extras or any(e not in valores_complemento for e in extras):
+                        return None
+                    base = base_mult(partes[0])
+                    return None if base is None else base + sum(valores_complemento[e] for e in extras)
+
+                def mult_de_base(nombre_base):
+                    return next((v for k, v in dict_mult.items() if k.upper() == nombre_base), None)
+
+                for p_nombre in list(dict_mult.keys()):
+                    if dict_mult[p_nombre] == 0.0 and "+" in p_nombre:
+                        derivado = mult_por_nombre(p_nombre, lambda b: mult_de_base(b) or 0.0)
+                        if derivado is not None:
+                            dict_mult[p_nombre] = derivado
+
+                dict_exact_clp = {}
                 for p_nombre, mult in dict_mult.items():
                     exact_val = mult * valor_uf
                     p_clp = round(exact_val)
@@ -378,7 +401,11 @@ class ProvisionesLoaderThread(QThread):
                     def get_valor_plan(row):
                         val = get_float_safe(row.get('Valor Plan'))
                         if val is not None: return val
-                        return dict_exact_clp.get(str(row.get('Plan')).strip(), 0.0)
+                        plan = str(row.get('Plan')).strip()
+                        if plan in dict_exact_clp:
+                            return dict_exact_clp[plan]
+                        calculado = mult_por_nombre(plan, mult_de_base)
+                        return calculado * valor_uf if calculado is not None else 0.0
                         
                     def get_var(row):
                         val = get_float_safe(row.get('VAR'))
@@ -399,7 +426,7 @@ class ProvisionesLoaderThread(QThread):
                 self.error_signal.emit(f"Error procesando provisiones: {str(e)}")
                 return
 
-            datos = (df_prov, lista_planes, valor_uf, valor_civ)
+            datos = (df_prov, lista_planes, valor_uf, valor_civ, valores_complemento)
             _guardar_cache_provisiones(self.filepath, firma, datos)
             self.data_loaded_signal.emit(datos)
             
@@ -477,7 +504,7 @@ class ContactosLoaderThread(QThread):
                 
             if ruta_lectura == temp_contactos_path:
                 try: os.remove(temp_contactos_path)
-                except: pass
+                except Exception: pass
 
             self.data_loaded_signal.emit(df)
             
@@ -525,13 +552,14 @@ class DataManager(QObject):
         self.df_deleted = pd.DataFrame()
         # deleted_sheets: {nombre_modulo: DataFrame} — una entrada por hoja de
         # RegistroEliminado.xlsx, cada una con el esquema propio de su origen.
-        # Ver MainDataLoaderThread.run() y HistorialModule (pestaña Papelera).
-        self.deleted_sheets = {}
+        # None mientras no se haya leído (ver _asegurar_papelera).
+        self.deleted_sheets = None
         self.df_prov = pd.DataFrame()
         self.df_contactos = pd.DataFrame()
         self.lista_planes = []
         self.valor_uf = 0
         self.valor_civ = 0
+        self.valores_complemento = {}
         self.last_load_time = 0.0
         self.is_loading_main = False
         self.is_loading_prov = False
@@ -603,7 +631,7 @@ class DataManager(QObject):
         self._iniciar_hilo_retenido(self.thread_prov)
 
     def _on_main_data_loaded(self, dataframes):
-        deleted_sheets = {}
+        deleted_sheets = None
         if len(dataframes) == 5:
             df_clean, df_logs, df_deleted, load_time, deleted_sheets = dataframes
             self.last_load_time = load_time
@@ -631,11 +659,12 @@ class DataManager(QObject):
         self.load_error.emit(error_msg)
 
     def _on_prov_data_loaded(self, dataframes):
-        df_prov, lista_planes, uf, civ = dataframes
+        df_prov, lista_planes, uf, civ, valores_complemento = dataframes
         self.df_prov = df_prov
         self.lista_planes = lista_planes
         self.valor_uf = uf
         self.valor_civ = civ
+        self.valores_complemento = valores_complemento
         self.is_loading_prov = False
         if getattr(self, '_prov_reload_pending', False):
             self.load_provisiones_async()
@@ -712,17 +741,29 @@ class DataManager(QObject):
         # solo necesitan propagar el resultado, sin volver a tocar disco.
         self.df_logs = df_logs
         self.logs_updated.emit()
-    def get_deleted_logs_df(self): return self.df_deleted.copy()
+    def get_deleted_logs_df(self):
+        self._asegurar_papelera()
+        return self.df_deleted.copy()
 
     def get_deleted_logs_sheets(self):
         # {nombre_modulo: DataFrame}, una entrada por hoja de
         # RegistroEliminado.xlsx, cada una con su propio esquema intacto (sin
         # mezclar columnas entre modulos). Fuente que usa HistorialModule
-        # para la pestaña Papelera; ver MainDataLoaderThread.run().
+        # para la pestaña Papelera.
+        self._asegurar_papelera()
         return {nombre: df.copy() for nombre, df in self.deleted_sheets.items()}
+
+    def papelera_en_memoria(self):
+        return self.deleted_sheets is not None
+
+    def _asegurar_papelera(self):
+        """La Papelera se lee recién cuando alguien la pide; cada carga del archivo principal la invalida."""
+        if self.deleted_sheets is None:
+            self.df_deleted, self.deleted_sheets = leer_registro_eliminado(config.settings.DELETED_LOG_EXCEL_PATH)
     def get_provisiones_df(self): return self.df_prov.copy()
     def get_costos(self): return self.lista_planes.copy()
     def get_variables(self): return self.valor_uf, self.valor_civ
+    def get_valores_complemento(self): return dict(self.valores_complemento)
 
     def get_system_health(self):
         from datetime import datetime
@@ -738,6 +779,7 @@ class DataManager(QObject):
             "log_status": "Sin revisar",
             "log_color": "#6B7280",
             "recent_errors": [],
+            "recent_alerts": [],
             "ram_usage": "N/A",
             "load_time": f"{getattr(self, 'last_load_time', 0.0)} s"
         }
@@ -762,28 +804,36 @@ class DataManager(QObject):
             extension_backup = os.path.splitext(EXCEL_PATH)[1] or '.xlsx'
             health["backups_count"] = len([f for f in os.listdir(backup_dir) if f.endswith(extension_backup)])
             
-        log_path = os.path.join(os.getcwd(), 'logs', 'sistema.log')
+        log_path = RUTA_LOG
         if os.path.exists(log_path):
             try:
-                # Solo se usan las últimas 50 líneas: se lee el final del
-                # archivo en vez de cargar el log completo en cada data_ready.
+                # Se lee solo el final del archivo (64 KB) en vez de cargar el
+                # log completo en cada data_ready. Las alertas quedan hasta que
+                # se limpia el registro (Configuración) o rota el archivo.
                 with open(log_path, 'rb') as f:
                     f.seek(0, os.SEEK_END)
                     f.seek(max(0, f.tell() - 65536))
                     lines = f.read().decode('utf-8', errors='ignore').splitlines()
-                    errores = [line.strip() for line in lines[-50:] if 'ERROR' in line]
-                    warnings_log = sum(1 for line in lines[-50:] if 'WARNING' in line)
-                    
-                    if errores:
-                        health["log_status"] = f"{len(errores)} Errores"
-                        health["log_color"] = DANGER
-                        health["recent_errors"] = errores[::-1] 
-                    elif warnings_log > 0:
-                        health["log_status"] = f"{warnings_log} Alertas"
-                        health["log_color"] = WARNING
-                    else:
-                        health["log_status"] = "100% Saludable"
-                        health["log_color"] = SUCCESS
+                alertas = []
+                for line in reversed(lines):
+                    m = _LINEA_ALERTA_LOG.match(line)
+                    # Los congelamientos que anotó el vigía en versiones anteriores (WARNING) no son alertas para el usuario
+                    if m and not m.group(3).startswith("Interfaz sin responder"):
+                        alertas.append({"hora": m.group(1), "nivel": m.group(2), "mensaje": m.group(3).strip()})
+                errores = [a for a in alertas if a["nivel"] != "WARNING"]
+                avisos = len(alertas) - len(errores)
+                health["recent_alerts"] = alertas
+                health["recent_errors"] = [f"{a['hora']} - {a['nivel']} - {a['mensaje']}" for a in errores]
+
+                if errores:
+                    health["log_status"] = f"{len(errores)} Error" + ("" if len(errores) == 1 else "es")
+                    health["log_color"] = DANGER
+                elif avisos:
+                    health["log_status"] = f"{avisos} Alerta" + ("" if avisos == 1 else "s")
+                    health["log_color"] = WARNING
+                else:
+                    health["log_status"] = "100% Saludable"
+                    health["log_color"] = SUCCESS
             except Exception: pass
                 
         return health

@@ -10,6 +10,7 @@ from collections import Counter
 
 import pandas as pd
 
+from src.services import catalogos_service
 from src.services.ejecutivos_service import buscar_ejecutivo
 from src.services.provisiones_services import mapear_industria
 from src.services.vin_service import obtener_modelo_desde_vin
@@ -30,6 +31,8 @@ MAPEO_COLUMNAS = {
 # Fila de nota que Power BI agrega al final de la hoja "Export" con los
 # filtros aplicados (ver conversación de diseño, ejemplo real observado).
 _PREFIJO_FILTROS = "filtros aplicados"
+
+MARCA_VOLVO_CONNECT = "Trae Volvo Connect (Notas de Venta)"
 
 _MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
           "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -96,10 +99,12 @@ def modelo_desde_tipo(tipo):
         return ''
     coincidencia = re.match(r'[A-Za-z]+', tipo)
     letras = coincidencia.group(0).upper() if coincidencia else ''
-    for modelo in _MODELOS_OFICIALES:
+    modelos = _MODELOS_OFICIALES + tuple(
+        m.upper() for m in catalogos_service.modelos_activos() if m.isalpha() and m.upper() not in _MODELOS_OFICIALES)
+    for modelo in modelos:
         if letras == modelo:
             return modelo
-    for modelo in _MODELOS_OFICIALES:
+    for modelo in modelos:
         if letras.startswith(modelo):
             return modelo
     return tipo[:2].strip()
@@ -117,7 +122,7 @@ def mapear_fila_powerbi(fila):
         if col_rm in ('RUT', 'CDB'):
             valor = _limpiar_numero_texto(fila.get(col_bi))
         if col_rm == 'INDUSTRIA':
-            valor = mapear_industria(valor) if valor else ''
+            valor = mapear_industria(valor, registrar=True) if valor else ''
         if col_rm == 'VIN':
             valor = valor.upper()
         datos[col_rm] = valor
@@ -146,7 +151,13 @@ def mapear_fila_powerbi(fila):
             datos['ESTADO DE ENTREGA'] = texto
 
     datos['_CHASIS_BI'] = _limpiar_valor(fila.get('Chasis'))
+    datos['_TRAE_VOLVO_CONNECT'] = _limpiar_valor(fila.get('Conectividad')).upper() in ('SI', 'SÍ')
     return datos
+
+
+def trae_volvo_connect(observaciones):
+    """True si OBSERVACIONES lleva la marca que deja la importación de Power BI."""
+    return MARCA_VOLVO_CONNECT.lower() in str(observaciones or '').lower()
 
 
 def detectar_periodo_desde_filtros(texto_filtros):
@@ -337,6 +348,7 @@ def construir_altas_nuevas(filas, df_comercial, plantilla, periodo_interno, dire
     registros, existentes, repetidos, incompletos = [], [], [], []
     sin_coincidencia = set()
     vistos = set()
+    con_volvo_connect = 0
     for fila in filas:
         datos = mapear_fila_powerbi(fila)
         vin = datos.get('VIN', '')
@@ -376,14 +388,18 @@ def construir_altas_nuevas(filas, df_comercial, plantilla, periodo_interno, dire
             modelo = obtener_modelo_desde_vin(vin)
             if modelo:
                 registro['MODELO'] = modelo
+        if datos.get('_TRAE_VOLVO_CONNECT'):
+            registro['OBSERVACIONES'] = MARCA_VOLVO_CONNECT
+            con_volvo_connect += 1
         flota = flotas.get(datos.get('CDB', '').upper())
         if flota:
             registro['FLOTA VC'] = flota
         registro['PERIODO INTERNO'] = periodo_interno
         registros.append(registro)
 
+    catalogos_service.volcar_pendientes()
     return {'registros': registros, 'existentes': existentes, 'reactivables': reactivables,
-            'repetidos': repetidos, 'incompletos': incompletos,
+            'repetidos': repetidos, 'incompletos': incompletos, 'con_volvo_connect': con_volvo_connect,
             'ejecutivos_sin_coincidencia': sorted(sin_coincidencia)}
 
 

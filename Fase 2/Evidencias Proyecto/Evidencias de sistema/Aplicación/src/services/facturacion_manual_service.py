@@ -234,7 +234,7 @@ def leer_registros_fm(ruta):
         unidades = _numero(fila.get(COLS_FM_XLSX["unidades"]))
         etapa = _texto(fila.get(COLS_FM_XLSX["etapa"]))
         registros.append({
-            "FILA": pos, "PERIODO": periodo.to_pydatetime(), "CLIENTE": cliente,
+            "FILA": pos, "PERIODO": periodo.to_pydatetime(warn=False), "CLIENTE": cliente,
             "RUT": normalizar_rut(fila.get(COLS_FM_XLSX["rut"])),
             "TIPO": _texto(fila.get(COLS_FM_XLSX["tipo"])).upper(),
             "UNIDADES": int(unidades) if unidades is not None else 0,
@@ -321,30 +321,31 @@ def _flota_serie(df):
     return flota.where(~flota.str.upper().isin(["", "-", "NAN", "NONE"]), razon)
 
 
+def _clave_nivel(plan):
+    return str(plan).strip().upper().replace("Á", "A")
+
+
+def niveles_servicio():
+    """[(clave, etiqueta)] de los planes base del catálogo (Básico, Medio y Full primero).
+    La clave va en mayúsculas y sin tilde ('BASICO'), como se guarda en TIPO DE SERVICIO."""
+    from src.services import catalogos_service
+    return [(_clave_nivel(b), "Básico" if _clave_nivel(b) == "BASICO" else b)
+            for b in catalogos_service.planes_base(("Basico", "Medio", "Full"))]
+
+
 def nivel_servicio_dominante(df_unidades):
-    """('BASICO'|'MEDIO'|'FULL', con_civ) más frecuente en TIPO DE SERVICIO."""
+    """(nivel, [complementos]) del plan más frecuente en TIPO DE SERVICIO; el nivel es la
+    clave de `niveles_servicio()` y, si no se reconoce, MEDIO."""
+    from src.services import catalogos_service
     if df_unidades.empty or COL_TIPO_SERVICIO not in df_unidades.columns:
-        return "MEDIO", False
+        return "MEDIO", []
     serie = df_unidades[COL_TIPO_SERVICIO].astype(str).str.strip().str.upper()
     serie = serie[~serie.isin(["", "-", "NAN"])]
     if serie.empty:
-        return "MEDIO", False
-    tipo = serie.value_counts().idxmax()
-    civ = "CIV" in tipo
-    base = tipo.replace("+ CIV", "").replace("CIV", "").replace("+ SZ", "").replace("SZ", "").replace("Á", "A").strip(" +")
-    return (base if base in ("BASICO", "MEDIO", "FULL") else "MEDIO"), civ
-
-
-def tiene_safety_zone(df_unidades):
-    """True si el plan más frecuente de la flota incluye Safety Zone (SZ)."""
-    if df_unidades.empty or COL_TIPO_SERVICIO not in df_unidades.columns:
-        return False
-    serie = df_unidades[COL_TIPO_SERVICIO].astype(str).str.strip().str.upper()
-    serie = serie[~serie.isin(["", "-", "NAN"])]
-    if serie.empty:
-        return False
-    partes = {p.strip() for p in serie.value_counts().idxmax().split("+")[1:]}
-    return "SZ" in partes
+        return "MEDIO", []
+    base, complementos = catalogos_service.partir_tipo_servicio(serie.value_counts().idxmax())
+    nivel = _clave_nivel(base)
+    return (nivel if nivel in {c for c, _e in niveles_servicio()} else "MEDIO"), complementos
 
 
 def guardar_cambios_fm(ruta, cambios):
@@ -617,6 +618,7 @@ def armar_guardado(registro, valores, uf=None):
             return celdas
         celdas = {k: valores[k] for k in ("precio", "tipo") if k in valores}
         if "precio" in valores:
+            celdas["etapa"] = ETAPA_FACTURADO
             pago = calcular_totales(valores["precio"], n, uf)[1]
             if pago is not None:
                 celdas["pago"] = pago
@@ -658,6 +660,35 @@ def armar_guardado(registro, valores, uf=None):
     return cambios, nuevas
 
 
+def sugerir_cobro_anterior(df_excel, df_fm, registro, max_meses=12):
+    """Cobro del último mes anterior en que esta razón social (RUT y flota) tuvo precio:
+    {'PERIODO': 'AAAA-MM', 'TIPO', 'PRECIO'} con precio por unidad, o {'PERIODO', 'TIPO',
+    'PAGO'} con precio fijo en CLP. None si no hay ninguno."""
+    if df_excel.empty or not registro["RUT"] and not registro["CLIENTE"]:
+        return None
+    desde = clave_periodo(min(df_excel["PERIODO"]))
+    anio, mes = registro["PERIODO"].year, registro["PERIODO"].month
+    for _ in range(max_meses):
+        anio, mes = (anio, mes - 1) if mes > 1 else (anio - 1, 12)
+        clave = f"{anio}-{mes:02d}"
+        if clave < desde:
+            return None
+        previos = armar_registros_periodo(df_excel, df_fm, clave, False)
+        if previos.empty:
+            continue
+        if registro["RUT"]:
+            propios = previos[(previos["RUT"] == registro["RUT"]) & (previos["CLAVE_FLOTA"] == registro["CLAVE_FLOTA"])]
+        else:
+            propios = previos[previos["CLIENTE"] == registro["CLIENTE"]]
+        for _, previo in propios.iterrows():
+            precio, pago = _numero(previo["PRECIO"]), _numero(previo["PAGO"])
+            if precio:
+                return {"PERIODO": clave, "TIPO": previo["TIPO"], "PRECIO": precio}
+            if pago and previo["ETAPA"] == ETAPA_FACTURADO:
+                return {"PERIODO": clave, "TIPO": previo["TIPO"], "PAGO": int(pago)}
+    return None
+
+
 def armar_ajuste_a_rm(registro):
     """(cambios, nuevas) que dejan las unidades de una razón social ya facturada igual a las
     de RM_JAVI. El pago con precio por unidad se recalcula con la misma UF con que se facturó;
@@ -679,6 +710,34 @@ def armar_ajuste_a_rm(registro):
                 celdas["pago"] = nuevo
         cambios.append({"fila": int(fila["FILA"]), "cliente": fila["CLIENTE"], "periodo": periodo, "valores": celdas})
     return cambios, []
+
+
+def ajustar_unidades_facturadas(ruta, df_master, hoy=None):
+    """Ajuste automático de los meses en curso y anterior: si una razón social ya facturada tiene en
+    RM_JAVI menos unidades que su fila del Excel (una salió de Facturación Manual o se dio de baja),
+    deja la fila igual al RM, como el botón "Ajustar a RM". Solo bajan; si el RM no tiene ninguna unidad
+    de esa razón social no se toca. Devuelve (detalle, error): detalle es una lista de
+    (cliente, período, antes, ahora) con lo ajustado y error el motivo si no se pudo guardar."""
+    df_excel = leer_registros_fm(ruta)
+    if df_excel.empty or df_master is None or df_master.empty:
+        return [], ""
+    df_fm = filtrar_facturacion_manual(df_master)
+    cambios, detalle = [], []
+    for clave in dict.fromkeys((periodo_anterior(hoy), periodo_actual(hoy))):
+        for r in armar_registros_periodo(df_excel, df_fm, clave, False).to_dict("records"):
+            if not (r["RUT"] and r["ORIGEN"] == ORIGEN_EXCEL and r["ETAPA"] == ETAPA_FACTURADO):
+                continue
+            antes, ahora = int(r["UNIDADES_EXCEL"]), int(r["UNIDADES_PF"])
+            if not 0 < ahora < antes:
+                continue
+            c, _ = armar_ajuste_a_rm(r)
+            if c:
+                cambios += c
+                detalle.append((r["CLIENTE"], clave, antes, ahora))
+    if not cambios:
+        return [], ""
+    ok, mensaje = guardar_registros_fm(ruta, cambios)
+    return (detalle, "") if ok else ([], mensaje)
 
 
 def periodo_actual(hoy=None):

@@ -59,8 +59,8 @@ class SharePointSyncWorker(QThread):
                     time.sleep(2) 
                     break
                 
-                time.sleep(1)
-                elapsed += 1
+                time.sleep(0.25)
+                elapsed += 0.25
                 if elapsed % 5 == 0:
                     self.log_signal.emit(f"[ESPERANDO] Buscando archivo en Descargas... ({elapsed}s/60s)")
 
@@ -74,9 +74,9 @@ class SharePointSyncWorker(QThread):
 
             hoja = self._hoja_del_anio(temp_file_path)
             self.log_signal.emit(f"[PROCESANDO] Leyendo hoja '{hoja}' y adaptando formato...")
-            df_sp = pd.read_excel(temp_file_path, sheet_name=hoja)
-            
             required_cols = ['AÑO', 'MES', 'CHASIS', 'CLIENTE', 'Ejecutivo', 'OBSERVACIONES', 'Dynafleet']
+            df_sp = pd.read_excel(temp_file_path, sheet_name=hoja, usecols=lambda c: str(c) in required_cols)
+
             for col in required_cols:
                 if col not in df_sp.columns:
                     raise Exception(f"Falta la columna '{col}' en el archivo de SharePoint.")
@@ -209,4 +209,4 @@ class SharePointSyncWorker(QThread):
         if os.path.exists(folder_path):
             for f in glob.glob(os.path.join(folder_path, "Provision Contratos-RpySS*.xlsx")):
                 try: os.remove(f)
-                except: pass
+                except Exception: pass

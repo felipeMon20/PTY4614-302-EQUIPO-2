@@ -1,3 +1,5 @@
+> Desarrollado por Felipe Monsalve Umanzor.
+
 # Gestor SSCC — Documentación
 
 Este es el Vault de Obsidian con la documentación técnica y funcional de **Gestor SSCC** (antes Volvo Dashboard; la carpeta del proyecto sigue llamándose `volvo_dashboard_app`), una aplicación de escritorio en PyQt6 que centraliza la gestión de la flota comercial (contratos, provisiones financieras, contactos, instalaciones, contratos de mantenimiento y correos) sobre archivos Excel como fuente de datos.

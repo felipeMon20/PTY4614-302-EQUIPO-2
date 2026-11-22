@@ -4,7 +4,7 @@
 
 /* --- Contenedores Principales --- */
 QMainWindow {
-    background-color: #F8FAFC; 
+    background-color: #F8FAFC;
 }
 
 /* SIDEBAR: Fondo Azul Marino Corporativo */
@@ -222,7 +222,8 @@ QScrollBar::add-page, QScrollBar::sub-page {
 
 QToolTip {
     background-color: #FFFFFF;
-    color: #1E293B;
-    border: 1px solid #C9D1E0;
-    padding: 4px 8px;
+    color: #1B2B4E;
+    border: 1px solid #D5DDEB;
+    padding: 8px 12px;
+    font-size: 12px;
 }

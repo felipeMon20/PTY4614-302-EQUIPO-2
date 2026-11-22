@@ -102,6 +102,22 @@ class TestBuildUnidadesDf(unittest.TestCase):
         self.assertEqual(resultado.iloc[0]['Industria/s'], 'Minería')
         self.assertEqual(resultado.iloc[0]['ETAPA GESTIÓN'], 'OPERACIONES')
 
+    def test_conserva_la_fecha_de_entrega_con_y_sin_dato(self):
+        """05-11-2026: 'Fecha de Entrega' sale de ESTADO DE ENTREGA; las unidades sin fecha quedan
+        vacías (el '-' no se muestra) y las que la tienen la conservan."""
+        df = pd.DataFrame({
+            COL_VIN: ['VIN001', 'VIN002', 'VIN003', 'VIN004'], COL_CHASIS: ['C1', 'C2', 'C3', 'C4'],
+            COL_RAZON_SOCIAL: ['Empresa A'] * 4, COL_CDB: ['CDB001'] * 4, COL_FLOTA_VC: ['FLOTA ABC'] * 4,
+            COL_ESTADO_ACTIVACION: ['CONECTADO'] * 4,
+            'ESTADO DE ENTREGA': ['08-09-2026', '-', '', '15-10-2026'],
+        })
+        resultado = self.mod._build_unidades_df(df)
+        entregas = dict(zip(resultado['VIN'], resultado['Fecha de Entrega']))
+        self.assertEqual(entregas['VIN001'], '08-09-2026')
+        self.assertEqual(entregas['VIN004'], '15-10-2026')
+        self.assertIn(entregas['VIN002'], ('', '-'))
+        self.assertEqual(entregas['VIN003'], '')
+
     def test_sin_industria_ni_etapa_gestion_quedan_vacias_no_falla(self):
         df = pd.DataFrame({
             COL_VIN: ['VIN001'], COL_CHASIS: ['CH1'], COL_RAZON_SOCIAL: ['Empresa A'],
@@ -427,6 +443,7 @@ class TestPopulateContactCards(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.mod = GeneralModule.__new__(GeneralModule)
+        cls.mod._pbi_director_pendiente = False
 
     def setUp(self):
         # El QWidget contenedor debe mantenerse referenciado durante todo el
@@ -813,11 +830,13 @@ class TestClientesYUnidadesColumnasVisibles(unittest.TestCase):
         self.module.filter_unidades()
         QApplication.processEvents()
 
-    def test_industria_visible_en_tarjeta_de_cliente(self):
+    def test_tarjeta_de_cliente_muestra_rut_y_cdb(self):
+        # Industria/s ya no va en la tarjeta de cliente: se ve en Unidades (test siguiente)
         df_clientes = self.module._df_clientes_visible
         self.assertFalse(df_clientes.empty)
         card = self.module._cliente_cards[str(df_clientes.iloc[0]['Clave'])]
-        self.assertIn(str(df_clientes.iloc[0]['Industria/s']), card.lbl_sub.text())
+        self.assertIn(str(df_clientes.iloc[0]['RUT']), card.lbl_sub.text())
+        self.assertIn(str(df_clientes.iloc[0]['CDB']), card.lbl_sub.text())
 
     def test_industria_visible_en_unidades(self):
         self._cargar_unidad_de_prueba()
@@ -1181,7 +1200,7 @@ class TestSeleccionVinUnidades(unittest.TestCase):
 
         textos = self._textos_historial_vin()
         self.assertFalse(any('VIN_QUE_NO_ES_ESTE' in t for t in textos))
-        self.assertTrue(any('No hay eventos' in t for t in textos))
+        self.assertTrue(any('Sin historial registrado' in t for t in textos))
 
     def test_logs_updated_sin_vin_seleccionado_no_falla(self):
         self._limpiar_seleccion_vin()
@@ -1289,14 +1308,14 @@ class TestAgregarContactoCliente(unittest.TestCase):
         return datos
 
     def test_01_boton_agregar_contacto_esta_conectado_al_flujo(self):
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog:
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog:
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Rejected
             self.module.btn_agregar_contacto.click()
 
         mock_dialog.assert_called_once()
 
     def test_02_abre_el_dialogo_con_cdb_y_razon_social_del_cliente_seleccionado(self):
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog:
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog:
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Rejected
             self.module.btn_agregar_contacto.click()
 
@@ -1308,7 +1327,7 @@ class TestAgregarContactoCliente(unittest.TestCase):
 
     def test_03_cancelar_no_modifica_contactos(self):
         df_antes = self.dm.df_contactos.copy()
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog:
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog:
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Rejected
             self.module.btn_agregar_contacto.click()
 
@@ -1322,8 +1341,8 @@ class TestAgregarContactoCliente(unittest.TestCase):
         # correr de verdad y re-habilitar el botón -- un MagicMock sin
         # emisión real dejaría el botón deshabilitado para el resto de los
         # tests de esta clase (comparten self.module vía setUpClass).
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog, \
-             patch('src.ui.general.AddContactoThread', _FakeAddContactoThreadExitoso):
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog, \
+             patch('src.ui.general.pantalla.AddContactoThread', _FakeAddContactoThreadExitoso):
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_data.return_value = self._datos_contacto_nuevo()
             self.module.btn_agregar_contacto.click()
@@ -1342,8 +1361,8 @@ class TestAgregarContactoCliente(unittest.TestCase):
             'Nombre': ['Pedro'], 'Apellidos': ['Prueba'],
             'Correo electrónico': ['pedro@empresa.cl'], 'Número móvil': ['+56911111111'],
         })
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog, \
-             patch('src.ui.general.AddContactoThread', _FakeAddContactoThreadExitoso):
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog, \
+             patch('src.ui.general.pantalla.AddContactoThread', _FakeAddContactoThreadExitoso):
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_data.return_value = self._datos_contacto_nuevo()
             self.module.btn_agregar_contacto.click()
@@ -1357,8 +1376,8 @@ class TestAgregarContactoCliente(unittest.TestCase):
         contactos_ready -- ya conectado a _on_contactos_ready, que repuebla
         Contactos del cliente activo (mecanismo preexistente, no se
         duplica ni se vuelve a probar acá)."""
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog, \
-             patch('src.ui.general.AddContactoThread', _FakeAddContactoThreadExitoso), \
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog, \
+             patch('src.ui.general.pantalla.AddContactoThread', _FakeAddContactoThreadExitoso), \
              patch.object(self.module.data_manager, 'load_contactos_async') as mock_reload:
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_data.return_value = self._datos_contacto_nuevo()
@@ -1371,10 +1390,10 @@ class TestAgregarContactoCliente(unittest.TestCase):
             def start(self):
                 self.finished_signal.emit(False, self.new_data)
 
-        with patch('src.ui.general.ContactosAddDialog') as mock_dialog, \
-             patch('src.ui.general.AddContactoThread', _FakeAddContactoThreadError), \
+        with patch('src.ui.general.pantalla.ContactosAddDialog') as mock_dialog, \
+             patch('src.ui.general.pantalla.AddContactoThread', _FakeAddContactoThreadError), \
              patch.object(self.module.data_manager, 'load_contactos_async') as mock_reload, \
-             patch('src.ui.general.QMessageBox') as mock_msgbox:
+             patch('src.ui.general.pantalla.QMessageBox') as mock_msgbox:
             mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_data.return_value = self._datos_contacto_nuevo()
             self.module.btn_agregar_contacto.click()
@@ -1693,8 +1712,13 @@ class TestLoadDataGuardDeReentrancia(unittest.TestCase):
         modulo._prep_en_curso = False
         modulo._prep_pendiente = False
         modulo._data_dirty = False
+        modulo._programar_prerender_pestanas = MagicMock()  # crea un QTimer con parent: no aplica sin __init__
         # _on_prep_finished necesita poder llamar a esto sin construir la UI real:
         modulo._filtros_unidades = {}
+        modulo._filtro_vins = None  # filtro por VIN que pone el Dashboard; sin __init__ no existe
+        modulo.search_input = MagicMock()
+        modulo.search_input.text.return_value = ""
+        modulo._aplicar_busqueda_unidades = MagicMock(side_effect=lambda df, texto: df)
         modulo.filter_clientes = MagicMock()
         modulo.filter_unidades = MagicMock()
         return modulo
@@ -1704,7 +1728,7 @@ class TestLoadDataGuardDeReentrancia(unittest.TestCase):
         df = pd.DataFrame({'marca': [marca]})
         return (df, df, df)
 
-    @patch('src.ui.general.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
+    @patch('src.ui.general.pantalla.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
     def test_no_lanza_un_segundo_worker_mientras_el_actual_sigue_corriendo(self):
         _FakeGeneralDataPrepThread.instancias = []
         modulo = self._make_module([pd.DataFrame({'x': [1]}), pd.DataFrame({'x': [2]})])
@@ -1719,7 +1743,7 @@ class TestLoadDataGuardDeReentrancia(unittest.TestCase):
                           "Fallo: no debe lanzar un segundo worker mientras el primero sigue corriendo.")
         self.assertTrue(modulo._prep_pendiente, "Fallo: debe marcar la actualizacion como pendiente.")
 
-    @patch('src.ui.general.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
+    @patch('src.ui.general.pantalla.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
     def test_al_terminar_con_pendiente_reprocesa_el_snapshot_mas_reciente(self):
         _FakeGeneralDataPrepThread.instancias = []
         modulo = self._make_module([pd.DataFrame({'x': [1]}), pd.DataFrame({'x': [2]})])
@@ -1740,7 +1764,7 @@ class TestLoadDataGuardDeReentrancia(unittest.TestCase):
         segundo_worker = _FakeGeneralDataPrepThread.instancias[1]
         pd.testing.assert_frame_equal(segundo_worker.snapshot, pd.DataFrame({'x': [2]}))
 
-    @patch('src.ui.general.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
+    @patch('src.ui.general.pantalla.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
     def test_sin_pendiente_terminar_no_relanza_un_tercer_worker(self):
         _FakeGeneralDataPrepThread.instancias = []
         modulo = self._make_module([pd.DataFrame({'x': [1]})])
@@ -1753,7 +1777,7 @@ class TestLoadDataGuardDeReentrancia(unittest.TestCase):
                           "Fallo: sin actualizacion pendiente, no debe lanzarse un worker adicional.")
         self.assertFalse(modulo._prep_en_curso)
 
-    @patch('src.ui.general.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
+    @patch('src.ui.general.pantalla.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
     def test_terminar_aplica_los_dataframes_recibidos(self):
         _FakeGeneralDataPrepThread.instancias = []
         modulo = self._make_module([pd.DataFrame({'x': [1]})])
@@ -1768,7 +1792,7 @@ class TestLoadDataGuardDeReentrancia(unittest.TestCase):
         modulo.filter_clientes.assert_called_once()
         modulo.filter_unidades.assert_called_once()
 
-    @patch('src.ui.general.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
+    @patch('src.ui.general.pantalla.GeneralDataPrepThread', _FakeGeneralDataPrepThread)
     def test_nunca_hay_mas_de_un_worker_corriendo_a_la_vez(self):
         """Verifica 'no hay workers superpuestos' de punta a punta: varias
         llamadas rapidas a load_data() (simulando varios data_ready seguidos

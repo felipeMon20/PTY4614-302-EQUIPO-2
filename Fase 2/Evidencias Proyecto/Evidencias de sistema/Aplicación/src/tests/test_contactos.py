@@ -11,8 +11,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMessageBox, QDialog
 
 import config.settings
-from src.ui.contactos import ContactosModule
-from src.ui.contactos_agregar import ContactosAddDialog
+from src.ui.administracion.contactos import ContactosModule
+from src.ui.administracion.contactos_agregar import ContactosAddDialog
 
 logger = logging.getLogger("TestRunner")
 
@@ -257,7 +257,7 @@ class TestContactos(unittest.TestCase):
         self.assertEqual(len(df_excel), 1, "Fallo: El Excel físico no quedó con 1 contacto después de eliminar.")
         logger.info(" -> Éxito: El contacto fue eliminado y la recarga terminó sin heredar estados del test anterior.")
 
-    @patch('src.ui.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
+    @patch('src.ui.administracion.contactos_agregar.ContactosAddDialog._load_flotas_dict', lambda self: None)
     def test_06_dialogo_agregar_autocompletado_validacion_y_get_data(self):
         logger.info("[Test Contactos 06] Verificando contactos_agregar: CDB, validación, teléfono y get_data...")
         dialog = ContactosAddDialog()
@@ -302,7 +302,7 @@ class TestContactos(unittest.TestCase):
                 'Nombre': ['FLOTA UNO', 'FLOTA DOS'],
             }).to_excel(powerbi_path, index=False)
 
-            with patch('src.ui.contactos_agregar.POWERBI_EXCEL_PATH', powerbi_path):
+            with patch('src.ui.administracion.contactos_agregar.POWERBI_EXCEL_PATH', powerbi_path):
                 dialog = ContactosAddDialog()
                 self.assertFalse(
                     dialog.inputs['CDB'].isEnabled(),

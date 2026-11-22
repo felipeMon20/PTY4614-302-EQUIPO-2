@@ -1,5 +1,5 @@
-"""Pruebas de Fase 2 (integracion CSV en MainDataLoaderThread, RMJaviSyncWorker
-y restauracion de backup, 23-09-2026). No tocan PruebasFM.xlsx real ni
+"""Pruebas de Fase 2 (integracion CSV en MainDataLoaderThread y restauracion
+de backup, 23-09-2026). No tocan PruebasFM.xlsx real ni
 EXCEL_PATH real: todo corre sobre archivos temporales, con config.settings
 parcheado por test (mismo patron que test_comercial.py/test_excel_writer.py)."""
 
@@ -15,7 +15,6 @@ import pandas as pd
 import config.settings
 from src.core.data_manager import MainDataLoaderThread
 from src.core.excel_writer import ExcelWriter
-from src.ui.comercial import RMJaviSyncWorker
 
 COLUMNAS = [
     'VIN', 'CHASIS', 'RUT', 'CDB', 'RAZÓN SOCIAL', 'ESTADO COMERCIAL',
@@ -144,113 +143,6 @@ class TestMainDataLoaderThreadCsvVsXlsx(unittest.TestCase):
             self.assertEqual(df.loc['YV2AAA0000000001', 'RUT'], '76123456-7')
             cdb_normalizado = str(df.loc['YV2AAA0000000001', 'CDB']).replace('.0', '')
             self.assertEqual(cdb_normalizado, '9990001')
-
-
-# =========================================================
-# 3. RMJaviSyncWorker: XLSX vs CSV como destino
-# =========================================================
-class TestRMJaviSyncCsvVsXlsx(unittest.TestCase):
-    """Misma secuencia (merge/limpieza/logging real, sin mocks de negocio)
-    que TestRMJaviSyncActualizaHistorial (test_comercial.py), pero comparando
-    el resultado contra un PruebasFM destino .xlsx y uno .csv."""
-
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.rm_javi_path = os.path.join(self.temp_dir.name, "RM_JAVI_test.xlsx")
-        df_javi = pd.DataFrame({
-            "VIN": ["YV2AAA0000000001", "YV2BBB0000000002"],
-            "MODELO": ["FH", "FMX"],
-        })
-        with pd.ExcelWriter(self.rm_javi_path, engine='openpyxl') as w:
-            df_javi.to_excel(w, sheet_name='BBDD', index=False)
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def _crear_pruebas_xlsx(self, ruta):
-        # VIN_CLEAN(...)[-7:] fija CHASIS igual al que el propio worker
-        # recalcula siempre (mismo criterio que test_comercial.py), para que
-        # el unico cambio detectable sea MODELO.
-        df = pd.DataFrame({
-            "VIN": ["YV2AAA0000000001", "YV2BBB0000000002"],
-            "CHASIS": ["0000001", "0000002"],
-            "MODELO": ["FL", "FL"],
-        })
-        with pd.ExcelWriter(ruta, engine='openpyxl') as w:
-            df.to_excel(w, sheet_name='BBDD (2)', index=False)
-
-    def _crear_pruebas_csv(self, ruta):
-        df = pd.DataFrame({
-            "VIN": ["YV2AAA0000000001", "YV2BBB0000000002"],
-            "CHASIS": ["0000001", "0000002"],
-            "MODELO": ["FL", "FL"],
-        })
-        df.to_csv(ruta, index=False, encoding='utf-8-sig')
-
-    def _sync_contra(self, pruebas_path, crear_fn):
-        crear_fn(pruebas_path)
-        log_csv_path = os.path.splitext(pruebas_path)[0] + "_LogApp.csv"
-        deleted_path = os.path.splitext(pruebas_path)[0] + "_RegistroEliminado.xlsx"
-
-        patches = [
-            patch.object(config.settings, 'EXCEL_PATH', pruebas_path),
-            patch.object(config.settings, 'LOG_CSV_PATH', log_csv_path),
-            patch.object(config.settings, 'LOG_EXCEL_PATH', ""),
-            patch.object(config.settings, 'DELETED_LOG_EXCEL_PATH', deleted_path),
-            patch('src.ui.comercial.RM_JAVI_PATH', self.rm_javi_path),
-            # _crear_backup real escribiria en data/backups/ real (backup_dir
-            # se fija en ExcelWriter.__init__ via os.getcwd(), no via
-            # EXCEL_PATH parcheado) -- se mockea para no tocar produccion,
-            # mismo patron que TestUpdateCellsConfirmarBajaCm (test_excel_writer.py).
-            patch('src.core.excel_writer.ExcelWriter._crear_backup'),
-        ]
-        for p in patches:
-            p.start()
-        try:
-            worker = RMJaviSyncWorker()
-            capturado = {}
-            errores = []
-            worker.success_signal.connect(lambda msg, df_final, df_logs: capturado.update(df_final=df_final))
-            worker.error_signal.connect(lambda e: errores.append(e))
-            worker.run()
-            self.assertFalse(errores, f"Fallo: la sincronización RM_JAVI lanzó un error: {errores}")
-            self.assertIn('df_final', capturado, "Fallo: no se emitió success_signal.")
-        finally:
-            for p in patches:
-                p.stop()
-        return capturado['df_final']
-
-    def test_sync_contra_xlsx_escribe_y_conserva_estructura(self):
-        pruebas_path = os.path.join(self.temp_dir.name, "PruebasFM_rmjavi.xlsx")
-        df_final = self._sync_contra(pruebas_path, self._crear_pruebas_xlsx)
-        self.assertEqual(len(df_final), 2)
-        wb_check = openpyxl.load_workbook(pruebas_path)
-        self.assertIn('BBDD (2)', wb_check.sheetnames)
-        wb_check.close()
-
-    def test_sync_contra_csv_escribe_dataset_completo(self):
-        pruebas_path = os.path.join(self.temp_dir.name, "PruebasFM_rmjavi.csv")
-        df_final = self._sync_contra(pruebas_path, self._crear_pruebas_csv)
-        self.assertEqual(len(df_final), 2)
-        df_disco = pd.read_csv(pruebas_path, dtype=str, keep_default_na=False)
-        self.assertEqual(len(df_disco), 2)
-        self.assertEqual(sorted(df_disco['VIN'].tolist()),
-                          ['YV2AAA0000000001', 'YV2BBB0000000002'])
-
-    def test_equivalencia_df_final_xlsx_vs_csv(self):
-        path_xlsx = os.path.join(self.temp_dir.name, "PruebasFM_rmjavi_x.xlsx")
-        path_csv = os.path.join(self.temp_dir.name, "PruebasFM_rmjavi_c.csv")
-        df_final_xlsx = self._sync_contra(path_xlsx, self._crear_pruebas_xlsx).sort_values('VIN').reset_index(drop=True)
-        df_final_csv = self._sync_contra(path_csv, self._crear_pruebas_csv).sort_values('VIN').reset_index(drop=True)
-
-        self.assertEqual(list(df_final_xlsx.columns), list(df_final_csv.columns))
-        diffs = (df_final_xlsx.astype(str) != df_final_csv.astype(str))
-        self.assertEqual(diffs.values.sum(), 0,
-                          f"Diferencia real en df_final entre destino xlsx y csv:\n{df_final_xlsx[diffs.any(axis=1)]}\nvs\n{df_final_csv[diffs.any(axis=1)]}")
-
-        # Ambos deben detectar el mismo cambio real (MODELO: FL -> FH/FMX).
-        self.assertEqual(df_final_xlsx.set_index('VIN').loc['YV2AAA0000000001', 'MODELO'], 'FH')
-        self.assertEqual(df_final_csv.set_index('VIN').loc['YV2AAA0000000001', 'MODELO'], 'FH')
 
 
 # =========================================================

@@ -6,6 +6,9 @@ from PyQt6.QtCore import pyqtSignal, QThread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from src.core.data_manager import DataManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Ventana desde el último guardado propio (DataManager.save_timestamp) en la
 # que se ignoran los eventos del archivo. OneDrive suele generar eventos
@@ -53,7 +56,7 @@ class ExcelHandler(FileSystemEventHandler):
         if es_directorio or not ruta or not ruta.endswith(self.filename):
             return
         if self._silenciado():
-            print(f"Watchdog ignorando cambio en {self.filename} (guardado propio hace menos de {VENTANA_SILENCIO_GUARDADO_SEGUNDOS}s).")
+            logger.debug(f"Watchdog ignorando cambio en {self.filename} (guardado propio hace menos de {VENTANA_SILENCIO_GUARDADO_SEGUNDOS}s).")
             self._programar(self._refrescar_firma)
             return
         # Un cambio suele producir varios eventos seguidos: se espera a que el
@@ -87,7 +90,7 @@ class ExcelHandler(FileSystemEventHandler):
             return
         firma = self._calcular_firma()
         if firma is not None and firma == self._firma:
-            print(f"Watchdog ignorando {self.filename}: cambió la fecha pero no el contenido.")
+            logger.debug(f"Watchdog ignorando {self.filename}: cambió la fecha pero no el contenido.")
             return
         self._firma = firma
         self.callback()
